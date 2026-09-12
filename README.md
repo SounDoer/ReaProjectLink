@@ -1,11 +1,13 @@
 # ReaDelivery
 
-ReaDelivery is a local, NAS-based delivery and dependency-management workflow for
-REAPER projects.
+ReaDelivery is a REAPER-native publish and dependency-update system for
+sound-post teams working on shared storage.
 
 It is intended for game-audio cinematic production where dialogue, music, and
 sound-design teams work in separate REAPER projects and periodically deliver
-rendered audio into a master mixing project.
+rendered audio into a master mixing project. It uses an existing NAS rather than
+a cloud service or central project database, and it does not attempt to make
+multiple users edit the same REAPER project.
 
 The project is currently in the design phase. The working principle is:
 
@@ -24,6 +26,6 @@ The project is currently in the design phase. The working principle is:
 
 ## Status
 
-No implementation has been selected yet. The next design topic is the exact
-source-side publish behavior for new items and new revisions on managed delivery
-tracks.
+No implementation has been selected yet. Product and architecture discovery is
+ongoing; confirmed decisions and remaining open questions are recorded in the
+decision log.
