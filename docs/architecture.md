@@ -363,9 +363,18 @@ the referenced video's hash. Replacement at the same path is a mismatch, while
 a missing historical file makes that revision unavailable without erasing its
 record.
 
-## Suggested REAPER integration
+## MVP implementation stack
 
-The first prototype can use ReaScript for project inspection, project metadata,
-manifest publication, and Mix-side media replacement. A native C++ extension can
-be considered later if continuous monitoring, stronger filesystem integration,
-or more reliable lifecycle hooks are required.
+The MVP uses Lua 5.4 ReaScript for direct REAPER integration and ReaImGui for its
+interactive UI. The code is divided into three boundaries:
+
+- pure-Lua domain and manifest logic;
+- a REAPER adapter for project inspection, extension state, Items, Takes, Tracks,
+  and undo points;
+- a ReaImGui presentation layer for Publish Review, first-import mapping, and
+  revision-conflict workflows.
+
+ReaImGui is an accepted runtime dependency. Python, a standalone desktop app,
+and a native C++ extension are outside the initial implementation. A native
+extension may be reconsidered later if continuous monitoring, stronger
+filesystem integration, or more reliable lifecycle hooks become necessary.

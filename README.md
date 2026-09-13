@@ -27,6 +27,6 @@ The project is currently in the design phase. The working principle is:
 
 ## Status
 
-The MVP product and architecture baseline is documented. Implementation has not
-started; technical choices will be validated through a thin end-to-end
-prototype.
+The MVP product and architecture baseline is documented. The implementation
+stack is Lua 5.4 ReaScript with ReaImGui; development will begin with a thin
+end-to-end prototype.

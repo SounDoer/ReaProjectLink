@@ -428,3 +428,12 @@ accept all new audio, keep all Mix edits, or use Source for unmodified Items. On
 Apply operation creates one REAPER undo point. Each Instance records its accepted
 media revision separately from its last handled Source-state revision so partial
 updates remain trackable.
+
+### D056 — MVP uses Lua ReaScript and ReaImGui
+
+The MVP is implemented as Lua 5.4 ReaScripts with ReaImGui as an accepted runtime
+dependency. Pure-Lua domain and manifest logic remains separated from the REAPER
+adapter and ReaImGui presentation layers. Python, a standalone desktop app, and
+a native C++ REAPER extension are outside the initial implementation. A native
+extension may be reconsidered later if continuous monitoring or stronger
+filesystem and lifecycle integration becomes necessary.
