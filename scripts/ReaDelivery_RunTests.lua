@@ -13,6 +13,10 @@ end
 
 package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
 
+local temporary_project = root .. "/tests/.manual-runner-project.rpp"
+os.remove(temporary_project)
+reaper.Main_OnCommand(40859, 0)
+
 local ok, result = xpcall(function()
   local passed = dofile(root .. "/tests/source_service_spec.lua")
   passed = passed + dofile(root .. "/tests/reaper_adapter_spec.lua")
@@ -33,6 +37,10 @@ local ok, result = xpcall(function()
   passed = passed + dofile(root .. "/tests/mix_update_spec.lua")
   return passed
 end, debug.traceback)
+
+reaper.Main_SaveProjectEx(0, temporary_project, 8)
+reaper.Main_OnCommand(40860, 0)
+os.remove(temporary_project)
 
 if ok then
   local message = string.format("All %d ReaDelivery tests passed.", result)

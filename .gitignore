@@ -4,3 +4,4 @@ tests/.hash-fixture
 tests/.filesystem-fixture/
 tests/.adapter-fixture.wav
 tests/.runner-project.rpp
+tests/.manual-runner-project.rpp
