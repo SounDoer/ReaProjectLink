@@ -26,6 +26,7 @@ local ok, result = xpcall(function()
   end
 
   local passed = dofile(root .. "/tests/source_service_spec.lua")
+  passed = passed + dofile(root .. "/tests/reaper_adapter_spec.lua")
   passed = passed + dofile(root .. "/tests/manifest_spec.lua")
   passed = passed + dofile(root .. "/tests/hash_spec.lua")
   passed = passed + dofile(root .. "/tests/delivery_manifest_spec.lua")

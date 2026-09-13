@@ -142,6 +142,7 @@ end
 
 local function scan_item(adapter, item)
   local clip = {
+    item_ref = item,
     clip_id = adapter.get_item_clip_id(item),
     display_name = adapter.item_display_name(item),
     blockers = {},
@@ -154,7 +155,18 @@ local function scan_item(adapter, item)
   end
 
   clip.media_path = media.path
+  clip.media_sample_rate = media.sample_rate
+  clip.channel_count = media.channel_count
   clip.take_fx_count = media.take_fx_count or 0
+
+  local presentation = adapter.item_presentation(item) or {}
+  clip.start_offset_samples = presentation.start_offset_samples
+  clip.source_offset_samples = presentation.source_offset_samples
+  clip.length_samples = presentation.length_samples
+  clip.item_gain = presentation.item_gain
+  clip.fade_in_samples = presentation.fade_in_samples
+  clip.fade_out_samples = presentation.fade_out_samples
+  clip.take = presentation.take
 
   if media.path == nil or media.path == "" then
     table.insert(clip.blockers, "Active Take has no file-backed media")
@@ -176,6 +188,7 @@ function M.scan(adapter)
 
   local result = {
     lanes = {},
+    sample_rate = adapter.project_sample_rate(),
     clip_count = 0,
     blocker_count = 0,
     untagged_count = 0,
@@ -187,6 +200,7 @@ function M.scan(adapter)
       local lane = {
         lane_id = lane_id,
         display_name = adapter.track_name(track),
+        order = #result.lanes,
         track_fx_count = adapter.track_fx_count(track),
         clips = {},
       }

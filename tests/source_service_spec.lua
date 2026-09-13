@@ -29,6 +29,8 @@ local function fake_adapter(options)
   function adapter.track_fx_count(track) return track.fx or 0 end
   function adapter.item_display_name(item) return item.name end
   function adapter.active_take_media(item) return item.media end
+  function adapter.item_presentation(item) return item.presentation end
+  function adapter.project_sample_rate() return options.sample_rate or 48000 end
   function adapter.file_exists(path) return path ~= "missing.wav" end
   function adapter.begin_undo() undo_depth = undo_depth + 1 end
   function adapter.end_undo() undo_depth = undo_depth - 1 end
@@ -106,6 +108,64 @@ function tests.scans_registered_tracks_and_reports_blockers()
   equal(result.clip_count, 2, "clip count")
   equal(result.untagged_count, 1, "untagged count")
   equal(result.blocker_count, 3, "blocker count")
+end
+
+function tests.scans_manifest_ready_clip_state()
+  local presentation = {
+    start_offset_samples = 96000,
+    source_offset_samples = 2400,
+    length_samples = 48000,
+    item_gain = 0.5,
+    fade_in_samples = 240,
+    fade_out_samples = 480,
+    take = {
+      volume = 0.8,
+      pan = -0.25,
+      playback_rate = 1.1,
+      pitch = 2,
+      channel_mode = 1,
+      polarity_inverted = true,
+    },
+  }
+  local adapter = fake_adapter({
+    sample_rate = 48000,
+    project_values = { project_mode = "source" },
+    tracks = {
+      {
+        name = "DX Print",
+        lane_id = "lane-1",
+        items = {
+          {
+            name = "Line A",
+            clip_id = "clip-1",
+            presentation = presentation,
+            media = {
+              path = "ok.wav",
+              sample_rate = 96000,
+              channel_count = 2,
+              take_fx_count = 0,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  local result = assert(source_service.scan(adapter))
+  local lane = result.lanes[1]
+  local clip = lane.clips[1]
+  equal(result.sample_rate, 48000, "project sample rate")
+  equal(lane.order, 0, "lane order")
+  equal(clip.item_ref, adapter.all_tracks()[1].items[1], "item reference")
+  equal(clip.media_sample_rate, 96000, "media sample rate")
+  equal(clip.channel_count, 2, "channel count")
+  equal(clip.start_offset_samples, 96000, "timeline position")
+  equal(clip.source_offset_samples, 2400, "source offset")
+  equal(clip.length_samples, 48000, "item length")
+  equal(clip.item_gain, 0.5, "item gain")
+  equal(clip.fade_out_samples, 480, "fade out")
+  equal(clip.take.playback_rate, 1.1, "take playback rate")
+  equal(clip.take.polarity_inverted, true, "take polarity")
 end
 
 local passed = 0
