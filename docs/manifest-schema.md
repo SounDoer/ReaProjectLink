@@ -1,7 +1,7 @@
 # Delivery Manifest schema
 
-This is the current MVP field-level draft. It records confirmed semantics but is
-not yet a formal JSON Schema.
+This is the implemented MVP field-level schema. It is not yet published as a
+separate machine-readable JSON Schema document.
 
 ## Stable entry point
 

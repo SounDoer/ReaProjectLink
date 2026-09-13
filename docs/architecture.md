@@ -227,7 +227,7 @@ independent `pictureRevision`; there is no `clipRevision` in the MVP.
 
 `delivery.json` is a small stable entry point that references the latest
 immutable, complete history manifest. Historical manifests are snapshots rather
-than deltas. See `manifest-schema.md` for the current field-level draft.
+than deltas. See `manifest-schema.md` for the implemented MVP fields.
 
 Each Publish scans all registered Delivery Tracks and uses every item's active
 take. Track and item mute state are playback choices and do not affect delivery

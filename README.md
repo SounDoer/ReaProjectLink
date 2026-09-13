@@ -9,7 +9,7 @@ rendered audio into a master mixing project. It uses an existing NAS rather than
 a cloud service or central project database, and it does not attempt to make
 multiple users edit the same REAPER project.
 
-The project is currently in the design phase. The working principle is:
+The working principle is:
 
 - source projects keep their own folder structures and working conventions;
 - source teams explicitly publish bounced audio as versioned deliveries;
@@ -25,10 +25,20 @@ The project is currently in the design phase. The working principle is:
 - [Manifest schema](docs/manifest-schema.md)
 - [Decision log](docs/decisions.md)
 - [Development](docs/development.md)
+- [Manual validation](docs/validation.md)
 
 ## Status
 
-The MVP product and architecture baseline is documented. The implementation
-stack is Lua 5.4 ReaScript with ReaImGui. Development has started with the Source
-initialization, Delivery Track registration, and scan portion of a thin
-end-to-end prototype.
+The local MVP is implemented in Lua 5.4 ReaScript with ReaImGui. It includes:
+
+- Source and Mix project initialization;
+- authoritative Picture publication, Source subscription, synchronization, and
+  explicit review;
+- Delivery Track registration, complete Publish Review, immutable WAV revisions,
+  and atomic manifests;
+- Mix-side Source subscription, Lane mapping, first import, new-Take updates,
+  per-Instance three-way field resolution, and explicit detach;
+- NAS Publish locking, stale-lock inspection, and interrupted-commit recovery.
+
+The current scope assumes new projects initialized through ReaDelivery and does
+not infer bindings for existing legacy Mix Items.
