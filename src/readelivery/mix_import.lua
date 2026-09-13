@@ -183,7 +183,7 @@ function M.apply(review, adapter, options)
       end
       binding.trackGuid = adapter.track_guid(track)
       for _, clip in ipairs(lane.clips) do
-        local item = adapter.create_delivery_item(track, clip, {
+        local item, item_error = adapter.create_delivery_item(track, clip, {
           position_seconds = picture_start / mix_sample_rate +
             clip.startOffsetSamples / review.snapshot.sampleRate,
           source_project_id = review.pointer.sourceProjectId,
@@ -192,6 +192,10 @@ function M.apply(review, adapter, options)
           instance_id = adapter.new_id(),
           source_sample_rate = review.snapshot.sampleRate,
         })
+        if not item then
+          adapter.end_undo("Import ReaDelivery Source")
+          return nil, item_error
+        end
         table.insert(result.items, item)
         result.created_items = result.created_items + 1
       end

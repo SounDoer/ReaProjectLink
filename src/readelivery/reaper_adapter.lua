@@ -127,6 +127,12 @@ function M.track_guid(track)
   return reaper.GetTrackGUID(track)
 end
 
+function M.track_by_guid(guid)
+  for _, track in ipairs(M.all_tracks()) do
+    if M.track_guid(track) == guid then return track end
+  end
+end
+
 function M.create_mix_track(name, parent_track)
   local index = reaper.CountTracks(project())
   if parent_track then
@@ -344,6 +350,11 @@ local function set_item_string(item, key, value)
   reaper.GetSetMediaItemInfo_String(item, key, tostring(value or ""), true)
 end
 
+local function get_item_string(item, key)
+  local _, value = reaper.GetSetMediaItemInfo_String(item, key, "", false)
+  return value
+end
+
 function M.create_delivery_item(track, clip, context)
   local source = reaper.PCM_Source_CreateFromFile(clip.media_path)
   if not source then return nil, "Could not open managed WAV: " .. clip.media_path end
@@ -377,6 +388,165 @@ function M.create_delivery_item(track, clip, context)
   set_item_string(item, constants.ITEM_KEYS.handled_publish_revision, context.publish_revision)
   set_item_string(item, constants.ITEM_KEYS.picture_revision, context.picture_revision)
   return item
+end
+
+local function current_instance_state(item, picture_start_seconds)
+  local take = reaper.GetActiveTake(item)
+  if not take then return nil end
+  local take_volume = reaper.GetMediaItemTakeInfo_Value(take, "D_VOL")
+  return {
+    position_seconds = reaper.GetMediaItemInfo_Value(item, "D_POSITION") -
+      picture_start_seconds,
+    length_seconds = reaper.GetMediaItemInfo_Value(item, "D_LENGTH"),
+    source_offset_seconds = reaper.GetMediaItemTakeInfo_Value(take, "D_STARTOFFS"),
+    fade_in_seconds = reaper.GetMediaItemInfo_Value(item, "D_FADEINLEN"),
+    fade_out_seconds = reaper.GetMediaItemInfo_Value(item, "D_FADEOUTLEN"),
+    item_gain = reaper.GetMediaItemInfo_Value(item, "D_VOL"),
+    take_volume = math.abs(take_volume),
+    take_pan = reaper.GetMediaItemTakeInfo_Value(take, "D_PAN"),
+    take_playback_rate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE"),
+    take_pitch = reaper.GetMediaItemTakeInfo_Value(take, "D_PITCH"),
+    take_channel_mode = reaper.GetMediaItemTakeInfo_Value(take, "I_CHANMODE"),
+    take_polarity_inverted = take_volume < 0,
+  }
+end
+
+local function has_advanced_take_state(take)
+  if reaper.TakeFX_GetCount(take) > 0 then return true end
+  if reaper.CountTakeEnvelopes and reaper.CountTakeEnvelopes(take) > 0 then return true end
+  if reaper.GetTakeNumStretchMarkers and reaper.GetTakeNumStretchMarkers(take) > 0 then return true end
+  if reaper.GetNumTakeMarkers and reaper.GetNumTakeMarkers(take) > 0 then return true end
+  local source = reaper.GetMediaItemTake_Source(take)
+  local source_type = source and reaper.GetMediaSourceType(source, "") or ""
+  return source_type ~= "WAVE" and source_type ~= "WAV"
+end
+
+function M.delivery_instances(source_project_id)
+  local instances = {}
+  local sample_rate = M.project_sample_rate()
+  local picture_start_samples = tonumber(M.get_project_value(
+    constants.PROJECT_KEYS.picture_start_samples
+  )) or 0
+  local picture_start_seconds = picture_start_samples / sample_rate
+  for _, track in ipairs(M.all_tracks()) do
+    for _, item in ipairs(M.track_items(track)) do
+      if get_item_string(item, constants.ITEM_KEYS.source_project_id) == source_project_id then
+        local take = reaper.GetActiveTake(item)
+        table.insert(instances, {
+          item_ref = item,
+          clip_id = M.get_item_clip_id(item),
+          instance_id = get_item_string(item, constants.ITEM_KEYS.instance_id),
+          accepted_media_revision = tonumber(get_item_string(
+            item,
+            constants.ITEM_KEYS.accepted_media_revision
+          )) or 0,
+          handled_publish_revision = tonumber(get_item_string(
+            item,
+            constants.ITEM_KEYS.handled_publish_revision
+          )) or 0,
+          state = current_instance_state(item, picture_start_seconds),
+          advanced_take_state = take and has_advanced_take_state(take) or false,
+        })
+      end
+    end
+  end
+  return instances
+end
+
+local function apply_take_state(take, clip)
+  local state = clip.take or {}
+  local volume = state.volume or 1
+  if state.polarityInverted then volume = -math.abs(volume) end
+  reaper.SetMediaItemTakeInfo_Value(take, "D_VOL", volume)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PAN", state.pan or 0)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", state.playbackRate or 1)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PITCH", state.pitch or 0)
+  reaper.SetMediaItemTakeInfo_Value(take, "I_CHANMODE", state.channelMode or 0)
+end
+
+function M.add_delivery_take(item, clip, media_path, context)
+  local source = reaper.PCM_Source_CreateFromFile(media_path)
+  if not source then return nil, "Could not open managed WAV: " .. media_path end
+  local take = reaper.AddTakeToMediaItem(item)
+  reaper.SetMediaItemTake_Source(take, source)
+  reaper.SetMediaItemTakeInfo_Value(
+    take,
+    "D_STARTOFFS",
+    clip.sourceOffsetSamples / context.source_sample_rate
+  )
+  apply_take_state(take, clip)
+  reaper.GetSetMediaItemTakeInfo_String(
+    take,
+    "P_NAME",
+    string.format("%s r%04d", clip.displayName or "Delivery", clip.mediaRevision),
+    true
+  )
+  reaper.SetActiveTake(take)
+  return true
+end
+
+function M.apply_delivery_fields(item, fields, context)
+  local take = reaper.GetActiveTake(item)
+  if not take then return nil, "Linked Instance has no active Take." end
+  local function source_value(field)
+    local decision = fields[field]
+    return decision and decision.choice == "use_source" and decision.source or nil
+  end
+  local value = source_value("position_seconds")
+  if value ~= nil then
+    reaper.SetMediaItemInfo_Value(
+      item,
+      "D_POSITION",
+      context.picture_start_samples / context.project_sample_rate + value
+    )
+  end
+  value = source_value("length_seconds")
+  if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_LENGTH", value) end
+  value = source_value("source_offset_seconds")
+  if value ~= nil then reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", value) end
+  value = source_value("fade_in_seconds")
+  if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_FADEINLEN", value) end
+  value = source_value("fade_out_seconds")
+  if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_FADEOUTLEN", value) end
+  value = source_value("item_gain")
+  if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_VOL", value) end
+
+  local current_volume = reaper.GetMediaItemTakeInfo_Value(take, "D_VOL")
+  local volume = source_value("take_volume") or math.abs(current_volume)
+  local polarity = source_value("take_polarity_inverted")
+  if polarity == nil then polarity = current_volume < 0 end
+  reaper.SetMediaItemTakeInfo_Value(take, "D_VOL", polarity and -math.abs(volume) or math.abs(volume))
+  local take_fields = {
+    take_pan = "D_PAN",
+    take_playback_rate = "D_PLAYRATE",
+    take_pitch = "D_PITCH",
+    take_channel_mode = "I_CHANMODE",
+  }
+  for field, parameter in pairs(take_fields) do
+    value = source_value(field)
+    if value ~= nil then reaper.SetMediaItemTakeInfo_Value(take, parameter, value) end
+  end
+  return true
+end
+
+function M.set_instance_revisions(item, media_revision, publish_revision)
+  set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, media_revision)
+  set_item_string(item, constants.ITEM_KEYS.handled_publish_revision, publish_revision)
+end
+
+function M.set_instance_id(item, instance_id)
+  set_item_string(item, constants.ITEM_KEYS.instance_id, instance_id)
+end
+
+function M.detach_instance(item)
+  M.set_item_clip_id(item, "")
+  set_item_string(item, constants.ITEM_KEYS.source_project_id, "")
+  set_item_string(item, constants.ITEM_KEYS.instance_id, "")
+  set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, "")
+  set_item_string(item, constants.ITEM_KEYS.handled_publish_revision, "")
+  set_item_string(item, constants.ITEM_KEYS.picture_revision, "")
+  M.mark_project_dirty()
+  return true
 end
 
 function M.file_exists(path)

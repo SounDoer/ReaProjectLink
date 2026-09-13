@@ -83,6 +83,29 @@ assert(imported_state.length_samples == 480, "imported length")
 assert(imported_state.source_offset_samples == 240, "imported source offset")
 assert(imported_state.take.polarity_inverted, "imported polarity")
 assert(adapter.get_item_clip_id(imported) == "imported-clip", "imported Clip binding")
+
+local instances = adapter.delivery_instances("source-1")
+assert(#instances == 1 and instances[1].instance_id == "instance-1", "linked Instance scan")
+assert(adapter.add_delivery_take(imported, {
+  displayName = "Imported Line",
+  mediaRevision = 5,
+  sourceOffsetSamples = 0,
+  take = { volume = 1, pan = 0, playbackRate = 1, pitch = 0, channelMode = 0, polarityInverted = false },
+}, wav_path, { source_sample_rate = 48000 }))
+assert(reaper.CountTakes(imported) == 2, "update adds a Take")
+assert(adapter.apply_delivery_fields(imported, {
+  position_seconds = { choice = "use_source", source = 2 },
+  length_seconds = { choice = "use_source", source = 0.02 },
+  take_pan = { choice = "use_source", source = -0.5 },
+}, { picture_start_samples = 96000, project_sample_rate = 48000 }))
+assert(math.abs(reaper.GetMediaItemInfo_Value(imported, "D_POSITION") - 4) < 0.000001, "update position")
+assert(math.abs(reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(imported), "D_PAN") + 0.5) < 0.000001, "update Take pan")
+adapter.set_instance_revisions(imported, 5, 9)
+instances = adapter.delivery_instances("source-1")
+assert(instances[1].accepted_media_revision == 5, "accepted media revision")
+assert(instances[1].handled_publish_revision == 9, "handled Publish revision")
+assert(adapter.detach_instance(imported), "detach Instance")
+assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
 os.remove(wav_path)
 
 reaper.DeleteTrack(track)
