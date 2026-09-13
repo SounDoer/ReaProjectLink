@@ -172,6 +172,8 @@ local function scan_item(adapter, item)
     table.insert(clip.blockers, "Active Take has no file-backed media")
   elseif not adapter.file_exists(media.path) then
     table.insert(clip.blockers, "Active Take media is missing or offline")
+  elseif not media.path:lower():match("%.wav$") then
+    table.insert(clip.blockers, "Only file-backed WAV media can be published")
   end
 
   if clip.take_fx_count > 0 then

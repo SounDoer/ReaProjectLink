@@ -168,6 +168,29 @@ function tests.scans_manifest_ready_clip_state()
   equal(clip.take.polarity_inverted, true, "take polarity")
 end
 
+function tests.rejects_non_wav_delivery_media()
+  local adapter = fake_adapter({
+    project_values = { project_mode = "source" },
+    tracks = {
+      {
+        name = "DX Print",
+        lane_id = "lane-1",
+        items = {
+          {
+            name = "Compressed bounce",
+            clip_id = "clip-1",
+            presentation = {},
+            media = { path = "bounce.mp3", take_fx_count = 0 },
+          },
+        },
+      },
+    },
+  })
+  local result = assert(source_service.scan(adapter))
+  equal(result.blocker_count, 1, "non-WAV blocker")
+  equal(result.lanes[1].clips[1].blockers[1], "Only file-backed WAV media can be published", "non-WAV message")
+end
+
 local passed = 0
 for name, test in pairs(tests) do
   local ok, err = pcall(test)
