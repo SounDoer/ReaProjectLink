@@ -3,6 +3,7 @@ local picture_writer = require("readelivery.picture_writer")
 
 local files = {}
 local locked = false
+local fail_atomic = false
 local fs = {}
 function fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
 function fs.exists(path) return files[path] ~= nil end
@@ -15,6 +16,10 @@ function fs.move_file(source, destination)
   return true
 end
 function fs.atomic_replace(source, destination)
+  if fail_atomic then
+    fail_atomic = false
+    return nil, "simulated pointer failure"
+  end
   files[destination], files[source] = files[source], nil
   return true
 end
@@ -51,4 +56,24 @@ assert(not locked, "lock released")
 assert(json.decode(files["package/picture.json"]).latestPictureRevision == 1, "pointer visible")
 assert(json.decode(files["package/picture-history/picture-0001.json"]).pictureRevision == 1, "history visible")
 
-return 1
+local snapshot_two = { schemaVersion = 1, pictureId = "picture-1", pictureRevision = 2 }
+local pointer_two = {
+  schemaVersion = 1,
+  pictureId = "picture-1",
+  latestPictureRevision = 2,
+  manifest = "picture-history/picture-0002.json",
+}
+local retry_input = {
+  package_root = "package",
+  expected_revision = 1,
+  transaction_id = "tx-2",
+  snapshot = snapshot_two,
+  pointer = pointer_two,
+}
+fail_atomic = true
+assert(picture_writer.publish(retry_input, fs) == nil, "pointer failure is uncommitted")
+local retried, retry_error = picture_writer.publish(retry_input, fs)
+assert(retried, retry_error)
+assert(json.decode(files["package/picture.json"]).latestPictureRevision == 2, "Picture retry commits pointer")
+
+return 2

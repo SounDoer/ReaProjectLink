@@ -31,7 +31,8 @@ local function perform_publish(input, fs)
   local staged_snapshot = fs.join(staging_root, input.pointer.manifest)
   local snapshot_parent = staged_snapshot:match("^(.*)[/\\][^/\\]+$")
   assert_ok(fs.make_directory(snapshot_parent))
-  assert_ok(fs.write_file(staged_snapshot, json.encode(input.snapshot) .. "\n"))
+  local snapshot_bytes = json.encode(input.snapshot) .. "\n"
+  assert_ok(fs.write_file(staged_snapshot, snapshot_bytes))
   local verified = json.decode(assert(fs.read_file(staged_snapshot)))
   if verified.pictureId ~= input.pointer.pictureId or
       verified.pictureRevision ~= input.pointer.latestPictureRevision then
@@ -41,7 +42,13 @@ local function perform_publish(input, fs)
   local final_snapshot = fs.join(input.package_root, input.pointer.manifest)
   local final_parent = final_snapshot:match("^(.*)[/\\][^/\\]+$")
   assert_ok(fs.make_directory(final_parent))
-  assert_ok(fs.move_file(staged_snapshot, final_snapshot))
+  if fs.exists(final_snapshot) then
+    if fs.read_file(final_snapshot) ~= snapshot_bytes then
+      error("immutable Picture snapshot collision: " .. input.pointer.manifest, 2)
+    end
+  else
+    assert_ok(fs.move_file(staged_snapshot, final_snapshot))
+  end
 
   local pointer_temp = fs.join(
     input.package_root,

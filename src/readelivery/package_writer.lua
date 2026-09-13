@@ -59,6 +59,13 @@ local function perform_publish(input, fs)
 
   local staged_media = {}
   for _, media in ipairs(input.media or {}) do
+    local final_path = fs.join(input.package_root, media.destination)
+    if fs.exists(final_path) then
+      if fs.file_size(final_path) ~= media.size or
+          fs.hash_file(final_path) ~= media.hash then
+        error("immutable media destination collision: " .. media.destination, 2)
+      end
+    else
     local staged_path = fs.join(staging_root, media.destination)
     assert_ok(fs.make_directory(parent_path(staged_path)))
     assert_ok(fs.copy_file(media.source_path, staged_path))
@@ -73,13 +80,15 @@ local function perform_publish(input, fs)
     end
     table.insert(staged_media, {
       staged_path = staged_path,
-      final_path = fs.join(input.package_root, media.destination),
+      final_path = final_path,
     })
+    end
   end
 
   local staged_snapshot = fs.join(staging_root, input.pointer.manifest)
   assert_ok(fs.make_directory(parent_path(staged_snapshot)))
-  assert_ok(fs.write_file(staged_snapshot, json.encode(input.snapshot) .. "\n"))
+  local snapshot_bytes = json.encode(input.snapshot) .. "\n"
+  assert_ok(fs.write_file(staged_snapshot, snapshot_bytes))
   local verified_snapshot = read_json(fs, staged_snapshot, "staged snapshot")
   if verified_snapshot.schemaVersion ~= input.snapshot.schemaVersion or
       verified_snapshot.sourceProjectId ~= input.snapshot.sourceProjectId or
@@ -94,7 +103,14 @@ local function perform_publish(input, fs)
 
   local final_snapshot = fs.join(input.package_root, input.pointer.manifest)
   assert_ok(fs.make_directory(parent_path(final_snapshot)))
-  assert_ok(fs.move_file(staged_snapshot, final_snapshot))
+  if fs.exists(final_snapshot) then
+    local existing_snapshot = fs.read_file(final_snapshot)
+    if existing_snapshot ~= snapshot_bytes then
+      error("immutable Publish snapshot collision: " .. input.pointer.manifest, 2)
+    end
+  else
+    assert_ok(fs.move_file(staged_snapshot, final_snapshot))
+  end
 
   local pointer_temp = fs.join(
     input.package_root,

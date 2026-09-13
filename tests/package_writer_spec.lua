@@ -6,6 +6,7 @@ local function memory_filesystem(initial, options)
   local files = initial or {}
   options = options or {}
   local locked = false
+  local atomic_failures = options.atomic_failures or 0
   local fs = {}
 
   function fs.join(...)
@@ -48,11 +49,16 @@ local function memory_filesystem(initial, options)
   function fs.hash_file(path) return files[path] and sha256.digest(files[path]) or nil end
   function fs.move_file(source, destination)
     if not files[source] then return nil, "missing staged file" end
+    if files[destination] then return nil, "destination already exists" end
     files[destination] = files[source]
     files[source] = nil
     return true
   end
   function fs.atomic_replace(source, destination)
+    if atomic_failures > 0 then
+      atomic_failures = atomic_failures - 1
+      return nil, "simulated pointer failure"
+    end
     return fs.move_file(source, destination)
   end
   function fs.is_locked() return locked end
@@ -126,4 +132,28 @@ assert(
   "failed Publish must not expose a stable pointer"
 )
 
-return 2
+local retry_fs = memory_filesystem({ ["source.wav"] = wav }, {
+  atomic_failures = 1,
+})
+local retry_input = {
+  package_root = "retry-package",
+  expected_revision = 0,
+  transaction_id = "tx-retry",
+  snapshot = snapshot,
+  pointer = pointer,
+  media = {
+    {
+      source_path = "source.wav",
+      destination = "media/clip-1/clip_r0001.wav",
+      size = #wav,
+      hash = digest,
+    },
+  },
+}
+local interrupted = package_writer.publish(retry_input, retry_fs)
+assert(interrupted == nil, "pointer failure leaves Publish uncommitted")
+local retried, retry_error = package_writer.publish(retry_input, retry_fs)
+assert(retried, retry_error)
+assert(json.decode(retry_fs.read_file("retry-package/delivery.json")).latestPublishRevision == 1, "retry commits pointer")
+
+return 3
