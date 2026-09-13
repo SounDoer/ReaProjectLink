@@ -24,6 +24,21 @@ local function load_pointer(fs, package_root)
   return pointer
 end
 
+local VIDEO_EXTENSIONS = {
+  mov = true,
+  mp4 = true,
+  m4v = true,
+  mxf = true,
+  avi = true,
+  mkv = true,
+  webm = true,
+}
+
+local function is_video_path(path)
+  local extension = path and path:lower():match("%.([^.\\/]+)$")
+  return extension and VIDEO_EXTENSIONS[extension] or false
+end
+
 function M.create(dependencies)
   dependencies = dependencies or {}
   local writer = dependencies.picture_writer or default_picture_writer
@@ -44,6 +59,9 @@ function M.create(dependencies)
     local state = adapter.picture_item_state(item)
     if not state or not state.video_file or state.video_file == "" then
       return nil, "The selected Item has no file-backed video Take."
+    end
+    if not is_video_path(state.video_file) then
+      return nil, "The selected Item does not reference a supported video file."
     end
     if not fs.exists(state.video_file) then
       return nil, "The selected Picture media is missing or offline."

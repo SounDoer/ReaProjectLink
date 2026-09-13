@@ -63,4 +63,8 @@ assert(captured.snapshot.videoFile == item.path, "original video is referenced")
 assert(captured.snapshot.videoHash == "sha256:video-hash", "published video hash")
 assert(captured.snapshot.pictureStartSamples == 96000, "Picture Start")
 
-return 1
+item.path = "C:/show/not-picture.wav"
+local rejected, rejected_error = service.review(adapter, fs)
+assert(not rejected and rejected_error:find("video", 1, true), "audio Item cannot become Picture")
+
+return 2
