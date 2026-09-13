@@ -19,13 +19,14 @@ local project_values = {
   project_mode = "source",
   picture_id = "picture-1",
   reviewed_picture_revision = "7",
+  picture_start_samples = "96000",
 }
 local item = {
   name = "Line A",
   clip_id = "",
   media = { path = "C:/show/bounce.wav", sample_rate = 48000, channel_count = 1 },
   presentation = {
-    start_offset_samples = 0,
+    start_offset_samples = 144000,
     source_offset_samples = 0,
     length_samples = 48000,
     item_gain = 1,
@@ -94,6 +95,7 @@ assert(events[5] == "publish package", "package Publish follows project save")
 assert(captured_publish.package_root == review.package_root, "writer package root")
 assert(captured_publish.expected_revision == 0, "writer reviewed base")
 assert(captured_publish.snapshot.picture.reviewedRevision == 7, "reviewed Picture revision")
+assert(captured_publish.snapshot.lanes[1].clips[1].startOffsetSamples == 48000, "Picture-relative Clip position")
 assert(captured_publish.pointer.manifest == "history/publish-0001.json", "history pointer")
 
 files[review.package_root .. "/delivery.json"] = json.encode(captured_publish.pointer)

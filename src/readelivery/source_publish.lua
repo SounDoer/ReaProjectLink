@@ -73,6 +73,18 @@ function M.create(dependencies)
 
     local current, scan_error = source_service.scan(adapter)
     if not current then return nil, scan_error end
+    local picture_start_samples = tonumber(adapter.get_project_value(
+      constants.PROJECT_KEYS.picture_start_samples
+    ))
+    if picture_start_samples then
+      for _, lane in ipairs(current.lanes) do
+        for _, clip in ipairs(lane.clips) do
+          if clip.start_offset_samples then
+            clip.start_offset_samples = clip.start_offset_samples - picture_start_samples
+          end
+        end
+      end
+    end
     local review = source_review.build({
       current = current,
       previous_snapshot = previous,
@@ -92,7 +104,7 @@ function M.create(dependencies)
       constants.PROJECT_KEYS.reviewed_picture_revision
     ))
     if not review.picture_id or review.picture_id == "" or
-        not review.reviewed_picture_revision then
+        not review.reviewed_picture_revision or not picture_start_samples then
       review.blocker_count = review.blocker_count + 1
       review.picture_blocker = "Subscribe to and review a Picture revision before audio Publish."
     end

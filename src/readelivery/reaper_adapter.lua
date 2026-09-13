@@ -278,6 +278,53 @@ function M.picture_item_state(item)
   }
 end
 
+local function picture_items(picture_id)
+  local items = {}
+  for _, track in ipairs(M.all_tracks()) do
+    for _, item in ipairs(M.track_items(track)) do
+      if M.get_item_picture_id(item) == picture_id then
+        table.insert(items, item)
+      end
+    end
+  end
+  return items
+end
+
+function M.sync_picture(snapshot)
+  local matches = picture_items(snapshot.pictureId)
+  if #matches > 1 then
+    return nil, "Multiple Items carry the subscribed Picture ID."
+  end
+
+  local item = matches[1]
+  local created = false
+  if not item then
+    reaper.InsertTrackAtIndex(reaper.CountTracks(project()), true)
+    local track = reaper.GetTrack(project(), reaper.CountTracks(project()) - 1)
+    reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "ReaDelivery Picture", true)
+    item = reaper.AddMediaItemToTrack(track)
+    created = true
+  end
+
+  local source = reaper.PCM_Source_CreateFromFile(snapshot.videoFile)
+  if not source then return nil, "Could not open the published Picture video." end
+  local take = reaper.GetActiveTake(item)
+  if not take then take = reaper.AddTakeToMediaItem(item) end
+  local old_source = reaper.GetMediaItemTake_Source(take)
+  reaper.SetMediaItemTake_Source(take, source)
+  if old_source then reaper.PCM_Source_Destroy(old_source) end
+  reaper.SetActiveTake(take)
+
+  local sample_rate = snapshot.sampleRate
+  reaper.SetMediaItemInfo_Value(item, "D_POSITION", snapshot.pictureStartSamples / sample_rate)
+  reaper.SetMediaItemInfo_Value(item, "D_LENGTH", snapshot.durationSamples / sample_rate)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", snapshot.sourceOffsetSamples / sample_rate)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", snapshot.playbackRate)
+  M.set_item_picture_id(item, snapshot.pictureId)
+  reaper.UpdateArrange()
+  return { item_ref = item, created = created }
+end
+
 function M.file_exists(path)
   return reaper.file_exists(path)
 end

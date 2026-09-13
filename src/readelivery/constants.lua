@@ -11,7 +11,10 @@ M.PROJECT_KEYS = {
   publish_revision = "publish_revision",
   picture_id = "picture_id",
   picture_revision = "picture_revision",
+  picture_manifest_path = "picture_manifest_path",
+  synchronized_picture_revision = "synchronized_picture_revision",
   reviewed_picture_revision = "reviewed_picture_revision",
+  picture_start_samples = "picture_start_samples",
 }
 
 M.TRACK_KEYS = {
