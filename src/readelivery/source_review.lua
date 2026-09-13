@@ -53,6 +53,16 @@ local function copy_clip(clip)
   return result
 end
 
+local function effective_blockers(blockers, publish_anyway)
+  local result = {}
+  for _, blocker in ipairs(blockers or {}) do
+    if not publish_anyway or blocker ~= "Take FX requires Publish Anyway" then
+      table.insert(result, blocker)
+    end
+  end
+  return result
+end
+
 local function suggestions_for(lane_id, current, ordered_previous, current_ids)
   local suggestions = {}
   for _, entry in ipairs(ordered_previous) do
@@ -138,7 +148,10 @@ function M.build(input, fs)
       local clip = copy_clip(original)
       clip.media_hash = fs.hash_file(clip.media_path)
       clip.media_size = fs.file_size(clip.media_path)
-      local row = { clip = clip, blockers = clip.blockers or {} }
+      local row = {
+        clip = clip,
+        blockers = effective_blockers(clip.blockers, input.publish_anyway),
+      }
       local decision = decisions[clip.item_ref]
 
       if clip.clip_id and clip.clip_id ~= "" and

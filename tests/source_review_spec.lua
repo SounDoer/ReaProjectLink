@@ -121,6 +121,22 @@ assert(resolved.blocker_count == 0, "explicit FX override")
 assert(resolved.current.lanes[1].clips[1].media_hash == "same-hash", "current media hash")
 assert(resolved.current.lanes[1].clips[1].media_size == 10, "current media size")
 
+current.lanes[1].clips[2].blockers = { "Take FX requires Publish Anyway" }
+local take_fx_blocked = source_review.build({
+  current = current,
+  previous_snapshot = previous,
+  identity_decisions = { ["item-2"] = { kind = "new" } },
+}, fs)
+assert(take_fx_blocked.lanes[1].clips[2].status == "Blocked", "Take FX blocks by default")
+local take_fx_overridden = source_review.build({
+  current = current,
+  previous_snapshot = previous,
+  publish_anyway = true,
+  identity_decisions = { ["item-2"] = { kind = "new" } },
+}, fs)
+assert(take_fx_overridden.lanes[1].clips[2].status == "Added", "Take FX override")
+current.lanes[1].clips[2].blockers = {}
+
 current.lanes[1].clips[1].display_name = "Old line"
 local unchanged = source_review.build({
   current = current,
