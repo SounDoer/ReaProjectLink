@@ -216,4 +216,29 @@ function M.apply(review, adapter, options)
   return result
 end
 
+function M.remove_subscription(adapter, source_project_id)
+  local stored = adapter.get_project_value(constants.PROJECT_KEYS.source_subscriptions)
+  if not stored or stored == "" then return nil, "Source subscription was not found." end
+  local ok, subscriptions = pcall(json.decode, stored)
+  if not ok then return nil, "Stored Source subscriptions are invalid." end
+  local remaining = json.array()
+  local found = false
+  for _, subscription in ipairs(subscriptions) do
+    if subscription.sourceProjectId == source_project_id then
+      found = true
+    else
+      table.insert(remaining, subscription)
+    end
+  end
+  if not found then return nil, "Source subscription was not found." end
+  adapter.begin_undo("Remove ReaDelivery Source subscription")
+  adapter.set_project_value(
+    constants.PROJECT_KEYS.source_subscriptions,
+    json.encode(remaining)
+  )
+  adapter.mark_project_dirty()
+  adapter.end_undo("Remove ReaDelivery Source subscription")
+  return { source_project_id = source_project_id }
+end
+
 return M

@@ -41,6 +41,8 @@ local source_picture, source_review, picture_review, import_review, update_revie
 local source_decisions, import_mappings = {}, {}
 local update_decisions, update_additions, update_lanes = {}, {}, {}
 local publish_anyway, import_picture_override, update_picture_override = false, false, false
+local show_unchanged = false
+local lock_info, lock_package_root
 
 local function notify(value, is_error)
   message, message_is_error = value, is_error or false
@@ -70,6 +72,29 @@ local function draw_notice()
   if message_is_error then ImGui.PushStyleColor(ctx, ImGui.Col_Text, 0xff6b6bff) end
   ImGui.TextWrapped(ctx, message)
   if message_is_error then ImGui.PopStyleColor(ctx) end
+  ImGui.Separator(ctx)
+end
+
+local function inspect_lock(package_root)
+  lock_info = fs.read_lock(package_root)
+  lock_package_root = lock_info and package_root or nil
+end
+
+local function draw_lock()
+  if not lock_info then return end
+  ImGui.TextWrapped(ctx, string.format(
+    "Publish lock: %s on %s since %s",
+    lock_info.user or "unknown user",
+    lock_info.machine or "unknown machine",
+    lock_info.started_at or "unknown time"
+  ))
+  if ImGui.Button(ctx, "Remove Observed Stale Lock") then
+    local removed, err = fs.remove_lock(lock_package_root, lock_info.token)
+    if removed then
+      lock_info, lock_package_root = nil, nil
+      notify("Observed Publish lock removed. Retry with a fresh review.")
+    else notify(err, true) end
+  end
   ImGui.Separator(ctx)
 end
 
@@ -150,11 +175,14 @@ local function draw_source_review()
   local changed
   changed, publish_anyway = ImGui.Checkbox(ctx, "Publish Anyway for detected FX", publish_anyway)
   if changed then refresh_source_review() end
+  changed, show_unchanged = ImGui.Checkbox(ctx, "Show Unchanged Clips", show_unchanged)
   for _, lane in ipairs(source_review.lanes) do
     if ImGui.TreeNode(ctx, lane.display_name .. "##" .. lane.lane_id) then
       if lane.fx_blocked then ImGui.TextWrapped(ctx, "Blocked: Delivery Track has FX.") end
       for _, row in ipairs(lane.clips) do
-        ImGui.TextWrapped(ctx, string.format("[%s] %s", row.status, row.display_name or "(unnamed)"))
+        if row.status ~= "Unchanged" or show_unchanged then
+          ImGui.TextWrapped(ctx, string.format("[%s] %s", row.status, row.display_name or "(unnamed)"))
+        end
         if row.status == "Needs Decision" then
           local item_key = tostring(row.clip.item_ref)
           if ImGui.Button(ctx, "Create New Clip##" .. item_key) then
@@ -170,7 +198,9 @@ local function draw_source_review()
             ImGui.TextWrapped(ctx, table.concat(candidate.reasons, ", "))
           end
         end
-        for _, blocker in ipairs(row.blockers or {}) do ImGui.TextWrapped(ctx, "  " .. blocker) end
+        if row.status ~= "Unchanged" or show_unchanged then
+          for _, blocker in ipairs(row.blockers or {}) do ImGui.TextWrapped(ctx, "  " .. blocker) end
+        end
       end
       ImGui.TreePop(ctx)
     end
@@ -183,7 +213,7 @@ local function draw_source_review()
     if result then
       notify("Published Delivery revision " .. result.publish_revision .. ".")
       source_review, source_decisions = nil, {}
-    else notify(err, true) end
+    else notify(err, true); inspect_lock(source_review.package_root) end
   end
 end
 
@@ -227,7 +257,7 @@ local function draw_picture_publish()
     if result then
       notify("Published Picture revision " .. result.picture_revision .. ".")
       picture_review = nil
-    else notify(err, true) end
+    else notify(err, true); inspect_lock(picture_review.package_root) end
   end
 end
 
@@ -324,6 +354,13 @@ local function draw_update()
           local changed
           changed, accept = ImGui.Checkbox(ctx, "Accept audio as new Take", accept)
           if changed then decision.media_choice = accept and "accept_new_take" or "skip" end
+          if row.advanced_take_state and accept then
+            changed, decision.replace_anyway = ImGui.Checkbox(
+              ctx,
+              "Replace Anyway despite advanced Take state",
+              decision.replace_anyway or false
+            )
+          end
         end
         for field, plan in pairs(row.plan.fields) do
           if plan.kind ~= "unchanged" then
@@ -381,6 +418,11 @@ local function draw_mix(state)
     ImGui.TextWrapped(ctx, string.format("%s | accepted r%d", entry.sourceProjectId, entry.acceptedPublishRevision or 0))
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Check Update##" .. entry.sourceProjectId) then begin_update(entry.sourceProjectId) end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Remove Subscription##" .. entry.sourceProjectId) then
+      local result, err = mix_import.remove_subscription(adapter, entry.sourceProjectId)
+      notify(result and "Source subscription removed; Tracks and Items were kept." or err, not result)
+    end
   end
   draw_import()
   draw_update()
@@ -392,6 +434,7 @@ local function draw()
   visible, window_open = ImGui.Begin(ctx, "ReaDelivery", window_open)
   if visible then
     draw_notice()
+    draw_lock()
     local state = source_service.project_state(adapter)
     if not state.mode or state.mode == "" then draw_uninitialized(state)
     elseif state.mode == constants.PROJECT_MODES.source then draw_source(state)

@@ -260,6 +260,27 @@ function M.create(reaper_api)
     return true
   end
 
+  function fs.read_lock(package_root)
+    local lock_path = fs.join(package_root, ".publish.lock")
+    local bytes, read_error = fs.read_file(lock_path)
+    if not bytes then return nil, read_error or "Publish lock was not found." end
+    local ok, metadata = pcall(json.decode, bytes)
+    if not ok then return nil, "Publish lock metadata is invalid: " .. tostring(metadata) end
+    return metadata
+  end
+
+  function fs.remove_lock(package_root, expected_token)
+    local metadata, read_error = fs.read_lock(package_root)
+    if not metadata then return nil, read_error end
+    if not expected_token or metadata.token ~= expected_token then
+      return nil, "Publish lock changed; it was not removed."
+    end
+    local lock_path = fs.join(package_root, ".publish.lock")
+    local removed, remove_error = os.remove(lock_path)
+    if not removed then return nil, remove_error end
+    return true
+  end
+
   return fs
 end
 

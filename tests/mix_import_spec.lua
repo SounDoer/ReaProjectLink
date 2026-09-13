@@ -112,4 +112,8 @@ assert(subscriptions[1].lanes[2].skipped, "skipped Lane persisted")
 local duplicate, duplicate_error = mix_import.review(adapter, fs, pointer_path)
 assert(not duplicate and duplicate_error:find("already subscribed", 1, true), "duplicate subscription blocked")
 
-return 3
+local removed = assert(mix_import.remove_subscription(adapter, "source-1"))
+assert(removed.source_project_id == "source-1", "subscription removal result")
+assert(#json.decode(values.source_subscriptions) == 0, "subscription removed without project content mutation")
+
+return 4

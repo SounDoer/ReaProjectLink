@@ -22,6 +22,17 @@ assert(fs.release_lock(root, first_lock))
 local third_lock = assert(fs.acquire_lock(root, {}))
 assert(fs.release_lock(root, third_lock))
 
+local stale_token = assert(fs.acquire_lock(root, {
+  user = "stale-user",
+  machine = "stale-machine",
+  started_at = "2026-09-13T12:30:00+08:00",
+}))
+local lock_info = assert(fs.read_lock(root))
+assert(lock_info.token == stale_token and lock_info.user == "stale-user", "lock metadata")
+local wrong_removal = fs.remove_lock(root, "wrong-token")
+assert(wrong_removal == nil, "lock removal requires the observed token")
+assert(fs.remove_lock(root, stale_token), "explicit stale-lock removal")
+
 local source_path = fs.join(root, "source.wav")
 local copied_path = fs.join(root, "nested", "copy.wav")
 assert(fs.write_file(source_path, "wave bytes"))
