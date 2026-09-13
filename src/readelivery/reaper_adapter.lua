@@ -45,6 +45,14 @@ function M.selected_tracks()
   return tracks
 end
 
+function M.selected_items()
+  local items = {}
+  for index = 0, reaper.CountSelectedMediaItems(project()) - 1 do
+    table.insert(items, reaper.GetSelectedMediaItem(project(), index))
+  end
+  return items
+end
+
 function M.all_tracks()
   local tracks = {}
   for index = 0, reaper.CountTracks(project()) - 1 do
@@ -87,6 +95,25 @@ function M.set_item_clip_id(item, clip_id)
     item,
     constants.ITEM_KEYS.clip_id,
     clip_id,
+    true
+  )
+end
+
+function M.get_item_picture_id(item)
+  local _, value = reaper.GetSetMediaItemInfo_String(
+    item,
+    constants.ITEM_KEYS.picture_id,
+    "",
+    false
+  )
+  return value
+end
+
+function M.set_item_picture_id(item, picture_id)
+  reaper.GetSetMediaItemInfo_String(
+    item,
+    constants.ITEM_KEYS.picture_id,
+    picture_id,
     true
   )
 end
@@ -197,6 +224,57 @@ function M.item_presentation(item)
       channel_mode = reaper.GetMediaItemTakeInfo_Value(take, "I_CHANMODE"),
       polarity_inverted = take_volume < 0,
     },
+  }
+end
+
+local function frame_rate_ratio(frame_rate)
+  local ntsc_rates = {
+    { value = 24000 / 1001, numerator = 24000 },
+    { value = 30000 / 1001, numerator = 30000 },
+    { value = 60000 / 1001, numerator = 60000 },
+  }
+  for _, candidate in ipairs(ntsc_rates) do
+    if math.abs(frame_rate - candidate.value) < 0.001 then
+      return candidate.numerator, 1001
+    end
+  end
+  return math.floor(frame_rate + 0.5), 1
+end
+
+function M.picture_item_state(item)
+  local take = reaper.GetActiveTake(item)
+  if not take or reaper.TakeIsMIDI(take) then return nil end
+  local source = reaper.GetMediaItemTake_Source(take)
+  if not source then return nil end
+  local path = reaper.GetMediaSourceFileName(source, "")
+  local sample_rate = M.project_sample_rate()
+  local frame_rate, drop_frame = reaper.TimeMap_curFrameRate(project())
+  local numerator, denominator = frame_rate_ratio(frame_rate)
+  return {
+    video_file = path,
+    sample_rate = sample_rate,
+    picture_start_samples = seconds_to_samples(
+      reaper.GetMediaItemInfo_Value(item, "D_POSITION"),
+      sample_rate
+    ),
+    source_offset_samples = seconds_to_samples(
+      reaper.GetMediaItemTakeInfo_Value(take, "D_STARTOFFS"),
+      sample_rate
+    ),
+    duration_samples = seconds_to_samples(
+      reaper.GetMediaItemInfo_Value(item, "D_LENGTH"),
+      sample_rate
+    ),
+    playback_rate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE"),
+    frame_rate = {
+      numerator = numerator,
+      denominator = denominator,
+      drop_frame = drop_frame,
+    },
+    project_timecode_offset_samples = seconds_to_samples(
+      reaper.GetProjectTimeOffset(project(), false),
+      sample_rate
+    ),
   }
 end
 

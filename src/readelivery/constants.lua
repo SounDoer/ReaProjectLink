@@ -10,6 +10,7 @@ M.PROJECT_KEYS = {
   delivery_set_id = "delivery_set_id",
   publish_revision = "publish_revision",
   picture_id = "picture_id",
+  picture_revision = "picture_revision",
   reviewed_picture_revision = "reviewed_picture_revision",
 }
 
@@ -19,6 +20,7 @@ M.TRACK_KEYS = {
 
 M.ITEM_KEYS = {
   clip_id = "P_EXT:ReaDelivery_clip_id",
+  picture_id = "P_EXT:ReaDelivery_picture_id",
 }
 
 M.PROJECT_MODES = {
