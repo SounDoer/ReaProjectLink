@@ -22,10 +22,11 @@ The project is currently in the design phase. The working principle is:
 
 - [Product concept](docs/product-concept.md)
 - [Architecture](docs/architecture.md)
+- [Manifest schema](docs/manifest-schema.md)
 - [Decision log](docs/decisions.md)
 
 ## Status
 
-No implementation has been selected yet. Product and architecture discovery is
-ongoing; confirmed decisions and remaining open questions are recorded in the
-decision log.
+The MVP product and architecture baseline is documented. Implementation has not
+started; technical choices will be validated through a thin end-to-end
+prototype.

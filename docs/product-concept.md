@@ -35,13 +35,16 @@ operation creates a delivery revision visible to mix projects.
 
 ## Roles
 
+On first use, each `.rpp` is explicitly initialized in one role for the MVP. A
+project does not combine Source and Mix modes.
+
 ### Source project
 
 A dialogue, music, or sound-effects project:
 
 - may live anywhere on the NAS;
 - keeps the department's preferred working structure and naming;
-- uses template-provided or user-designated delivery tracks;
+- uses delivery tracks manually designated through the tool;
 - bounces plug-in-dependent work to ordinary audio files;
 - explicitly publishes delivery revisions;
 - does not write to or target a mix project.
@@ -60,15 +63,19 @@ The integration project:
 ## Primary workflow
 
 1. A source project designates managed delivery tracks.
-2. The source project publishes bounced items to its local `_Delivery` package.
-3. A mix project adds the source's `delivery.json` and performs the first import.
-4. The mix project stores stable lane-to-track and clip-to-item bindings.
-5. A later source Publish creates new WAV revisions without modifying the mix
+2. A source user creates bounced items using any preferred REAPER workflow and
+   places the current effective items on managed delivery tracks.
+3. Publish compares those tracks with the previous published snapshot, asks for
+   confirmation where a new item cannot be classified safely, and writes the
+   accepted state to the local `_Delivery` package.
+4. A mix project adds the source's `delivery.json` and performs the first import.
+5. The mix project stores stable lane-to-track and clip-to-item bindings.
+6. A later source Publish creates new WAV revisions without modifying the mix
    project.
-6. The mix project detects the new manifest revision and presents the change.
-7. After user confirmation, a changed WAV becomes a new take on the already
-   bound mix item.
-8. Old takes remain until the user explicitly removes them.
+7. The mix project detects the new manifest revision and presents the change.
+8. After user confirmation, a changed WAV becomes a new take on the already
+   bound mix item or items, including still-linked copies and split instances.
+9. Old takes remain until the user explicitly removes them.
 
 ## Picture workflow
 
@@ -95,3 +102,4 @@ unchanged.
 - Automatically conforming audio to a changed picture edit.
 - Inferring semantic identity from filenames.
 - Directly modifying another user's closed or open `.rpp` file.
+- Adopting or reconstructing delivery bindings in existing legacy mix projects.
