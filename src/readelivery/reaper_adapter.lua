@@ -135,12 +135,48 @@ end
 
 function M.create_mix_track(name, parent_track)
   local index = reaper.CountTracks(project())
+  local close_folder = false
   if parent_track then
-    index = math.floor(reaper.GetMediaTrackInfo_Value(parent_track, "IP_TRACKNUMBER"))
+    local parent_index = math.floor(
+      reaper.GetMediaTrackInfo_Value(parent_track, "IP_TRACKNUMBER")
+    ) - 1
+    local parent_depth = math.floor(
+      reaper.GetMediaTrackInfo_Value(parent_track, "I_FOLDERDEPTH")
+    )
+    if parent_depth <= 0 then
+      reaper.SetMediaTrackInfo_Value(parent_track, "I_FOLDERDEPTH", 1)
+      index = parent_index + 1
+      close_folder = true
+    else
+      local depth = parent_depth
+      for candidate_index = parent_index + 1, reaper.CountTracks(project()) - 1 do
+        local candidate = reaper.GetTrack(project(), candidate_index)
+        depth = depth + math.floor(
+          reaper.GetMediaTrackInfo_Value(candidate, "I_FOLDERDEPTH")
+        )
+        if depth <= 0 then
+          local closing_depth = math.floor(
+            reaper.GetMediaTrackInfo_Value(candidate, "I_FOLDERDEPTH")
+          )
+          reaper.SetMediaTrackInfo_Value(
+            candidate,
+            "I_FOLDERDEPTH",
+            closing_depth + 1
+          )
+          index = candidate_index + 1
+          close_folder = true
+          break
+        end
+      end
+      if not close_folder then close_folder = true end
+    end
   end
   reaper.InsertTrackAtIndex(index, true)
   local track = reaper.GetTrack(project(), index)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", name or "Delivery Lane", true)
+  if close_folder then
+    reaper.SetMediaTrackInfo_Value(track, "I_FOLDERDEPTH", -1)
+  end
   return track
 end
 

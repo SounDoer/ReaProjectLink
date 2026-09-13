@@ -108,6 +108,20 @@ assert(adapter.detach_instance(imported), "detach Instance")
 assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
 os.remove(wav_path)
 
+local folder = adapter.create_mix_track("Delivery Folder")
+local child_one = adapter.create_mix_track("Lane One", folder)
+local child_two = adapter.create_mix_track("Lane Two", folder)
+assert(reaper.GetTrack(0, 1) == folder, "Folder position")
+assert(reaper.GetTrack(0, 2) == child_one, "first child order")
+assert(reaper.GetTrack(0, 3) == child_two, "second child order")
+assert(reaper.GetMediaTrackInfo_Value(folder, "I_FOLDERDEPTH") == 1, "Folder opened")
+assert(reaper.GetMediaTrackInfo_Value(child_one, "I_FOLDERDEPTH") == 0, "intermediate child")
+assert(reaper.GetMediaTrackInfo_Value(child_two, "I_FOLDERDEPTH") == -1, "last child closes Folder")
+
+reaper.DeleteTrack(child_two)
+reaper.DeleteTrack(child_one)
+reaper.DeleteTrack(folder)
+
 reaper.DeleteTrack(track)
 
 return 1

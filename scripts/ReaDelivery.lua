@@ -319,6 +319,17 @@ local function draw_import()
     local changed
     changed, import_picture_override = ImGui.Checkbox(ctx, "Allow Picture revision difference", import_picture_override)
   end
+  if ImGui.Button(ctx, "Create All Under Selected Folder Track##import") then
+    local selected = adapter.selected_tracks()
+    if #selected == 1 then
+      for _, lane in ipairs(import_review.lanes) do
+        import_mappings[lane.lane_id] = {
+          kind = "create",
+          parent_track_ref = selected[1],
+        }
+      end
+    else notify("Select exactly one Folder Track.", true) end
+  end
   for _, lane in ipairs(import_review.lanes) do draw_mapping(lane, import_mappings, "import-") end
   if import_review.blocker_count == 0 and ImGui.Button(ctx, "Confirm Import") then
     local result, err = mix_import.apply(import_review, adapter, {
@@ -395,6 +406,18 @@ local function draw_update()
     local changed
     changed, include = ImGui.Checkbox(ctx, "Import new Clip " .. (row.clip.displayName or id), include)
     if changed then update_additions[id] = include and "import" or "skip" end
+  end
+  if #update_review.unmapped_lanes > 0 and
+      ImGui.Button(ctx, "Create New Lanes Under Selected Folder Track") then
+    local selected = adapter.selected_tracks()
+    if #selected == 1 then
+      for _, lane in ipairs(update_review.unmapped_lanes) do
+        update_lanes[lane.lane_id] = {
+          kind = "create",
+          parent_track_ref = selected[1],
+        }
+      end
+    else notify("Select exactly one Folder Track.", true) end
   end
   for _, lane in ipairs(update_review.unmapped_lanes) do draw_mapping(lane, update_lanes, "update-") end
   if update_review.blocker_count == 0 and ImGui.Button(ctx, "Apply Update") then
