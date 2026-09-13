@@ -1,0 +1,150 @@
+local json = require("readelivery.json")
+
+local M = {}
+
+local function assert_ok(ok, err)
+  if not ok then
+    error(err or "filesystem operation failed", 3)
+  end
+end
+
+local function parent_path(path)
+  return path:match("^(.*)/[^/]+$")
+end
+
+local function current_revision(input, fs)
+  local pointer_path = fs.join(input.package_root, "delivery.json")
+  if not fs.exists(pointer_path) then
+    return 0
+  end
+  local bytes, read_error = fs.read_file(pointer_path)
+  if not bytes then
+    error(read_error or "could not read current delivery.json", 3)
+  end
+  local pointer = json.decode(bytes)
+  if pointer.schemaVersion ~= 1 then
+    error("unsupported delivery schema version", 3)
+  end
+  return pointer.latestPublishRevision
+end
+
+local function read_json(fs, path, label)
+  local bytes, read_error = fs.read_file(path)
+  if not bytes then
+    error(read_error or ("could not read " .. label), 3)
+  end
+  local ok, value = pcall(json.decode, bytes)
+  if not ok then
+    error(label .. " failed JSON validation: " .. tostring(value), 3)
+  end
+  return value
+end
+
+local function perform_publish(input, fs)
+  local found_revision = current_revision(input, fs)
+  if found_revision ~= input.expected_revision then
+    error(string.format(
+      "Publish base changed: reviewed revision %d, current revision %d",
+      input.expected_revision,
+      found_revision
+    ), 2)
+  end
+
+  local staging_root = fs.join(
+    input.package_root,
+    ".staging",
+    input.transaction_id
+  )
+  assert_ok(fs.make_directory(staging_root))
+
+  local staged_media = {}
+  for _, media in ipairs(input.media or {}) do
+    local staged_path = fs.join(staging_root, media.destination)
+    assert_ok(fs.make_directory(parent_path(staged_path)))
+    assert_ok(fs.copy_file(media.source_path, staged_path))
+
+    local size = fs.file_size(staged_path)
+    if size ~= media.size then
+      error("staged media size mismatch: " .. media.destination, 2)
+    end
+    local digest = fs.hash_file(staged_path)
+    if digest ~= media.hash then
+      error("staged media hash mismatch: " .. media.destination, 2)
+    end
+    table.insert(staged_media, {
+      staged_path = staged_path,
+      final_path = fs.join(input.package_root, media.destination),
+    })
+  end
+
+  local staged_snapshot = fs.join(staging_root, input.pointer.manifest)
+  assert_ok(fs.make_directory(parent_path(staged_snapshot)))
+  assert_ok(fs.write_file(staged_snapshot, json.encode(input.snapshot) .. "\n"))
+  local verified_snapshot = read_json(fs, staged_snapshot, "staged snapshot")
+  if verified_snapshot.schemaVersion ~= input.snapshot.schemaVersion or
+      verified_snapshot.sourceProjectId ~= input.snapshot.sourceProjectId or
+      verified_snapshot.publishRevision ~= input.snapshot.publishRevision then
+    error("staged snapshot identity validation failed", 2)
+  end
+
+  for _, media in ipairs(staged_media) do
+    assert_ok(fs.make_directory(parent_path(media.final_path)))
+    assert_ok(fs.move_file(media.staged_path, media.final_path))
+  end
+
+  local final_snapshot = fs.join(input.package_root, input.pointer.manifest)
+  assert_ok(fs.make_directory(parent_path(final_snapshot)))
+  assert_ok(fs.move_file(staged_snapshot, final_snapshot))
+
+  local pointer_temp = fs.join(
+    input.package_root,
+    ".delivery.json." .. input.transaction_id .. ".tmp"
+  )
+  assert_ok(fs.write_file(pointer_temp, json.encode(input.pointer) .. "\n"))
+  local verified_pointer = read_json(fs, pointer_temp, "staged delivery pointer")
+  if verified_pointer.schemaVersion ~= input.pointer.schemaVersion or
+      verified_pointer.sourceProjectId ~= input.pointer.sourceProjectId or
+      verified_pointer.latestPublishRevision ~= input.pointer.latestPublishRevision or
+      verified_pointer.manifest ~= input.pointer.manifest then
+    error("staged delivery pointer identity validation failed", 2)
+  end
+  assert_ok(fs.atomic_replace(
+    pointer_temp,
+    fs.join(input.package_root, "delivery.json")
+  ))
+
+  fs.remove_tree(staging_root)
+  return {
+    publish_revision = input.pointer.latestPublishRevision,
+    manifest_path = final_snapshot,
+  }
+end
+
+function M.publish(input, fs)
+  local lock_token, lock_error = fs.acquire_lock(
+    input.package_root,
+    input.lock_metadata or {}
+  )
+  if not lock_token then
+    return nil, lock_error or "Publish is locked by another user."
+  end
+
+  local ok, result = xpcall(function()
+    return perform_publish(input, fs)
+  end, debug.traceback)
+
+  local staging_root = fs.join(
+    input.package_root,
+    ".staging",
+    input.transaction_id
+  )
+  fs.remove_tree(staging_root)
+  fs.release_lock(input.package_root, lock_token)
+
+  if not ok then
+    return nil, result
+  end
+  return result
+end
+
+return M
