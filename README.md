@@ -24,9 +24,11 @@ The project is currently in the design phase. The working principle is:
 - [Architecture](docs/architecture.md)
 - [Manifest schema](docs/manifest-schema.md)
 - [Decision log](docs/decisions.md)
+- [Development](docs/development.md)
 
 ## Status
 
 The MVP product and architecture baseline is documented. The implementation
-stack is Lua 5.4 ReaScript with ReaImGui; development will begin with a thin
+stack is Lua 5.4 ReaScript with ReaImGui. Development has started with the Source
+initialization, Delivery Track registration, and scan portion of a thin
 end-to-end prototype.
