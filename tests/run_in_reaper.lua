@@ -56,5 +56,9 @@ if file then
   file:close()
 end
 
+reaper.atexit(function()
+  os.remove(root .. "/tests/.adapter-fixture.wav")
+  os.remove(root .. "/tests/.runner-project.rpp")
+end)
 reaper.Main_SaveProjectEx(0, root .. "/tests/.runner-project.rpp", 8)
 reaper.Main_OnCommand(40004, 0)

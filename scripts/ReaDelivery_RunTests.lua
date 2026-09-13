@@ -41,6 +41,7 @@ end, debug.traceback)
 reaper.Main_SaveProjectEx(0, temporary_project, 8)
 reaper.Main_OnCommand(40860, 0)
 os.remove(temporary_project)
+os.remove(root .. "/tests/.adapter-fixture.wav")
 
 if ok then
   local message = string.format("All %d ReaDelivery tests passed.", result)
