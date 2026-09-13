@@ -56,6 +56,7 @@ local result, err = service.publish(review, adapter, fs, {
 assert(result, err)
 assert(item.picture_id == "picture-1", "Picture identity attached to Item")
 assert(project_values.picture_id == "picture-1", "Picture identity attached to project")
+assert(project_values.picture_start_samples == "96000", "Mix Picture Start persisted")
 assert(events[4] == "save", "identity saved before Picture Publish")
 assert(events[5] == "publish", "Picture package follows project save")
 assert(captured.snapshot.videoFile == item.path, "original video is referenced")

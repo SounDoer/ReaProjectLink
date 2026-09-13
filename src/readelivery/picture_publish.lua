@@ -82,6 +82,10 @@ function M.create(dependencies)
 
     adapter.begin_undo("Assign ReaDelivery Picture identity")
     adapter.set_project_value(constants.PROJECT_KEYS.picture_id, picture_id)
+    adapter.set_project_value(
+      constants.PROJECT_KEYS.picture_start_samples,
+      tostring(review.picture_start_samples)
+    )
     adapter.set_item_picture_id(review.item_ref, picture_id)
     adapter.mark_project_dirty()
     adapter.end_undo("Assign ReaDelivery Picture identity")
