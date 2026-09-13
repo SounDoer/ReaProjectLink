@@ -56,4 +56,5 @@ if file then
   file:close()
 end
 
+reaper.Main_SaveProjectEx(0, root .. "/tests/.runner-project.rpp", 8)
 reaper.Main_OnCommand(40004, 0)
