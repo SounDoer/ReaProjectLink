@@ -123,6 +123,21 @@ function M.track_name(track)
   return value ~= "" and value or "(unnamed track)"
 end
 
+function M.track_guid(track)
+  return reaper.GetTrackGUID(track)
+end
+
+function M.create_mix_track(name, parent_track)
+  local index = reaper.CountTracks(project())
+  if parent_track then
+    index = math.floor(reaper.GetMediaTrackInfo_Value(parent_track, "IP_TRACKNUMBER"))
+  end
+  reaper.InsertTrackAtIndex(index, true)
+  local track = reaper.GetTrack(project(), index)
+  reaper.GetSetMediaTrackInfo_String(track, "P_NAME", name or "Delivery Lane", true)
+  return track
+end
+
 function M.item_display_name(item)
   local take = reaper.GetActiveTake(item)
   if take then
@@ -323,6 +338,45 @@ function M.sync_picture(snapshot)
   M.set_item_picture_id(item, snapshot.pictureId)
   reaper.UpdateArrange()
   return { item_ref = item, created = created }
+end
+
+local function set_item_string(item, key, value)
+  reaper.GetSetMediaItemInfo_String(item, key, tostring(value or ""), true)
+end
+
+function M.create_delivery_item(track, clip, context)
+  local source = reaper.PCM_Source_CreateFromFile(clip.media_path)
+  if not source then return nil, "Could not open managed WAV: " .. clip.media_path end
+  local item = reaper.AddMediaItemToTrack(track)
+  local take = reaper.AddTakeToMediaItem(item)
+  reaper.SetMediaItemTake_Source(take, source)
+  reaper.SetActiveTake(take)
+
+  local sample_rate = context.source_sample_rate
+  reaper.SetMediaItemInfo_Value(item, "D_POSITION", context.position_seconds)
+  reaper.SetMediaItemInfo_Value(item, "D_LENGTH", clip.lengthSamples / sample_rate)
+  reaper.SetMediaItemInfo_Value(item, "D_VOL", clip.itemGain or 1)
+  reaper.SetMediaItemInfo_Value(item, "D_FADEINLEN", (clip.fadeInSamples or 0) / sample_rate)
+  reaper.SetMediaItemInfo_Value(item, "D_FADEOUTLEN", (clip.fadeOutSamples or 0) / sample_rate)
+
+  local take_state = clip.take or {}
+  local take_volume = take_state.volume or 1
+  if take_state.polarityInverted then take_volume = -math.abs(take_volume) end
+  reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", clip.sourceOffsetSamples / sample_rate)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_VOL", take_volume)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PAN", take_state.pan or 0)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", take_state.playbackRate or 1)
+  reaper.SetMediaItemTakeInfo_Value(take, "D_PITCH", take_state.pitch or 0)
+  reaper.SetMediaItemTakeInfo_Value(take, "I_CHANMODE", take_state.channelMode or 0)
+  reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", clip.displayName or "", true)
+
+  M.set_item_clip_id(item, clip.clipId)
+  set_item_string(item, constants.ITEM_KEYS.source_project_id, context.source_project_id)
+  set_item_string(item, constants.ITEM_KEYS.instance_id, context.instance_id)
+  set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, clip.mediaRevision)
+  set_item_string(item, constants.ITEM_KEYS.handled_publish_revision, context.publish_revision)
+  set_item_string(item, constants.ITEM_KEYS.picture_revision, context.picture_revision)
+  return item
 end
 
 function M.file_exists(path)

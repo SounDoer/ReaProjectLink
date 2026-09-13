@@ -37,6 +37,54 @@ assert(math.abs(state.take.playback_rate - 1.1) < 0.000001, "take rate")
 assert(math.abs(state.take.volume - 0.8) < 0.000001, "absolute take volume")
 assert(state.take.polarity_inverted, "take polarity")
 
+local source = debug.getinfo(1, "S").source:sub(2)
+local tests_dir = assert(source:match("^(.*)[/\\]"))
+local wav_path = tests_dir .. "/.adapter-fixture.wav"
+local sample_bytes = string.rep("\0", 96)
+local wav = string.pack(
+  "<c4I4c4c4I4I2I2I4I4I2I2c4I4",
+  "RIFF", 36 + #sample_bytes, "WAVE", "fmt ", 16, 1, 1,
+  48000, 96000, 2, 16, "data", #sample_bytes
+) .. sample_bytes
+local fixture = assert(io.open(wav_path, "wb"))
+fixture:write(wav)
+fixture:close()
+
+local imported = assert(adapter.create_delivery_item(track, {
+  clipId = "imported-clip",
+  displayName = "Imported Line",
+  mediaPath = wav_path,
+  media_path = wav_path,
+  mediaRevision = 4,
+  sourceOffsetSamples = 240,
+  lengthSamples = 480,
+  itemGain = 0.5,
+  fadeInSamples = 48,
+  fadeOutSamples = 96,
+  take = {
+    volume = 0.8,
+    pan = 0.2,
+    playbackRate = 1,
+    pitch = 1,
+    channelMode = 0,
+    polarityInverted = true,
+  },
+}, {
+  source_sample_rate = 48000,
+  position_seconds = 3,
+  source_project_id = "source-1",
+  publish_revision = 8,
+  picture_revision = 7,
+  instance_id = "instance-1",
+}))
+local imported_state = adapter.item_presentation(imported)
+assert(imported_state.start_offset_samples == 144000, "imported position")
+assert(imported_state.length_samples == 480, "imported length")
+assert(imported_state.source_offset_samples == 240, "imported source offset")
+assert(imported_state.take.polarity_inverted, "imported polarity")
+assert(adapter.get_item_clip_id(imported) == "imported-clip", "imported Clip binding")
+os.remove(wav_path)
+
 reaper.DeleteTrack(track)
 
 return 1
