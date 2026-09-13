@@ -14,6 +14,11 @@ local function project_parts(path)
   return directory, filename:gsub("%.[Rr][Pp][Pp]$", "")
 end
 
+local function same_path(left, right)
+  if not left or not right then return false end
+  return left:gsub("\\", "/"):lower() == right:gsub("\\", "/"):lower()
+end
+
 local function read_json(fs, path, label)
   local bytes, read_error = fs.read_file(path)
   if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
@@ -56,11 +61,28 @@ function M.create(dependencies)
     local directory, project_name = project_parts(path)
     if not directory then return nil, "Save the REAPER project before Publish Review." end
 
-    local package_root = fs.join(directory, "_Delivery", project_name)
+    local derived_package_root = fs.join(directory, "_Delivery", project_name)
+    local stored_source_id = adapter.get_project_value(constants.PROJECT_KEYS.source_project_id)
+    local stored_identity_path = adapter.get_project_value(
+      constants.PROJECT_KEYS.source_identity_project_path
+    )
+    local stored_package_root = adapter.get_project_value(
+      constants.PROJECT_KEYS.source_package_root
+    )
+    local path_changed = stored_source_id and stored_source_id ~= "" and
+      stored_identity_path and stored_identity_path ~= "" and
+      not same_path(stored_identity_path, path)
+    local starts_new = path_changed and options.save_as_decision == "new"
+    local package_root = path_changed and not starts_new and
+      stored_package_root and stored_package_root ~= "" and stored_package_root or
+      derived_package_root
     local pointer, previous, load_error = load_previous(fs, package_root)
     if load_error then return nil, load_error end
 
-    local stored_source_id = adapter.get_project_value(constants.PROJECT_KEYS.source_project_id)
+    if starts_new and pointer then
+      return nil, "The new Source package destination already contains a published delivery."
+    end
+
     local stored_set_id = adapter.get_project_value(constants.PROJECT_KEYS.delivery_set_id)
     if pointer and stored_source_id and stored_source_id ~= "" and
         pointer.sourceProjectId ~= stored_source_id then
@@ -73,6 +95,12 @@ function M.create(dependencies)
 
     local current, scan_error = source_service.scan(adapter)
     if not current then return nil, scan_error end
+    if starts_new then
+      for _, lane in ipairs(current.lanes) do
+        for _, clip in ipairs(lane.clips) do clip.clip_id = "" end
+      end
+      pointer, previous = nil, nil
+    end
     local picture_start_samples = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.picture_start_samples
     ))
@@ -97,8 +125,16 @@ function M.create(dependencies)
     review.project_file = path
     review.base_revision = pointer and pointer.latestPublishRevision or 0
     review.previous_snapshot = previous
-    review.source_project_id = stored_source_id or (pointer and pointer.sourceProjectId)
-    review.delivery_set_id = stored_set_id or (pointer and pointer.deliverySetId)
+    review.source_project_id = not starts_new and
+      (stored_source_id or (pointer and pointer.sourceProjectId)) or nil
+    review.delivery_set_id = not starts_new and
+      (stored_set_id or (pointer and pointer.deliverySetId)) or nil
+    review.save_as_decision = options.save_as_decision
+    review.path_changed = path_changed
+    if path_changed and not options.save_as_decision then
+      review.save_as_blocker = "This project path changed. Choose Continue Logical Source or Start New Source."
+      review.blocker_count = review.blocker_count + 1
+    end
     review.picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id)
     review.reviewed_picture_revision = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.reviewed_picture_revision
@@ -134,6 +170,14 @@ function M.create(dependencies)
     adapter.begin_undo("Assign ReaDelivery Publish identities")
     adapter.set_project_value(constants.PROJECT_KEYS.source_project_id, plan.source_project_id)
     adapter.set_project_value(constants.PROJECT_KEYS.delivery_set_id, plan.delivery_set_id)
+    adapter.set_project_value(
+      constants.PROJECT_KEYS.source_identity_project_path,
+      review.project_file
+    )
+    adapter.set_project_value(
+      constants.PROJECT_KEYS.source_package_root,
+      review.package_root
+    )
     for _, assignment in ipairs(plan.assignments) do
       adapter.set_item_clip_id(assignment.item_ref, assignment.clip_id)
     end

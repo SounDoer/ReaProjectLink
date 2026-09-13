@@ -37,10 +37,11 @@ local item = {
 }
 local track = { name = "DX", lane_id = "lane-1", items = { item } }
 local events = {}
+local project_path = "C:/show/CIN_030_DX.rpp"
 local ids = { "source-1", "set-1", "clip-1", "tx-1" }
 local id_index = 0
 local adapter = {}
-function adapter.project_path() return "C:/show/CIN_030_DX.rpp" end
+function adapter.project_path() return project_path end
 function adapter.get_project_value(key) return project_values[key] end
 function adapter.set_project_value(key, value) project_values[key] = tostring(value) end
 function adapter.all_tracks() return { track } end
@@ -89,6 +90,8 @@ local result, publish_error = service.publish(review, adapter, fs, {
 assert(result, publish_error)
 assert(project_values.source_project_id == "source-1", "Source identity persisted")
 assert(project_values.delivery_set_id == "set-1", "Delivery Set identity persisted")
+assert(project_values.source_identity_project_path == project_path, "identity path persisted")
+assert(project_values.source_package_root == review.package_root, "stable package root persisted")
 assert(item.clip_id == "clip-1", "Clip identity persisted")
 assert(events[4] == "save project", "identity is saved before package Publish")
 assert(events[5] == "publish package", "package Publish follows project save")
@@ -104,4 +107,21 @@ local next_review = assert(service.review(adapter, fs, {}))
 assert(next_review.publish_revision == 2, "published baseline is loaded")
 assert(next_review.lanes[1].clips[1].status == "Unchanged", "baseline comparison")
 
-return 2
+project_path = "C:/show/renamed/CIN_030_DX_New.rpp"
+local unresolved_save_as = assert(service.review(adapter, fs, {}))
+assert(unresolved_save_as.save_as_blocker, "Save As requires an identity choice")
+assert(unresolved_save_as.blocker_count == 1, "Save As blocks Publish")
+
+local continued = assert(service.review(adapter, fs, { save_as_decision = "continue" }))
+assert(continued.package_root == review.package_root, "continuing keeps the stable package root")
+assert(continued.source_project_id == "source-1", "continuing keeps Source identity")
+
+local restarted = assert(service.review(adapter, fs, {
+  save_as_decision = "new",
+  identity_decisions = { [item] = { kind = "new" } },
+}))
+assert(restarted.package_root == "C:/show/renamed/_Delivery/CIN_030_DX_New", "new Source uses new package root")
+assert(restarted.source_project_id == nil, "new Source receives a new identity on Publish")
+assert(restarted.lanes[1].clips[1].status == "Added", "new Source resets Clip identity")
+
+return 5

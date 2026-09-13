@@ -39,6 +39,7 @@ local window_open = true
 local message, message_is_error
 local source_picture, source_review, picture_review, import_review, update_review
 local source_decisions, import_mappings = {}, {}
+local source_save_as_decision
 local update_decisions, update_additions, update_lanes = {}, {}, {}
 local publish_anyway, import_picture_override, update_picture_override = false, false, false
 local show_unchanged = false
@@ -156,6 +157,7 @@ local function refresh_source_review()
   local review, err = source_publish.review(adapter, fs, {
     identity_decisions = source_decisions,
     publish_anyway = publish_anyway,
+    save_as_decision = source_save_as_decision,
   })
   source_review = review
   notify(review and "Publish Review refreshed." or err, not review)
@@ -172,6 +174,19 @@ local function draw_source_review()
   ))
   ImGui.TextWrapped(ctx, "Output: " .. source_review.package_root)
   if source_review.picture_blocker then ImGui.TextWrapped(ctx, source_review.picture_blocker) end
+  if source_review.save_as_blocker then
+    ImGui.TextWrapped(ctx, source_review.save_as_blocker)
+    if ImGui.Button(ctx, "Continue Logical Source") then
+      source_save_as_decision = "continue"
+      refresh_source_review()
+    end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Start New Source") then
+      source_save_as_decision = "new"
+      source_decisions = {}
+      refresh_source_review()
+    end
+  end
   local changed
   changed, publish_anyway = ImGui.Checkbox(ctx, "Publish Anyway for detected FX", publish_anyway)
   if changed then refresh_source_review() end
@@ -212,7 +227,7 @@ local function draw_source_review()
     local result, err = source_publish.publish(source_review, adapter, fs, metadata())
     if result then
       notify("Published Delivery revision " .. result.publish_revision .. ".")
-      source_review, source_decisions = nil, {}
+      source_review, source_decisions, source_save_as_decision = nil, {}, nil
     else notify(err, true); inspect_lock(source_review.package_root) end
   end
 end
