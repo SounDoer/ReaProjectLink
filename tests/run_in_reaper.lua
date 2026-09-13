@@ -25,7 +25,9 @@ local ok, result = xpcall(function()
     reaper.ImGui_DestroyContext(context)
   end
 
-  return dofile(root .. "/tests/source_service_spec.lua")
+  local passed = dofile(root .. "/tests/source_service_spec.lua")
+  passed = passed + dofile(root .. "/tests/manifest_spec.lua")
+  return passed
 end, debug.traceback)
 
 local result_path = root .. "/tests/.last-result"
