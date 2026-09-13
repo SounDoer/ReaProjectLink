@@ -184,6 +184,7 @@ function M.review(adapter, fs, source_project_id)
 
   local instance_clips = {}
   for _, instance in ipairs(instances) do instance_clips[instance.clip_id] = true end
+  local mix_tracks = adapter.all_tracks()
   for _, lane in ipairs(latest.lanes or {}) do
     local binding = lane_bindings[lane.laneId]
     if not binding or binding.skipped then
@@ -191,7 +192,18 @@ function M.review(adapter, fs, source_project_id)
         lane_id = lane.laneId,
         display_name = lane.displayName,
         clips = {},
+        suggestions = {},
       }
+      for _, track in ipairs(mix_tracks) do
+        table.insert(unmapped.suggestions, {
+          track_ref = track,
+          track_guid = adapter.track_guid(track),
+          display_name = adapter.track_name(track),
+        })
+      end
+      table.sort(unmapped.suggestions, function(left, right)
+        return left.display_name < right.display_name
+      end)
       for _, clip in ipairs(lane.clips or {}) do
         local copy = {}
         for key, value in pairs(clip) do copy[key] = value end

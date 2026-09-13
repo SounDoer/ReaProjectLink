@@ -100,6 +100,9 @@ local adapter = {}
 function adapter.get_project_value(key) return values[key] end
 function adapter.set_project_value(key, value) values[key] = value end
 function adapter.project_sample_rate() return 48000 end
+function adapter.all_tracks() return { { guid = "existing-track", name = "New Lane Target" } } end
+function adapter.track_guid(track) return track.guid end
+function adapter.track_name(track) return track.name end
 function adapter.delivery_instances()
   return {
     {
@@ -153,6 +156,7 @@ assert(review.instances[1].plan.fields.position_seconds.choice == "use_source", 
 assert(review.instances[2].plan.fields.position_seconds.kind == "conflict", "local placement conflict")
 assert(review.additions[1].clip.clipId == "clip-2", "new Clip detected")
 assert(review.unmapped_lanes[1].lane_id == "lane-2", "new Lane requires mapping")
+assert(review.unmapped_lanes[1].suggestions[1].track_guid == "existing-track", "new Lane offers existing Tracks")
 
 local result, apply_error = mix_update.apply(review, adapter, {
   instances = {
