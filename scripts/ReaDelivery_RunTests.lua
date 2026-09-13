@@ -16,6 +16,7 @@ package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.pa
 local ok, result = xpcall(function()
   local passed = dofile(root .. "/tests/source_service_spec.lua")
   passed = passed + dofile(root .. "/tests/manifest_spec.lua")
+  passed = passed + dofile(root .. "/tests/hash_spec.lua")
   return passed
 end, debug.traceback)
 
