@@ -216,4 +216,9 @@ function M.mark_project_dirty()
   reaper.MarkProjectDirty(project())
 end
 
+function M.save_project()
+  reaper.Main_SaveProject(project(), false)
+  return true
+end
+
 return M

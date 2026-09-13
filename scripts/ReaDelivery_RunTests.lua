@@ -23,6 +23,7 @@ local ok, result = xpcall(function()
   passed = passed + dofile(root .. "/tests/filesystem_spec.lua")
   passed = passed + dofile(root .. "/tests/publish_plan_spec.lua")
   passed = passed + dofile(root .. "/tests/source_review_spec.lua")
+  passed = passed + dofile(root .. "/tests/source_publish_spec.lua")
   return passed
 end, debug.traceback)
 

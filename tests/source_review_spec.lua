@@ -152,4 +152,14 @@ assert(changed.lanes[1].clips[2].clip_id == "retired-1", "explicit identity link
 assert(changed.lanes[1].clips[2].status == "Audio Changed", "linked revision comparison")
 assert(#changed.retired == 0, "linked Clip is not retired")
 
-return 5
+current.lanes[1].clips[2].clip_id = "clip-1"
+local duplicated = source_review.build({
+  current = current,
+  previous_snapshot = previous,
+  publish_anyway = true,
+}, fs)
+assert(duplicated.blocker_count == 2, "each duplicate identity blocks")
+assert(duplicated.lanes[1].clips[1].status == "Blocked", "first duplicate blocked")
+assert(duplicated.lanes[1].clips[2].status == "Blocked", "second duplicate blocked")
+
+return 6

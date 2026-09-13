@@ -97,10 +97,12 @@ function M.build(input, fs)
   local previous_by_id, ordered_previous = previous_index(input.previous_snapshot)
   local decisions = input.identity_decisions or {}
   local current_ids = {}
+  local current_id_counts = {}
   for _, lane in ipairs(input.current.lanes or {}) do
     for _, clip in ipairs(lane.clips or {}) do
       if clip.clip_id and clip.clip_id ~= "" then
         current_ids[clip.clip_id] = true
+        current_id_counts[clip.clip_id] = (current_id_counts[clip.clip_id] or 0) + 1
       end
     end
   end
@@ -139,7 +141,12 @@ function M.build(input, fs)
       local row = { clip = clip, blockers = clip.blockers or {} }
       local decision = decisions[clip.item_ref]
 
-      if #row.blockers > 0 or not clip.media_hash or not clip.media_size then
+      if clip.clip_id and clip.clip_id ~= "" and
+          current_id_counts[clip.clip_id] > 1 then
+        row.status = "Blocked"
+        table.insert(row.blockers, "Duplicate Clip ID must be resolved")
+        result.blocker_count = result.blocker_count + 1
+      elseif #row.blockers > 0 or not clip.media_hash or not clip.media_size then
         row.status = "Blocked"
         result.blocker_count = result.blocker_count + math.max(1, #row.blockers)
       elseif not clip.clip_id or clip.clip_id == "" then

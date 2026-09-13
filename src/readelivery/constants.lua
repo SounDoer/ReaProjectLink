@@ -7,6 +7,10 @@ M.PROJECT_KEYS = {
   schema_version = "schema_version",
   project_mode = "project_mode",
   source_project_id = "source_project_id",
+  delivery_set_id = "delivery_set_id",
+  publish_revision = "publish_revision",
+  picture_id = "picture_id",
+  reviewed_picture_revision = "reviewed_picture_revision",
 }
 
 M.TRACK_KEYS = {
