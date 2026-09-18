@@ -210,25 +210,34 @@ function M.review(adapter, fs, source_project_id)
   local mix_tracks = adapter.all_tracks()
   for _, lane in ipairs(latest.lanes or {}) do
     local binding = lane_bindings[lane.laneId]
-    if not binding or binding.skipped then
+    -- Deleting the bound Mix Track must not strand the Lane; it becomes
+    -- mappable again so its Clips can be imported onto a new Track.
+    local orphaned = binding ~= nil and binding.trackGuid ~= nil and
+      adapter.track_by_guid(binding.trackGuid) == nil
+    if not binding or binding.skipped or orphaned then
       local unmapped = {
         lane_id = lane.laneId,
         display_name = lane.displayName,
+        orphaned = orphaned,
         clips = {},
         suggestions = track_suggestions.for_lane(adapter, mix_tracks, lane.displayName),
       }
       for _, clip in ipairs(lane.clips or {}) do
-        local copy = {}
-        for key, value in pairs(clip) do copy[key] = value end
-        copy.media_path = normalize_path(fs.join(latest_directory, clip.mediaFile))
-        local digest = fs.hash_file(copy.media_path)
-        if digest ~= clip.mediaHash:gsub("^sha256:", "") then
-          copy.blocked = true
-          copy.error = digest and "Managed WAV hash mismatch." or
-            "Managed WAV is missing or unreadable."
-          result.blocker_count = result.blocker_count + 1
+        -- An Item moved off the deleted Track keeps its Instance and must not
+        -- be imported a second time.
+        if not instance_clips[clip.clipId] then
+          local copy = {}
+          for key, value in pairs(clip) do copy[key] = value end
+          copy.media_path = normalize_path(fs.join(latest_directory, clip.mediaFile))
+          local digest = fs.hash_file(copy.media_path)
+          if digest ~= clip.mediaHash:gsub("^sha256:", "") then
+            copy.blocked = true
+            copy.error = digest and "Managed WAV hash mismatch." or
+              "Managed WAV is missing or unreadable."
+            result.blocker_count = result.blocker_count + 1
+          end
+          table.insert(unmapped.clips, copy)
         end
-        table.insert(unmapped.clips, copy)
       end
       table.insert(result.unmapped_lanes, unmapped)
     elseif binding.trackGuid then

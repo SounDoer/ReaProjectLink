@@ -362,6 +362,9 @@ end
 local function draw_mapping(lane, mappings, prefix)
   local mapping = mappings[lane.lane_id]
   ImGui.Text(ctx, lane.display_name .. " (" .. #lane.clips .. " Clips)")
+  if lane.orphaned then
+    ImGui.TextWrapped(ctx, "  Its bound Mix Track was deleted; map it again to restore the Clips.")
+  end
   if ImGui.Button(ctx, "Create Track##" .. prefix .. lane.lane_id) then
     mappings[lane.lane_id] = { kind = "create" }
   end
@@ -401,6 +404,8 @@ local function draw_import()
     local changed
     changed, import_picture_override = ImGui.Checkbox(ctx, "Allow Picture revision difference", import_picture_override)
   end
+  ImGui.Separator(ctx)
+  ImGui.Text(ctx, string.format("Delivery Lanes to map (%d)", #import_review.lanes))
   if ImGui.Button(ctx, "Create All Under Selected Folder Track##import") then
     local selected = adapter.selected_tracks()
     if #selected == 1 then
@@ -515,17 +520,23 @@ local function draw_update()
     changed, include = ImGui.Checkbox(ctx, "Import new Clip " .. (row.clip.displayName or id), include)
     if changed then update_additions[id] = include and "import" or "skip" end
   end
-  if #update_review.unmapped_lanes > 0 and
-      ImGui.Button(ctx, "Create New Lanes Under Selected Folder Track") then
-    local selected = adapter.selected_tracks()
-    if #selected == 1 then
-      for _, lane in ipairs(update_review.unmapped_lanes) do
-        update_lanes[lane.lane_id] = {
-          kind = "create",
-          parent_track_ref = selected[1],
-        }
-      end
-    else notify("Select exactly one Folder Track.", true) end
+  if #update_review.unmapped_lanes > 0 then
+    ImGui.Separator(ctx)
+    ImGui.Text(ctx, string.format(
+      "Delivery Lanes to map (%d)",
+      #update_review.unmapped_lanes
+    ))
+    if ImGui.Button(ctx, "Create All Under Selected Folder Track##update") then
+      local selected = adapter.selected_tracks()
+      if #selected == 1 then
+        for _, lane in ipairs(update_review.unmapped_lanes) do
+          update_lanes[lane.lane_id] = {
+            kind = "create",
+            parent_track_ref = selected[1],
+          }
+        end
+      else notify("Select exactly one Folder Track.", true) end
+    end
   end
   for _, lane in ipairs(update_review.unmapped_lanes) do draw_mapping(lane, update_lanes, "update-") end
   if update_review.blocker_count == 0 and ImGui.Button(ctx, "Apply Update") then

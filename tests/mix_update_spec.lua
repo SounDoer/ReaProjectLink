@@ -200,4 +200,18 @@ assert(repaired.reassigned_instances == 1, "copied Instance receives a new ident
 local detached = assert(mix_update.detach(adapter, first_item))
 assert(detached.item_ref == first_item, "explicit detach result")
 
-return 4
+duplicate_instances = false
+local orphaned_subscriptions = json.decode(values.source_subscriptions)
+orphaned_subscriptions[1].lanes[1].trackGuid = "deleted-track"
+values.source_subscriptions = json.encode(orphaned_subscriptions)
+local orphaned = assert(mix_update.review(adapter, fs, "source-1"))
+local orphaned_lane
+for _, lane in ipairs(orphaned.unmapped_lanes) do
+  if lane.lane_id == "lane-1" then orphaned_lane = lane end
+end
+assert(orphaned_lane, "a Lane whose Mix Track was deleted can be mapped again")
+assert(orphaned_lane.orphaned, "the Lane reports why it lost its mapping")
+assert(#orphaned_lane.clips == 1, "Clips that still have an Instance are not imported twice")
+assert(orphaned_lane.clips[1].clipId == "clip-2", "only the Clip without an Instance is restored")
+
+return 5
