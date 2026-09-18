@@ -71,12 +71,26 @@ function M.initialize_mix(adapter)
 end
 
 function M.project_state(adapter)
+  local function revision(key)
+    return tonumber(adapter.get_project_value(key)) or 0
+  end
   return {
     mode = current_mode(adapter),
     source_project_id = adapter.get_project_value(
       constants.PROJECT_KEYS.source_project_id
     ),
     path = adapter.project_path(),
+    picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id),
+    picture_manifest_path = adapter.get_project_value(
+      constants.PROJECT_KEYS.picture_manifest_path
+    ),
+    picture_revision = revision(constants.PROJECT_KEYS.picture_revision),
+    synchronized_picture_revision = revision(
+      constants.PROJECT_KEYS.synchronized_picture_revision
+    ),
+    reviewed_picture_revision = revision(
+      constants.PROJECT_KEYS.reviewed_picture_revision
+    ),
   }
 end
 

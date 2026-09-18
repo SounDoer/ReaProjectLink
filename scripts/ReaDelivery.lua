@@ -119,7 +119,7 @@ local function check_source_picture()
   notify(status and "Picture subscription checked." or err, not status)
 end
 
-local function draw_source_picture()
+local function draw_source_picture(state)
   ImGui.Text(ctx, "Picture Subscription")
   if ImGui.Button(ctx, "Select picture.json") then
     local path = choose_json("Select published picture.json")
@@ -130,7 +130,19 @@ local function draw_source_picture()
   end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "Check Picture Update") then check_source_picture() end
-  if not source_picture then return end
+  if not source_picture then
+    if not state.picture_manifest_path or state.picture_manifest_path == "" then
+      ImGui.TextWrapped(ctx, "No Picture subscription yet.")
+    else
+      ImGui.TextWrapped(ctx, "Subscribed: " .. state.picture_manifest_path)
+      ImGui.TextWrapped(ctx, string.format(
+        "Synchronized r%d | reviewed r%d | Check Picture Update for the latest revision",
+        state.synchronized_picture_revision,
+        state.reviewed_picture_revision
+      ))
+    end
+    return
+  end
   ImGui.TextWrapped(ctx, string.format(
     "Picture %s | latest r%d | synchronized r%d | reviewed r%d",
     source_picture.picture_id,
@@ -237,7 +249,7 @@ local function draw_source(state)
   ImGui.TextWrapped(ctx, "Source ID: " .. (state.source_project_id or "assigned on first Publish"))
   ImGui.TextWrapped(ctx, "Project: " .. state.path)
   ImGui.Separator(ctx)
-  draw_source_picture()
+  draw_source_picture(state)
   ImGui.Separator(ctx)
   ImGui.Text(ctx, "Delivery Tracks")
   if ImGui.Button(ctx, "Register Selected Track(s)") then
@@ -253,8 +265,17 @@ local function draw_source(state)
   draw_source_review()
 end
 
-local function draw_picture_publish()
+local function draw_picture_publish(state)
   ImGui.Text(ctx, "Authoritative Picture")
+  if state.picture_revision > 0 then
+    ImGui.TextWrapped(ctx, string.format(
+      "Published Picture %s | r%d",
+      state.picture_id,
+      state.picture_revision
+    ))
+  else
+    ImGui.TextWrapped(ctx, "No Picture published yet.")
+  end
   if ImGui.Button(ctx, "Review Selected Picture Item") then
     local review, err = picture_publish.review(adapter, fs)
     picture_review = review
@@ -446,7 +467,7 @@ local function draw_mix(state)
   ImGui.Text(ctx, "Mode: Mix")
   ImGui.TextWrapped(ctx, "Project: " .. state.path)
   ImGui.Separator(ctx)
-  draw_picture_publish()
+  draw_picture_publish(state)
   ImGui.Separator(ctx)
   ImGui.Text(ctx, "Source Deliveries")
   if ImGui.Button(ctx, "Add Source delivery.json") then begin_import() end
