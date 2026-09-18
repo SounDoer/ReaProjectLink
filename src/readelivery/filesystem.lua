@@ -25,6 +25,32 @@ function M.create(reaper_api)
     return "'" .. value:gsub("'", "''") .. "'"
   end
 
+  local function posix_literal(value)
+    return "'" .. value:gsub("'", "'\\''") .. "'"
+  end
+
+  -- The pure Lua digest runs at a few MB/s, which stalls the UI thread on
+  -- picture and media files. Prefer the platform hashing tool and keep the
+  -- Lua implementation as a fallback.
+  local function native_hash_file(path)
+    local command
+    if separator == "\\" then
+      command = 'certutil -hashfile "' .. path .. '" SHA256'
+    else
+      command = "shasum -a 256 " .. posix_literal(path)
+    end
+    local output = reaper_api.ExecProcess(command, 0)
+    if not output then return nil end
+    if tonumber(output:match("^(-?%d+)")) ~= 0 then return nil end
+    for line in output:gmatch("[^\r\n]+") do
+      local compact = line:gsub("%s", "")
+      if #compact == 64 and compact:match("^%x+$") then return compact:lower() end
+      local token = line:match("^%s*(%x+)%s")
+      if token and #token == 64 then return token:lower() end
+    end
+    return nil
+  end
+
   local function windows_atomic_replace(source, destination)
     local script = table.concat({
       "& {",
@@ -162,7 +188,7 @@ function M.create(reaper_api)
   end
 
   function fs.hash_file(path)
-    return sha256.file(path)
+    return native_hash_file(path) or sha256.file(path)
   end
 
   function fs.move_file(source, destination)

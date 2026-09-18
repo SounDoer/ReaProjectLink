@@ -42,6 +42,11 @@ assert(fs.read_file(copied_path) == "wave bytes", "copied bytes")
 assert(fs.file_size(copied_path) == 10, "copied size")
 assert(fs.hash_file(copied_path) == sha256.digest("wave bytes"), "copied hash")
 
+local spaced_path = fs.join(root, "spaced name.wav")
+local binary_bytes = "\0\r\n\255wave"
+assert(fs.write_file(spaced_path, binary_bytes))
+assert(fs.hash_file(spaced_path) == sha256.digest(binary_bytes), "hash of a spaced binary path")
+
 local stable_path = fs.join(root, "delivery.json")
 local temporary_path = fs.join(root, "delivery.tmp")
 assert(fs.write_file(stable_path, "old"))
