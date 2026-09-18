@@ -50,6 +50,19 @@ local function notify(value, is_error)
   message, message_is_error = value, is_error or false
 end
 
+local function short_id(value)
+  return tostring(value or ""):sub(1, 8)
+end
+
+-- Subscriptions created before the name was stored still carry the package
+-- path, whose last directory is the Source project name.
+local function subscription_name(entry)
+  if entry.sourceProjectName and entry.sourceProjectName ~= "" then
+    return entry.sourceProjectName
+  end
+  return (entry.pointerPath or ""):match("[/\\]([^/\\]+)[/\\][^/\\]+$") or "Unnamed Source"
+end
+
 local function choose_json(title)
   local ok, path = reaper.GetUserFileNameForRead("", title, "json")
   return ok and path or nil
@@ -304,8 +317,8 @@ local function draw_picture_publish(state)
   ImGui.Text(ctx, "Authoritative Picture")
   if state.picture_revision > 0 then
     ImGui.TextWrapped(ctx, string.format(
-      "Published Picture %s | r%d",
-      state.picture_id,
+      "Published Picture (%s) | r%d",
+      short_id(state.picture_id),
       state.picture_revision
     ))
   else
@@ -455,7 +468,19 @@ local function draw_update()
   end
   for _, row in ipairs(update_review.instances) do
     local decision = update_decisions[row.decision_key]
-    if ImGui.TreeNode(ctx, row.clip_id .. " / " .. row.instance_id .. "##" .. row.decision_key) then
+    local label = string.format(
+      "%s (%s)",
+      row.display_name or row.clip_id,
+      short_id(row.clip_id)
+    )
+    if row.clip_instance_total > 1 then
+      label = label .. string.format(
+        " [%d/%d]",
+        row.clip_instance_index,
+        row.clip_instance_total
+      )
+    end
+    if ImGui.TreeNode(ctx, label .. "##" .. row.decision_key) then
       if row.plan.retired then ImGui.TextWrapped(ctx, "Retired upstream; the Item will not be deleted.")
       else
         if row.plan.media.pending then
@@ -536,7 +561,12 @@ local function draw_mix(state)
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "Detach Selected Instance(s)") then detach_selected() end
   for _, entry in ipairs(subscriptions()) do
-    ImGui.TextWrapped(ctx, string.format("%s | accepted r%d", entry.sourceProjectId, entry.acceptedPublishRevision or 0))
+    ImGui.TextWrapped(ctx, string.format(
+      "%s (%s) | accepted r%d",
+      subscription_name(entry),
+      short_id(entry.sourceProjectId),
+      entry.acceptedPublishRevision or 0
+    ))
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Check Update##" .. entry.sourceProjectId) then begin_update(entry.sourceProjectId) end
     ImGui.SameLine(ctx)

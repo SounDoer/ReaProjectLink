@@ -109,6 +109,7 @@ assert(result.items[1].context.source_project_id == "source-1", "Source binding 
 assert(result.items[1].context.instance_id == "instance-1", "local Instance identity")
 local subscriptions = json.decode(values.source_subscriptions)
 assert(subscriptions[1].deliverySetId == "set-1", "subscription persisted")
+assert(subscriptions[1].sourceProjectName == "DX", "subscription carries a readable Source name")
 assert(subscriptions[1].lanes[1].trackGuid == "track-new", "Lane binding persisted")
 assert(subscriptions[1].lanes[2].skipped, "skipped Lane persisted")
 

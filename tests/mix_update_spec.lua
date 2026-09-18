@@ -158,6 +158,11 @@ assert(review.additions[1].clip.clipId == "clip-2", "new Clip detected")
 assert(review.unmapped_lanes[1].lane_id == "lane-2", "new Lane requires mapping")
 assert(review.unmapped_lanes[1].suggestions[1].track_guid == "existing-track", "new Lane offers existing Tracks")
 assert(review.pending_count > 0, "a real update reports pending work")
+assert(review.instances[1].display_name == "Line", "Instances are labelled by Clip name")
+assert(
+  review.instances[2].clip_instance_index == 2 and review.instances[2].clip_instance_total == 2,
+  "Instances sharing one Clip are numbered"
+)
 
 local idle, idle_error = mix_update.apply({ pending_count = 0 }, adapter, {})
 assert(not idle and idle_error == "Nothing to update.", "an up-to-date Source is not applied")

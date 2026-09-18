@@ -139,10 +139,18 @@ function M.review(adapter, fs, source_project_id)
     result.picture_error = "Latest Source delivery references a different Picture ID."
   end
 
+  -- Several Mix Items may legitimately carry one Clip, so the review numbers
+  -- them instead of leaning on identifiers the user cannot read.
+  local clip_totals, clip_seen = {}, {}
+  for _, instance in ipairs(instances) do
+    clip_totals[instance.clip_id] = (clip_totals[instance.clip_id] or 0) + 1
+  end
+
   for _, instance in ipairs(instances) do
     local instance_id = instance.instance_id or ""
     instance_id_counts[instance_id] = (instance_id_counts[instance_id] or 0) + 1
     local occurrence = instance_id_counts[instance_id]
+    clip_seen[instance.clip_id] = (clip_seen[instance.clip_id] or 0) + 1
     local baseline_revision = instance.handled_publish_revision
     local baseline = baseline_cache[baseline_revision]
     if not baseline then
@@ -161,6 +169,10 @@ function M.review(adapter, fs, source_project_id)
       item_ref = instance.item_ref,
       clip_id = instance.clip_id,
       instance_id = instance.instance_id,
+      display_name = (latest_clip and latest_clip.displayName) or
+        (baseline_clip and baseline_clip.displayName),
+      clip_instance_index = clip_seen[instance.clip_id],
+      clip_instance_total = clip_totals[instance.clip_id],
       decision_key = occurrence == 1 and instance_id or
         (instance_id .. "#" .. occurrence),
       needs_new_instance_id = instance_id == "" or occurrence > 1,
@@ -413,6 +425,7 @@ function M.apply(review, adapter, options)
   end
 
   review.subscription.acceptedPublishRevision = review.latest_revision
+  review.subscription.sourceProjectName = review.latest_snapshot.sourceProjectName
   adapter.set_project_value(
     constants.PROJECT_KEYS.source_subscriptions,
     json.encode(review.subscriptions)

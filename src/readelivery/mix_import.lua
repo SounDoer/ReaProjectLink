@@ -136,6 +136,7 @@ function M.apply(review, adapter, options)
   local subscription = {
     pointerPath = review.pointer_path,
     sourceProjectId = review.pointer.sourceProjectId,
+    sourceProjectName = review.snapshot.sourceProjectName,
     deliverySetId = review.pointer.deliverySetId,
     acceptedPublishRevision = review.pointer.latestPublishRevision,
     lanes = {},
