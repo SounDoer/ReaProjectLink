@@ -72,9 +72,11 @@ function tests.reports_persisted_picture_state_without_reading_files()
       picture_manifest_path = "C:/mix/_Delivery/Mix/picture.json",
       synchronized_picture_revision = "2",
       reviewed_picture_revision = "2",
+      publish_revision = "4",
     },
   })
   local state = source_service.project_state(adapter)
+  equal(state.publish_revision, 4, "published Delivery revision")
   equal(state.picture_id, "picture-1", "picture id")
   equal(state.picture_manifest_path, "C:/mix/_Delivery/Mix/picture.json", "manifest path")
   equal(state.synchronized_picture_revision, 2, "synchronized revision")

@@ -275,6 +275,11 @@ end
 local function draw_source(state)
   ImGui.Text(ctx, "Mode: Source")
   ImGui.TextWrapped(ctx, "Source ID: " .. (state.source_project_id or "assigned on first Publish"))
+  if state.publish_revision > 0 then
+    ImGui.TextWrapped(ctx, "Published Delivery: r" .. state.publish_revision)
+  else
+    ImGui.TextWrapped(ctx, "Published Delivery: none yet")
+  end
   ImGui.TextWrapped(ctx, "Project: " .. state.path)
   ImGui.Separator(ctx)
   draw_source_picture(state)
@@ -369,6 +374,13 @@ local function draw_mapping(lane, mappings, prefix)
     mappings[lane.lane_id] = { kind = "create" }
   end
   ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Use Selected Track##" .. prefix .. lane.lane_id) then
+    local selected = adapter.selected_tracks()
+    if #selected == 1 then
+      mappings[lane.lane_id] = { kind = "existing", track_ref = selected[1] }
+    else notify("Select exactly one Track.", true) end
+  end
+  ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "Skip##" .. prefix .. lane.lane_id) then
     mappings[lane.lane_id] = { kind = "skip" }
   end
@@ -377,7 +389,13 @@ local function draw_mapping(lane, mappings, prefix)
       mappings[lane.lane_id] = { kind = "existing", track_ref = suggestion.track_ref }
     end
   end
-  if mapping then ImGui.Text(ctx, "  Mapping: " .. mapping.kind) end
+  if mapping then
+    local detail = mapping.kind
+    if mapping.kind == "existing" then
+      detail = "use " .. adapter.track_name(mapping.track_ref)
+    end
+    ImGui.Text(ctx, "  Mapping: " .. detail)
+  end
 end
 
 local function begin_import()

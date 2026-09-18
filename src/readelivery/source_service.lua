@@ -84,6 +84,7 @@ function M.project_state(adapter)
     picture_manifest_path = adapter.get_project_value(
       constants.PROJECT_KEYS.picture_manifest_path
     ),
+    publish_revision = revision(constants.PROJECT_KEYS.publish_revision),
     picture_revision = revision(constants.PROJECT_KEYS.picture_revision),
     synchronized_picture_revision = revision(
       constants.PROJECT_KEYS.synchronized_picture_revision
