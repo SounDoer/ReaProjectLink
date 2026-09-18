@@ -331,7 +331,6 @@ local function draw_mapping(lane, mappings, prefix)
     mappings[lane.lane_id] = { kind = "skip" }
   end
   for _, suggestion in ipairs(lane.suggestions or {}) do
-    ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Use " .. suggestion.display_name .. "##" .. prefix .. suggestion.track_guid) then
       mappings[lane.lane_id] = { kind = "existing", track_ref = suggestion.track_ref }
     end

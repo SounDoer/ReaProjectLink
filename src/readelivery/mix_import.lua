@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
 
@@ -100,22 +101,8 @@ function M.review(adapter, fs, pointer_path)
       display_name = lane.displayName,
       order = lane.order,
       clips = {},
-      suggestions = {},
+      suggestions = track_suggestions.for_lane(adapter, tracks, lane.displayName),
     }
-    for _, track in ipairs(tracks) do
-      table.insert(reviewed_lane.suggestions, {
-        track_ref = track,
-        track_guid = adapter.track_guid(track),
-        display_name = adapter.track_name(track),
-      })
-    end
-    table.sort(reviewed_lane.suggestions, function(left, right)
-      local needle = (lane.displayName or ""):lower()
-      local left_match = left.display_name:lower():find(needle, 1, true) ~= nil
-      local right_match = right.display_name:lower():find(needle, 1, true) ~= nil
-      if left_match ~= right_match then return left_match end
-      return left.display_name < right.display_name
-    end)
 
     for _, clip in ipairs(lane.clips or {}) do
       local reviewed_clip = {}

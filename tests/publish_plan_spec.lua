@@ -25,7 +25,7 @@ local plan = publish_plan.build({
           {
             item_ref = "item-1",
             confirmed_new = true,
-            display_name = "Commander Radio Close",
+            display_name = "Commander Radio Close.wav",
             media_path = "C:/bounce/latest.wav",
             media_hash = "abc123",
             media_size = 100,
@@ -50,6 +50,10 @@ assert(
   "managed manifest path"
 )
 assert(plan.media[1].destination == "media/clip-1/Commander_Radio_Close_r0001.wav", "copy target")
+assert(
+  plan.snapshot_input.lanes[1].clips[1].display_name == "Commander Radio Close.wav",
+  "displayName keeps the Item name as the user sees it"
+)
 assert(plan.assignments[1].item_ref == "item-1", "identity assignment target")
 
 local unchanged = publish_plan.build({

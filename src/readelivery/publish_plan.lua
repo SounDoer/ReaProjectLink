@@ -59,9 +59,11 @@ local function build_clip(clip, previous_clips, has_previous, new_id, assignment
   if unchanged then
     media_file = previous.mediaFile
   else
+    -- REAPER Item names usually carry the source extension already.
+    local base_name = ((clip.display_name or ""):gsub("%.[Ww][Aa][Vv]$", ""))
     local filename = string.format(
       "%s_r%04d.wav",
-      sanitize_name(clip.display_name),
+      sanitize_name(base_name),
       media_revision
     )
     local destination = "media/" .. clip_id .. "/" .. filename

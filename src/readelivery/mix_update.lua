@@ -1,6 +1,7 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
 local mix_update_plan = require("readelivery.mix_update_plan")
+local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
 
@@ -192,18 +193,8 @@ function M.review(adapter, fs, source_project_id)
         lane_id = lane.laneId,
         display_name = lane.displayName,
         clips = {},
-        suggestions = {},
+        suggestions = track_suggestions.for_lane(adapter, mix_tracks, lane.displayName),
       }
-      for _, track in ipairs(mix_tracks) do
-        table.insert(unmapped.suggestions, {
-          track_ref = track,
-          track_guid = adapter.track_guid(track),
-          display_name = adapter.track_name(track),
-        })
-      end
-      table.sort(unmapped.suggestions, function(left, right)
-        return left.display_name < right.display_name
-      end)
       for _, clip in ipairs(lane.clips or {}) do
         local copy = {}
         for key, value in pairs(clip) do copy[key] = value end

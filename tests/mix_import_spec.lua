@@ -60,13 +60,14 @@ local values = {
   picture_revision = "7",
   picture_start_samples = "96000",
 }
-local existing_track = { guid = "track-existing", name = "DX Existing" }
+local existing_track = { guid = "track-existing", name = "DX Main Print" }
+local unrelated_track = { guid = "track-unrelated", name = "(unnamed track)" }
 local events = {}
 local adapter = {}
 function adapter.get_project_value(key) return values[key] end
 function adapter.set_project_value(key, value) values[key] = value end
 function adapter.project_sample_rate() return 48000 end
-function adapter.all_tracks() return { existing_track } end
+function adapter.all_tracks() return { existing_track, unrelated_track } end
 function adapter.track_name(track) return track.name end
 function adapter.track_guid(track) return track.guid end
 function adapter.new_id() return "instance-1" end
@@ -88,6 +89,8 @@ assert(review, review_error)
 assert(review.blocker_count == 0, "valid delivery is importable")
 assert(review.picture_warning, "older reviewed Picture is warned")
 assert(review.lanes[1].suggestions[1].track_ref == existing_track, "track-name suggestion")
+assert(#review.lanes[1].suggestions == 1, "unrelated Tracks are not suggested")
+assert(#review.lanes[2].suggestions == 0, "a Lane without a name match has no suggestion")
 assert(review.lanes[1].clips[1].media_path == media_path, "relative media path resolved")
 
 local result, apply_error = mix_import.apply(review, adapter, {
