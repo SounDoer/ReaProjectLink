@@ -38,8 +38,17 @@ assert(plan.conflict_count == 1, "conflict count")
 assert(plan.media.pending, "new media revision pending")
 assert(plan.media.choice == "accept_new_take", "media defaults to a new Take")
 
+local rolled_back = mix_update_plan.build({
+  baseline = {},
+  source = {},
+  mix = {},
+  accepted_media_revision = 4,
+  source_media_revision = 2,
+})
+assert(rolled_back.media.pending, "an older target offers its own audio back")
+
 local retired = mix_update_plan.build({ baseline = {}, mix = {}, source = nil })
 assert(retired.retired, "missing Source Clip is retired")
 assert(retired.media.choice == "skip", "retirement never deletes media")
 
-return 2
+return 3

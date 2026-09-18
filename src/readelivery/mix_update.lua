@@ -76,7 +76,7 @@ local function find_subscription(subscriptions, source_project_id)
   end
 end
 
-function M.review(adapter, fs, source_project_id)
+function M.review(adapter, fs, source_project_id, target_revision)
   local stored = adapter.get_project_value(constants.PROJECT_KEYS.source_subscriptions)
   if not stored or stored == "" then return nil, "Mix project has no Source subscriptions." end
   local ok, subscriptions = pcall(json.decode, stored)
@@ -91,25 +91,25 @@ function M.review(adapter, fs, source_project_id)
     return nil, "Subscribed Source or Delivery Set identity changed."
   end
   local package_root = subscription.pointerPath:match("^(.*)[/\\][^/\\]+$")
-  local latest_path = fs.join(package_root, pointer.manifest)
-  local latest, latest_error = read_json(fs, latest_path, "latest Delivery Manifest")
-  if not latest then return nil, latest_error end
-  if latest.publishRevision ~= pointer.latestPublishRevision then
-    return nil, "Delivery pointer and latest snapshot revision do not match."
+  local latest_revision = pointer.latestPublishRevision
+  -- Every published snapshot is immutable, so any of them can serve as the
+  -- target the Mix project is aligned to.
+  local target = tonumber(target_revision) or latest_revision
+  if target < 1 or target > latest_revision then
+    return nil, "Requested Delivery revision was never published."
   end
-  local latest_clips = clip_index(latest)
-  local latest_directory = latest_path:match("^(.*)[/\\][^/\\]+$")
-  local accepted_path = fs.join(
-    package_root,
-    string.format("history/publish-%04d.json", subscription.acceptedPublishRevision)
-  )
-  local accepted_snapshot, accepted_error = read_json(
-    fs,
-    accepted_path,
-    "accepted Delivery Manifest"
-  )
-  if not accepted_snapshot then return nil, accepted_error end
-  local accepted_clips = clip_index(accepted_snapshot)
+  local target_path = target == latest_revision and
+    fs.join(package_root, pointer.manifest) or
+    fs.join(package_root, string.format("history/publish-%04d.json", target))
+  local snapshot, snapshot_error = read_json(fs, target_path, "target Delivery Manifest")
+  if not snapshot then return nil, snapshot_error end
+  if snapshot.publishRevision ~= target then
+    return nil, "Delivery snapshot does not carry the expected revision."
+  end
+  local target_clips = clip_index(snapshot)
+  local target_directory = target_path:match("^(.*)[/\\][^/\\]+$")
+  local declined = {}
+  for _, clip_id in ipairs(subscription.declinedClips or {}) do declined[clip_id] = true end
   local lane_bindings = {}
   for _, binding in ipairs(subscription.lanes or {}) do
     lane_bindings[binding.laneId] = binding
@@ -122,21 +122,24 @@ function M.review(adapter, fs, source_project_id)
     subscription_index = subscription_index,
     subscriptions = subscriptions,
     subscription = subscription,
-    latest_revision = pointer.latestPublishRevision,
-    latest_snapshot = latest,
+    latest_revision = latest_revision,
+    target_revision = target,
+    target_snapshot = snapshot,
     instances = {},
     additions = {},
     unmapped_lanes = {},
+    bound_lanes = {},
+    declined_clips = {},
     blocker_count = 0,
     picture_warning = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.picture_revision
-    )) ~= latest.picture.reviewedRevision,
+    )) ~= snapshot.picture.reviewedRevision,
   }
 
   local mix_picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id)
-  if mix_picture_id ~= latest.picture.pictureId then
+  if mix_picture_id ~= snapshot.picture.pictureId then
     result.blocker_count = result.blocker_count + 1
-    result.picture_error = "Latest Source delivery references a different Picture ID."
+    result.picture_error = "Targeted Source delivery references a different Picture ID."
   end
 
   -- Several Mix Items may legitimately carry one Clip, so the review numbers
@@ -164,12 +167,12 @@ function M.review(adapter, fs, source_project_id)
       baseline_cache[baseline_revision] = baseline
     end
     local baseline_clip = clip_index(baseline)[instance.clip_id]
-    local latest_clip = latest_clips[instance.clip_id]
+    local target_clip = target_clips[instance.clip_id]
     local row = {
       item_ref = instance.item_ref,
       clip_id = instance.clip_id,
       instance_id = instance.instance_id,
-      display_name = (latest_clip and latest_clip.displayName) or
+      display_name = (target_clip and target_clip.displayName) or
         (baseline_clip and baseline_clip.displayName),
       clip_instance_index = clip_seen[instance.clip_id],
       clip_instance_total = clip_totals[instance.clip_id],
@@ -178,9 +181,9 @@ function M.review(adapter, fs, source_project_id)
       needs_new_instance_id = instance_id == "" or occurrence > 1,
       accepted_media_revision = instance.accepted_media_revision,
       baseline = clip_state(baseline_clip, baseline.sampleRate),
-      source = clip_state(latest_clip, latest.sampleRate),
+      source = clip_state(target_clip, snapshot.sampleRate),
       mix = instance.state,
-      latest_clip = latest_clip,
+      target_clip = target_clip,
       advanced_take_state = instance.advanced_take_state,
     }
     row.plan = mix_update_plan.build({
@@ -188,13 +191,13 @@ function M.review(adapter, fs, source_project_id)
       source = row.source,
       mix = row.mix,
       accepted_media_revision = instance.accepted_media_revision,
-      source_media_revision = latest_clip and latest_clip.mediaRevision,
+      source_media_revision = target_clip and target_clip.mediaRevision,
     })
-    if latest_clip then
-      row.media_path = normalize_path(fs.join(latest_directory, latest_clip.mediaFile))
+    if target_clip then
+      row.media_path = normalize_path(fs.join(target_directory, target_clip.mediaFile))
       if row.plan.media.pending then
         local digest = fs.hash_file(row.media_path)
-        if digest ~= latest_clip.mediaHash:gsub("^sha256:", "") then
+        if digest ~= target_clip.mediaHash:gsub("^sha256:", "") then
           row.blocked = true
           row.error = digest and "Managed WAV hash mismatch." or
             "Managed WAV is missing or unreadable."
@@ -205,30 +208,49 @@ function M.review(adapter, fs, source_project_id)
     table.insert(result.instances, row)
   end
 
-  local instance_clips = {}
-  for _, instance in ipairs(instances) do instance_clips[instance.clip_id] = true end
+  local instance_clips, instance_tracks = {}, {}
+  for _, instance in ipairs(instances) do
+    instance_clips[instance.clip_id] = true
+    instance_tracks[instance.clip_id] = instance_tracks[instance.clip_id] or instance.track_ref
+  end
   local mix_tracks = adapter.all_tracks()
-  for _, lane in ipairs(latest.lanes or {}) do
+  for _, lane in ipairs(snapshot.lanes or {}) do
     local binding = lane_bindings[lane.laneId]
     -- Deleting the bound Mix Track must not strand the Lane; it becomes
     -- mappable again so its Clips can be imported onto a new Track.
-    local orphaned = binding ~= nil and binding.trackGuid ~= nil and
-      adapter.track_by_guid(binding.trackGuid) == nil
+    local bound_track = binding and binding.trackGuid and
+      adapter.track_by_guid(binding.trackGuid) or nil
+    local orphaned = binding ~= nil and binding.trackGuid ~= nil and bound_track == nil
     if not binding or binding.skipped or orphaned then
       local unmapped = {
         lane_id = lane.laneId,
         display_name = lane.displayName,
         orphaned = orphaned,
         clips = {},
+        present_clips = {},
         suggestions = track_suggestions.for_lane(adapter, mix_tracks, lane.displayName),
       }
       for _, clip in ipairs(lane.clips or {}) do
-        -- An Item moved off the deleted Track keeps its Instance and must not
-        -- be imported a second time.
-        if not instance_clips[clip.clipId] then
+        -- A Clip that already has an Instance stays where the mix user put it,
+        -- so the Lane reports it instead of importing a second copy.
+        if instance_clips[clip.clipId] then
+          local track = instance_tracks[clip.clipId]
+          table.insert(unmapped.present_clips, {
+            clip_id = clip.clipId,
+            display_name = clip.displayName,
+            track_name = track and adapter.track_name(track),
+            track_ref = track,
+          })
+        elseif declined[clip.clipId] then
+          table.insert(result.declined_clips, {
+            clip_id = clip.clipId,
+            display_name = clip.displayName,
+            lane_display_name = lane.displayName,
+          })
+        else
           local copy = {}
           for key, value in pairs(clip) do copy[key] = value end
-          copy.media_path = normalize_path(fs.join(latest_directory, clip.mediaFile))
+          copy.media_path = normalize_path(fs.join(target_directory, clip.mediaFile))
           local digest = fs.hash_file(copy.media_path)
           if digest ~= clip.mediaHash:gsub("^sha256:", "") then
             copy.blocked = true
@@ -239,11 +261,43 @@ function M.review(adapter, fs, source_project_id)
           table.insert(unmapped.clips, copy)
         end
       end
+      -- The Track already holding the Lane's Clips is the likeliest target and
+      -- display names alone would never suggest it.
+      for _, present in ipairs(unmapped.present_clips) do
+        local guid = present.track_ref and adapter.track_guid(present.track_ref)
+        local known = guid == nil
+        for _, suggestion in ipairs(unmapped.suggestions) do
+          if suggestion.track_guid == guid then known = true end
+        end
+        if not known then
+          table.insert(unmapped.suggestions, 1, {
+            track_ref = present.track_ref,
+            track_guid = guid,
+            display_name = present.track_name,
+          })
+        end
+      end
       table.insert(result.unmapped_lanes, unmapped)
     elseif binding.trackGuid then
+      -- Moving an Item elsewhere never breaks its Instance, but the Lane still
+      -- decides where the next new Clip lands, so the target stays visible.
+      table.insert(result.bound_lanes, {
+        lane_id = lane.laneId,
+        display_name = lane.displayName,
+        track_guid = binding.trackGuid,
+        track_name = adapter.track_name(bound_track),
+      })
       for _, clip in ipairs(lane.clips or {}) do
-        if not accepted_clips[clip.clipId] and not instance_clips[clip.clipId] then
-          local media_path = normalize_path(fs.join(latest_directory, clip.mediaFile))
+        -- A Clip belongs in the Mix unless an Item already carries it or the
+        -- mix user declined it; a passing revision number proves nothing.
+        if declined[clip.clipId] then
+          table.insert(result.declined_clips, {
+            clip_id = clip.clipId,
+            display_name = clip.displayName,
+            lane_display_name = lane.displayName,
+          })
+        elseif not instance_clips[clip.clipId] then
+          local media_path = normalize_path(fs.join(target_directory, clip.mediaFile))
           local digest = fs.hash_file(media_path)
           local addition = {
             lane_id = lane.laneId,
@@ -274,7 +328,10 @@ end
 
 function M.apply(review, adapter, options)
   options = options or {}
-  if review.pending_count == 0 then return nil, "Nothing to update." end
+  local rebindings = options.lane_rebindings or {}
+  if review.pending_count == 0 and next(rebindings) == nil then
+    return nil, "Nothing to update."
+  end
   if review.blocker_count > 0 then return nil, "Update Review has blockers." end
   if review.picture_warning and not options.allow_picture_revision_mismatch then
     return nil, "Source was reviewed against a different Picture revision."
@@ -299,6 +356,7 @@ function M.apply(review, adapter, options)
     new_tracks = 0,
     updated_instances = 0,
     reassigned_instances = 0,
+    rebound_lanes = 0,
   }
 
   adapter.begin_undo("Apply ReaDelivery Source update")
@@ -313,7 +371,7 @@ function M.apply(review, adapter, options)
       source = row.source,
       mix = row.mix,
       accepted_media_revision = row.accepted_media_revision,
-      source_media_revision = row.latest_clip and row.latest_clip.mediaRevision,
+      source_media_revision = row.target_clip and row.target_clip.mediaRevision,
       media_choice = decision.media_choice,
       field_choices = decision.field_choices,
     })
@@ -325,15 +383,15 @@ function M.apply(review, adapter, options)
       end
       local added, add_error = adapter.add_delivery_take(
         row.item_ref,
-        row.latest_clip,
+        row.target_clip,
         row.media_path,
-        { source_sample_rate = review.latest_snapshot.sampleRate }
+        { source_sample_rate = review.target_snapshot.sampleRate }
       )
       if not added then
         adapter.end_undo("Apply ReaDelivery Source update")
         return nil, add_error
       end
-      accepted_media_revision = row.latest_clip.mediaRevision
+      accepted_media_revision = row.target_clip.mediaRevision
       result.new_takes = result.new_takes + 1
     end
     if not plan.retired then
@@ -353,7 +411,7 @@ function M.apply(review, adapter, options)
     adapter.set_instance_revisions(
       row.item_ref,
       accepted_media_revision,
-      review.latest_revision
+      review.target_revision
     )
     result.updated_instances = result.updated_instances + 1
   end
@@ -368,12 +426,12 @@ function M.apply(review, adapter, options)
     copy.media_path = media_path
     local item, item_error = adapter.create_delivery_item(track, copy, {
       position_seconds = picture_start / project_sample_rate +
-        clip.startOffsetSamples / review.latest_snapshot.sampleRate,
+        clip.startOffsetSamples / review.target_snapshot.sampleRate,
       source_project_id = review.source_project_id,
-      publish_revision = review.latest_revision,
-      picture_revision = review.latest_snapshot.picture.reviewedRevision,
+      publish_revision = review.target_revision,
+      picture_revision = review.target_snapshot.picture.reviewedRevision,
       instance_id = adapter.new_id(),
-      source_sample_rate = review.latest_snapshot.sampleRate,
+      source_sample_rate = review.target_snapshot.sampleRate,
     })
     if not item then return nil, item_error end
     result.new_items = result.new_items + 1
@@ -433,8 +491,37 @@ function M.apply(review, adapter, options)
     end
   end
 
-  review.subscription.acceptedPublishRevision = review.latest_revision
-  review.subscription.sourceProjectName = review.latest_snapshot.sourceProjectName
+  for lane_id, track in pairs(rebindings) do
+    local binding
+    for _, candidate in ipairs(review.subscription.lanes or {}) do
+      if candidate.laneId == lane_id then binding = candidate end
+    end
+    local guid = track and adapter.track_guid(track)
+    if not binding or not guid then
+      adapter.end_undo("Apply ReaDelivery Source update")
+      return nil, "Rebound Mix Track is unavailable."
+    end
+    binding.skipped = nil
+    binding.trackGuid = guid
+    result.rebound_lanes = result.rebound_lanes + 1
+  end
+
+  -- Declining a Clip has to outlive the revision it was offered in, otherwise
+  -- the Clip silently disappears once the accepted revision moves past it.
+  local declined = {}
+  for _, clip_id in ipairs(review.subscription.declinedClips or {}) do
+    declined[clip_id] = true
+  end
+  for _, addition in ipairs(review.additions) do
+    declined[addition.clip.clipId] = addition_decisions[addition.clip.clipId] == "skip" or nil
+  end
+  local declined_list = {}
+  for clip_id in pairs(declined) do table.insert(declined_list, clip_id) end
+  table.sort(declined_list)
+  review.subscription.declinedClips = #declined_list > 0 and declined_list or nil
+
+  review.subscription.acceptedPublishRevision = review.target_revision
+  review.subscription.sourceProjectName = review.target_snapshot.sourceProjectName
   adapter.set_project_value(
     constants.PROJECT_KEYS.source_subscriptions,
     json.encode(review.subscriptions)
@@ -442,6 +529,27 @@ function M.apply(review, adapter, options)
   adapter.mark_project_dirty()
   adapter.end_undo("Apply ReaDelivery Source update")
   return result
+end
+
+function M.undecline(adapter, source_project_id, clip_id)
+  local stored = adapter.get_project_value(constants.PROJECT_KEYS.source_subscriptions)
+  local ok, subscriptions = pcall(json.decode, stored or "")
+  if not ok or type(subscriptions) ~= "table" then
+    return nil, "Stored Source subscriptions are invalid."
+  end
+  local subscription = find_subscription(subscriptions, source_project_id)
+  if not subscription then return nil, "Source subscription was not found." end
+  local kept = {}
+  for _, id in ipairs(subscription.declinedClips or {}) do
+    if id ~= clip_id then table.insert(kept, id) end
+  end
+  subscription.declinedClips = #kept > 0 and kept or nil
+  adapter.set_project_value(
+    constants.PROJECT_KEYS.source_subscriptions,
+    json.encode(subscriptions)
+  )
+  adapter.mark_project_dirty()
+  return { clip_id = clip_id }
 end
 
 function M.detach(adapter, item)

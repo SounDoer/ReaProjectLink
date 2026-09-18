@@ -37,7 +37,9 @@ function M.build(input)
     fields = {},
     conflict_count = 0,
     media = {
-      pending = (input.source_media_revision or 0) >
+      -- Targeting an older revision has to offer its audio back, so any
+      -- difference from the accepted media revision is pending.
+      pending = (input.source_media_revision or 0) ~=
         (input.accepted_media_revision or 0),
     },
   }

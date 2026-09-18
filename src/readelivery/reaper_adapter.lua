@@ -470,6 +470,7 @@ function M.delivery_instances(source_project_id)
         local take = reaper.GetActiveTake(item)
         table.insert(instances, {
           item_ref = item,
+          track_ref = track,
           clip_id = M.get_item_clip_id(item),
           instance_id = get_item_string(item, constants.ITEM_KEYS.instance_id),
           accepted_media_revision = tonumber(get_item_string(

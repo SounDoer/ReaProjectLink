@@ -41,6 +41,8 @@ local source_picture, source_review, picture_review, import_review, update_revie
 local source_decisions, import_mappings = {}, {}
 local source_save_as_decision
 local update_decisions, update_additions, update_lanes = {}, {}, {}
+local update_rebindings = {}
+local update_target_input = 0
 local publish_anyway, import_picture_override, update_picture_override = false, false, false
 local picture_publish_anyway = false
 local show_unchanged = false
@@ -366,9 +368,16 @@ end
 
 local function draw_mapping(lane, mappings, prefix)
   local mapping = mappings[lane.lane_id]
-  ImGui.Text(ctx, lane.display_name .. " (" .. #lane.clips .. " Clips)")
+  ImGui.Text(ctx, lane.display_name .. " (" .. #lane.clips .. " Clips to import)")
   if lane.orphaned then
     ImGui.TextWrapped(ctx, "  Its bound Mix Track was deleted; map it again to restore the Clips.")
+  end
+  for _, present in ipairs(lane.present_clips or {}) do
+    ImGui.TextWrapped(ctx, string.format(
+      "  %s is already in this project on %s and will not be imported again.",
+      present.display_name or short_id(present.clip_id),
+      present.track_name or "an unnamed Track"
+    ))
   end
   if ImGui.Button(ctx, "Create Track##" .. prefix .. lane.lane_id) then
     mappings[lane.lane_id] = { kind = "create" }
@@ -455,11 +464,14 @@ local function subscriptions()
   return ok and value or {}
 end
 
-local function begin_update(source_id)
-  local review, err = mix_update.review(adapter, fs, source_id)
+local function begin_update(source_id, target_revision)
+  local review, err = mix_update.review(adapter, fs, source_id, target_revision)
+  -- A failed reload keeps the review the user is looking at.
+  if not review then notify(err, true); return end
   update_review = review
   update_decisions, update_additions, update_lanes = {}, {}, {}
-  if not review then notify(err, true); return end
+  update_rebindings = {}
+  update_target_input = review.target_revision
   for _, row in ipairs(review.instances) do
     update_decisions[row.decision_key] = { media_choice = row.plan.media.choice, field_choices = {} }
   end
@@ -467,24 +479,107 @@ local function begin_update(source_id)
   for _, lane in ipairs(review.unmapped_lanes) do update_lanes[lane.lane_id] = { kind = "skip" } end
   if review.pending_count == 0 then
     notify(string.format(
-      "Already up to date with Publish r%d.",
-      review.latest_revision
+      "Already aligned with Publish r%d.",
+      review.target_revision
     ))
   else
     notify("Source Update Review ready.")
   end
 end
 
+local function draw_bound_lanes()
+  if #update_review.bound_lanes == 0 then return end
+  ImGui.Separator(ctx)
+  ImGui.Text(ctx, string.format("Mapped Delivery Lanes (%d)", #update_review.bound_lanes))
+  ImGui.TextWrapped(ctx, "New Clips from a Lane land on its mapped Track. Moving an Item to another Track does not change this.")
+  for _, lane in ipairs(update_review.bound_lanes) do
+    local rebound = update_rebindings[lane.lane_id]
+    ImGui.Text(ctx, string.format(
+      "%s -> %s",
+      lane.display_name,
+      rebound and adapter.track_name(rebound) or lane.track_name
+    ))
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Use Selected Track##rebind-" .. lane.lane_id) then
+      local selected = adapter.selected_tracks()
+      if #selected == 1 then update_rebindings[lane.lane_id] = selected[1]
+      else notify("Select exactly one Track.", true) end
+    end
+    if rebound then
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Keep Current##rebind-" .. lane.lane_id) then
+        update_rebindings[lane.lane_id] = nil
+      end
+    end
+  end
+end
+
+local function draw_declined_clips()
+  if #update_review.declined_clips == 0 then return end
+  ImGui.Separator(ctx)
+  ImGui.Text(ctx, string.format("Declined Clips (%d)", #update_review.declined_clips))
+  ImGui.TextWrapped(ctx, "These Clips are not offered because you skipped them. Offering one again puts it back in this review.")
+  for _, clip in ipairs(update_review.declined_clips) do
+    ImGui.Text(ctx, string.format(
+      "%s in %s",
+      clip.display_name or short_id(clip.clip_id),
+      clip.lane_display_name or "an unnamed Lane"
+    ))
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Offer Again##declined-" .. clip.clip_id) then
+      local result, err = mix_update.undecline(
+        adapter,
+        update_review.source_project_id,
+        clip.clip_id
+      )
+      if result then
+        begin_update(update_review.source_project_id, update_review.target_revision)
+      else notify(err, true) end
+    end
+  end
+end
+
+local function draw_update_target()
+  ImGui.Text(ctx, string.format(
+    "Target Publish r%d of r%d",
+    update_review.target_revision,
+    update_review.latest_revision
+  ))
+  ImGui.SetNextItemWidth(ctx, 120)
+  local changed
+  changed, update_target_input = ImGui.InputInt(ctx, "Revision##target", update_target_input)
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Load Revision") then
+    begin_update(update_review.source_project_id, update_target_input)
+  end
+end
+
 local function draw_update()
   if not update_review then return end
-  if update_review.pending_count == 0 then
+  draw_update_target()
+  local pending = update_review.pending_count > 0
+  if not pending then
     ImGui.TextWrapped(ctx, string.format(
-      "Already up to date with Publish r%d.",
-      update_review.latest_revision
+      "Every Clip of Publish r%d is already aligned in this project.",
+      update_review.target_revision
     ))
+    draw_declined_clips()
+    draw_bound_lanes()
+    if next(update_rebindings) and ImGui.Button(ctx, "Apply Lane Mapping") then
+      local result, err = mix_update.apply(update_review, adapter, {
+        instances = update_decisions,
+        additions = update_additions,
+        lane_mappings = update_lanes,
+        lane_rebindings = update_rebindings,
+        allow_picture_revision_mismatch = update_picture_override,
+      })
+      if result then
+        notify(string.format("Remapped %d Delivery Lane(s).", result.rebound_lanes))
+        update_review = nil
+      else notify(err, true) end
+    end
     return
   end
-  ImGui.Text(ctx, "Update to Publish r" .. update_review.latest_revision)
   if update_review.picture_warning then
     local changed
     changed, update_picture_override = ImGui.Checkbox(ctx, "Allow Picture revision difference##update", update_picture_override)
@@ -531,11 +626,19 @@ local function draw_update()
       ImGui.TreePop(ctx)
     end
   end
+  if #update_review.additions > 0 then
+    ImGui.Separator(ctx)
+    ImGui.Text(ctx, string.format(
+      "Clips without an Item here (%d)",
+      #update_review.additions
+    ))
+    ImGui.TextWrapped(ctx, "Unchecked Clips are declined and remembered, and can be offered again later.")
+  end
   for _, row in ipairs(update_review.additions) do
     local id = row.clip.clipId
     local include = update_additions[id] == "import"
     local changed
-    changed, include = ImGui.Checkbox(ctx, "Import new Clip " .. (row.clip.displayName or id), include)
+    changed, include = ImGui.Checkbox(ctx, "Import " .. (row.clip.displayName or short_id(id)), include)
     if changed then update_additions[id] = include and "import" or "skip" end
   end
   if #update_review.unmapped_lanes > 0 then
@@ -557,11 +660,14 @@ local function draw_update()
     end
   end
   for _, lane in ipairs(update_review.unmapped_lanes) do draw_mapping(lane, update_lanes, "update-") end
+  draw_declined_clips()
+  draw_bound_lanes()
   if update_review.blocker_count == 0 and ImGui.Button(ctx, "Apply Update") then
     local result, err = mix_update.apply(update_review, adapter, {
       instances = update_decisions,
       additions = update_additions,
       lane_mappings = update_lanes,
+      lane_rebindings = update_rebindings,
       allow_picture_revision_mismatch = update_picture_override,
     })
     if result then

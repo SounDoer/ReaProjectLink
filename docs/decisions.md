@@ -448,3 +448,29 @@ metadata. An identical Picture blocks Publish and offers an explicit
 `Publish Anyway` override, because D014 makes every source project treat a newer
 Picture revision as a mandatory re-synchronize and re-review. This differs from
 D042, where each source Publish always advances `publishRevision`.
+
+### D058 — A Lane binding routes new Clips only
+
+The Lane-to-Track binding of D022 decides where the next new Clip is created; it
+never constrains Items that already exist. Clip and Instance identity live on the
+Item, so moving an Item to another Mix Track keeps it updatable and does not ask
+the mix user to map anything again. Update Review therefore lists every mapped
+Lane with its current target Track and allows pointing it at another Track, which
+is the only way to make future Clips follow Items that were moved.
+
+### D059 — A Clip is pending until an Item carries it or the mix user declines it
+
+Update Review no longer treats a passing `acceptedPublishRevision` as proof that
+a Clip was handled. A Clip of the targeted snapshot is offered for import unless
+a Mix Item already carries it or its ID is listed in the subscription's
+`declinedClips`. Deleting an Item therefore offers its Clip again, and Skip
+becomes a durable decision that the review keeps visible and reversible.
+
+### D060 — Update Review targets any published revision
+
+Because every published snapshot is immutable and its media files are retained,
+Update Review accepts a target revision instead of always using the latest one.
+Rolling back is the same per-field review as moving forward, so Mix edits are
+never overwritten silently, and a media revision that merely differs from the
+accepted one counts as pending. The target only governs ReaDelivery-managed
+fields; restoring the rest of a Mix project remains REAPER's own concern.

@@ -61,18 +61,21 @@ table.insert(latest.lanes, {
   clips = {},
 })
 local media_path = root .. "/media/clip-1/Line_r0002.wav"
+local old_media_path = root .. "/media/clip-1/Line_r0001.wav"
 local new_media_path = root .. "/media/clip-2/New_Line_r0001.wav"
 local files = {
   [pointer_path] = json.encode(pointer),
   [root .. "/history/publish-0001.json"] = json.encode(baseline),
   [root .. "/history/publish-0002.json"] = json.encode(latest),
   [media_path] = "media-2",
+  [old_media_path] = "media-1",
   [new_media_path] = "media-new",
 }
 local fs = {}
 function fs.read_file(path) return files[path] end
 function fs.hash_file(path)
   if path == media_path then return "hash-2" end
+  if path == old_media_path then return "hash-1" end
   if path == new_media_path then return "hash-new" end
 end
 function fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
@@ -107,6 +110,7 @@ function adapter.delivery_instances()
   return {
     {
       item_ref = first_item,
+      track_ref = { guid = "moved-track", name = "DX A Alt" },
       clip_id = "clip-1",
       instance_id = "instance-1",
       accepted_media_revision = 1,
@@ -115,6 +119,7 @@ function adapter.delivery_instances()
     },
     {
       item_ref = second_item,
+      track_ref = { guid = "track-1", name = "DX A" },
       clip_id = "clip-1",
       instance_id = duplicate_instances and "instance-1" or "instance-2",
       accepted_media_revision = 1,
@@ -140,7 +145,7 @@ function adapter.detach_instance(item)
 end
 function adapter.mark_project_dirty() table.insert(events, "dirty") end
 function adapter.track_by_guid(guid)
-  if guid == "track-1" then return { guid = guid } end
+  if guid == "track-1" then return { guid = guid, name = "DX A" } end
 end
 function adapter.create_delivery_item(track, clip, context)
   table.insert(events, { "new item", track, clip, context })
@@ -158,6 +163,10 @@ assert(review.additions[1].clip.clipId == "clip-2", "new Clip detected")
 assert(review.unmapped_lanes[1].lane_id == "lane-2", "new Lane requires mapping")
 assert(review.unmapped_lanes[1].suggestions[1].track_guid == "existing-track", "new Lane offers existing Tracks")
 assert(review.pending_count > 0, "a real update reports pending work")
+assert(
+  review.bound_lanes[1].lane_id == "lane-1" and review.bound_lanes[1].track_name == "DX A",
+  "a mapped Lane reports where its new Clips land"
+)
 assert(review.instances[1].display_name == "Line", "Instances are labelled by Clip name")
 assert(
   review.instances[2].clip_instance_index == 2 and review.instances[2].clip_instance_total == 2,
@@ -203,6 +212,7 @@ assert(detached.item_ref == first_item, "explicit detach result")
 duplicate_instances = false
 local orphaned_subscriptions = json.decode(values.source_subscriptions)
 orphaned_subscriptions[1].lanes[1].trackGuid = "deleted-track"
+orphaned_subscriptions[1].declinedClips = nil
 values.source_subscriptions = json.encode(orphaned_subscriptions)
 local orphaned = assert(mix_update.review(adapter, fs, "source-1"))
 local orphaned_lane
@@ -213,5 +223,79 @@ assert(orphaned_lane, "a Lane whose Mix Track was deleted can be mapped again")
 assert(orphaned_lane.orphaned, "the Lane reports why it lost its mapping")
 assert(#orphaned_lane.clips == 1, "Clips that still have an Instance are not imported twice")
 assert(orphaned_lane.clips[1].clipId == "clip-2", "only the Clip without an Instance is restored")
+assert(
+  orphaned_lane.present_clips[1].clip_id == "clip-1" and
+    orphaned_lane.present_clips[1].track_name == "DX A Alt",
+  "a Clip that already has an Instance is reported with the Track holding it"
+)
+assert(
+  orphaned_lane.suggestions[1].track_guid == "moved-track",
+  "the Track already holding the Clips is suggested first"
+)
 
-return 5
+values.source_subscriptions = json.encode(subscriptions)
+local rebind_review = assert(mix_update.review(adapter, fs, "source-1"))
+local rebound = assert(mix_update.apply(rebind_review, adapter, {
+  instances = {
+    ["instance-1"] = { media_choice = "skip" },
+    ["instance-2"] = { media_choice = "skip" },
+  },
+  additions = { ["clip-2"] = "skip" },
+  lane_mappings = { ["lane-2"] = { kind = "skip" } },
+  lane_rebindings = { ["lane-1"] = { guid = "track-9" } },
+}))
+assert(rebound.rebound_lanes == 1, "a mapped Lane can be pointed at another Track")
+assert(
+  json.decode(values.source_subscriptions)[1].lanes[1].trackGuid == "track-9",
+  "rebinding is stored with the subscription"
+)
+
+-- Deleting every Item must not hide the Clips behind an accepted revision.
+values.source_subscriptions = json.encode(subscriptions)
+local linked_instances = adapter.delivery_instances
+adapter.delivery_instances = function() return {} end
+local emptied = assert(mix_update.review(adapter, fs, "source-1"))
+assert(#emptied.instances == 0, "deleted Items leave no Instances")
+local offered = {}
+for _, addition in ipairs(emptied.additions) do offered[addition.clip.clipId] = true end
+assert(offered["clip-1"] and offered["clip-2"], "a Clip without an Item is offered again")
+
+local declined_apply = assert(mix_update.apply(emptied, adapter, {
+  additions = { ["clip-1"] = "skip", ["clip-2"] = "import" },
+  lane_mappings = { ["lane-2"] = { kind = "skip" } },
+}))
+assert(declined_apply.new_items == 1, "only the imported Clip creates an Item")
+assert(
+  json.decode(values.source_subscriptions)[1].declinedClips[1] == "clip-1",
+  "declining a Clip outlives the revision that offered it"
+)
+local declined_review = assert(mix_update.review(adapter, fs, "source-1"))
+assert(
+  #declined_review.additions == 1 and declined_review.additions[1].clip.clipId == "clip-2",
+  "a declined Clip is not offered again"
+)
+assert(
+  declined_review.declined_clips[1].clip_id == "clip-1",
+  "a declined Clip stays visible in the review"
+)
+assert(mix_update.undecline(adapter, "source-1", "clip-1"), "a decline can be undone")
+assert(#mix_update.review(adapter, fs, "source-1").additions == 2, "an undeclined Clip returns")
+
+local rolled_back = assert(mix_update.review(adapter, fs, "source-1", 1))
+assert(
+  rolled_back.target_revision == 1 and rolled_back.latest_revision == 2,
+  "any published revision can be targeted"
+)
+assert(rolled_back.blocker_count == 0, "an older target uses its own media")
+assert(
+  #rolled_back.additions == 1 and rolled_back.additions[1].clip.clipId == "clip-1",
+  "an older target only offers the Clips it published"
+)
+local unpublished, revision_error = mix_update.review(adapter, fs, "source-1", 3)
+assert(
+  not unpublished and revision_error == "Requested Delivery revision was never published.",
+  "an unpublished revision cannot be targeted"
+)
+adapter.delivery_instances = linked_instances
+
+return 8
