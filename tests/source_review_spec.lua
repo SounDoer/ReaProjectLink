@@ -175,7 +175,42 @@ local duplicated = source_review.build({
   publish_anyway = true,
 }, fs)
 assert(duplicated.blocker_count == 2, "each duplicate identity blocks")
-assert(duplicated.lanes[1].clips[1].status == "Blocked", "first duplicate blocked")
-assert(duplicated.lanes[1].clips[2].status == "Blocked", "second duplicate blocked")
+assert(duplicated.lanes[1].clips[1].status == "Needs Decision", "first duplicate is resolvable")
+assert(duplicated.lanes[1].clips[2].status == "Needs Decision", "second duplicate is resolvable")
+assert(duplicated.lanes[1].clips[1].duplicate, "duplicate rows offer the keep decision")
 
-return 6
+local duplicate_resolved = source_review.build({
+  current = current,
+  previous_snapshot = previous,
+  publish_anyway = true,
+  identity_decisions = {
+    ["item-1"] = { kind = "keep" },
+    ["item-2"] = { kind = "new" },
+  },
+}, fs)
+assert(duplicate_resolved.blocker_count == 0, "resolved duplicates stop blocking")
+assert(duplicate_resolved.lanes[1].clips[1].clip_id == "clip-1", "the kept Item continues the lineage")
+assert(duplicate_resolved.lanes[1].clips[2].status == "Added", "the other Item becomes a new Clip")
+assert(
+  duplicate_resolved.lanes[1].clips[2].clip.confirmed_new,
+  "the new Clip is assigned an identity on Publish"
+)
+
+local contested = source_review.build({
+  current = current,
+  previous_snapshot = previous,
+  publish_anyway = true,
+  identity_decisions = {
+    ["item-1"] = { kind = "keep" },
+    ["item-2"] = { kind = "keep" },
+  },
+}, fs)
+assert(contested.blocker_count == 2, "two Items cannot keep one Clip ID")
+assert(contested.lanes[1].clips[1].status == "Blocked", "contested lineage blocks")
+assert(contested.lanes[1].clips[1].duplicate, "a contested Item can still be decided again")
+assert(
+  duplicate_resolved.lanes[1].clips[1].duplicate,
+  "a resolved Item can still be decided again"
+)
+
+return 7

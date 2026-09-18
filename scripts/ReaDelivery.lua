@@ -211,11 +211,18 @@ local function draw_source_review()
         if row.status ~= "Unchanged" or show_unchanged then
           ImGui.TextWrapped(ctx, string.format("[%s] %s", row.status, row.display_name or "(unnamed)"))
         end
-        if row.status == "Needs Decision" then
-          local item_key = tostring(row.clip.item_ref)
+        local item_key = tostring(row.clip.item_ref)
+        if row.status == "Needs Decision" or row.duplicate then
           if ImGui.Button(ctx, "Create New Clip##" .. item_key) then
             source_decisions[row.clip.item_ref] = { kind = "new" }
             refresh_source_review()
+          end
+          if row.duplicate then
+            ImGui.SameLine(ctx)
+            if ImGui.Button(ctx, "Keep this Clip ID##" .. item_key) then
+              source_decisions[row.clip.item_ref] = { kind = "keep" }
+              refresh_source_review()
+            end
           end
           for _, candidate in ipairs(row.suggestions or {}) do
             if ImGui.Button(ctx, "Link as revision of " .. (candidate.display_name or candidate.clip_id) .. "##" .. candidate.clip_id) then
@@ -224,6 +231,13 @@ local function draw_source_review()
             end
             ImGui.SameLine(ctx)
             ImGui.TextWrapped(ctx, table.concat(candidate.reasons, ", "))
+          end
+        end
+        if source_decisions[row.clip.item_ref] then
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "Clear Decision##" .. item_key) then
+            source_decisions[row.clip.item_ref] = nil
+            refresh_source_review()
           end
         end
         if row.status ~= "Unchanged" or show_unchanged then
@@ -261,6 +275,18 @@ local function draw_source(state)
   if ImGui.Button(ctx, "Remove Selected Track(s)") then
     local result, err = source_service.unregister_selected_tracks(adapter)
     notify(result and string.format("Removed %d Track(s).", result.removed) or err, not result)
+  end
+  local lanes = source_service.delivery_tracks(adapter)
+  if #lanes == 0 then
+    ImGui.TextWrapped(ctx, "No Delivery Track registered yet.")
+  else
+    for _, lane in ipairs(lanes) do
+      ImGui.TextWrapped(ctx, string.format(
+        "%s | %d Item(s)",
+        lane.display_name,
+        lane.item_count
+      ))
+    end
   end
   if ImGui.Button(ctx, "Open Publish Review") then refresh_source_review() end
   draw_source_review()

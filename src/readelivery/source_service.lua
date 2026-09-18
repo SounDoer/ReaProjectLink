@@ -94,6 +94,21 @@ function M.project_state(adapter)
   }
 end
 
+function M.delivery_tracks(adapter)
+  local lanes = {}
+  for _, track in ipairs(adapter.all_tracks()) do
+    local lane_id = adapter.get_track_lane_id(track)
+    if lane_id and lane_id ~= "" then
+      table.insert(lanes, {
+        lane_id = lane_id,
+        display_name = adapter.track_name(track),
+        item_count = #adapter.track_items(track),
+      })
+    end
+  end
+  return lanes
+end
+
 function M.register_selected_tracks(adapter)
   if current_mode(adapter) ~= constants.PROJECT_MODES.source then
     return nil, "Only a Source project can register Delivery Tracks."

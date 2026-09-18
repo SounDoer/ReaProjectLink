@@ -117,6 +117,18 @@ function M.build(input, fs)
     end
   end
 
+  -- Exactly one Item may continue the published lineage of a duplicated ID.
+  local keep_counts = {}
+  for _, lane in ipairs(input.current.lanes or {}) do
+    for _, clip in ipairs(lane.clips or {}) do
+      local decision = decisions[clip.item_ref]
+      if decision and decision.kind == "keep" and clip.clip_id and
+          clip.clip_id ~= "" and current_id_counts[clip.clip_id] > 1 then
+        keep_counts[clip.clip_id] = (keep_counts[clip.clip_id] or 0) + 1
+      end
+    end
+  end
+
   local result = {
     publish_revision = input.previous_snapshot and
       input.previous_snapshot.publishRevision + 1 or 1,
@@ -154,10 +166,25 @@ function M.build(input, fs)
       }
       local decision = decisions[clip.item_ref]
 
-      if clip.clip_id and clip.clip_id ~= "" and
-          current_id_counts[clip.clip_id] > 1 then
-        row.status = "Blocked"
+      -- The flag stays on every Item of a duplicated ID whatever it resolves
+      -- to, so the UI can always offer a way back to another decision.
+      local duplicated = clip.clip_id and clip.clip_id ~= "" and
+        current_id_counts[clip.clip_id] > 1
+      row.duplicate = duplicated
+      local contested = duplicated and (keep_counts[clip.clip_id] or 0) > 1
+      if duplicated and decision and decision.kind == "new" then
+        clip.clip_id = ""
+        duplicated = false
+      end
+
+      if duplicated and not (decision and decision.kind == "keep") then
+        row.status = "Needs Decision"
         table.insert(row.blockers, "Duplicate Clip ID must be resolved")
+        result.needs_decision_count = result.needs_decision_count + 1
+        result.blocker_count = result.blocker_count + 1
+      elseif contested then
+        row.status = "Blocked"
+        table.insert(row.blockers, "Only one Item may keep a duplicated Clip ID")
         result.blocker_count = result.blocker_count + 1
       elseif #row.blockers > 0 or not clip.media_hash or not clip.media_size then
         row.status = "Blocked"

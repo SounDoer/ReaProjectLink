@@ -354,7 +354,9 @@ snapshots inside the project.
 Copying or splitting a Mix Item retains its Clip ID but requires a new Instance
 ID. Duplicate Clip IDs found in a Source project are ambiguous and must be
 resolved during Publish review as either a new Clip or an intentional
-replacement relationship.
+replacement relationship. Every Item sharing a duplicated Clip ID requires its
+own decision, and at most one of them may keep the ID, because the Item that
+keeps it silently replaces the audio of the Mix Item already bound to that Clip.
 
 ### D050 — Publish saves durable identity before external commit
 

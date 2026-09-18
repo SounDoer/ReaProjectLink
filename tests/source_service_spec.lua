@@ -82,6 +82,20 @@ function tests.reports_persisted_picture_state_without_reading_files()
   equal(state.picture_revision, 0, "unpublished picture revision")
 end
 
+function tests.lists_registered_delivery_tracks()
+  local adapter = fake_adapter({
+    project_values = { project_mode = "source" },
+    tracks = {
+      { name = "DX Print", lane_id = "lane-1", items = { {}, {} } },
+      { name = "Working", lane_id = "", items = { {} } },
+    },
+  })
+  local lanes = source_service.delivery_tracks(adapter)
+  equal(#lanes, 1, "only registered Tracks are listed")
+  equal(lanes[1].display_name, "DX Print", "Track name")
+  equal(lanes[1].item_count, 2, "Item count")
+end
+
 function tests.rejects_initializing_an_unsaved_project()
   local adapter = fake_adapter({ path = "" })
   local result, err = source_service.initialize_source(adapter)
