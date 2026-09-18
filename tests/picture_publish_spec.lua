@@ -1,3 +1,4 @@
+local json = require("readelivery.json")
 local picture_publish = require("readelivery.picture_publish")
 
 local project_values = { project_mode = "mix" }
@@ -30,9 +31,11 @@ function adapter.end_undo() table.insert(events, "end") end
 function adapter.mark_project_dirty() table.insert(events, "dirty") end
 function adapter.save_project() table.insert(events, "save"); return true end
 
+local published_files = {}
 local fs = {}
 function fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
-function fs.exists(path) return path == item.path end
+function fs.exists(path) return path == item.path or published_files[path] ~= nil end
+function fs.read_file(path) return published_files[path] end
 function fs.hash_file(path) if path == item.path then return "video-hash" end end
 
 local captured
@@ -63,8 +66,23 @@ assert(captured.snapshot.videoFile == item.path, "original video is referenced")
 assert(captured.snapshot.videoHash == "sha256:video-hash", "published video hash")
 assert(captured.snapshot.pictureStartSamples == 96000, "Picture Start")
 
+published_files[fs.join(review.package_root, "picture.json")] = json.encode(captured.pointer)
+published_files[fs.join(review.package_root, captured.pointer.manifest)] =
+  json.encode(captured.snapshot)
+
+local unchanged = assert(service.review(adapter, fs))
+assert(unchanged.picture_revision == 2, "next Picture revision")
+assert(unchanged.unchanged, "an identical Picture is detected")
+assert(unchanged.unchanged_blocker, "an identical Picture blocks Publish by default")
+local refused, refused_error = service.publish(unchanged, adapter, fs, {})
+assert(not refused and refused_error == unchanged.unchanged_blocker, "unchanged Publish is refused")
+
+local overridden = assert(service.review(adapter, fs, { publish_anyway = true }))
+assert(overridden.unchanged, "Publish Anyway still reports the Picture as unchanged")
+assert(not overridden.unchanged_blocker, "Publish Anyway clears the blocker")
+
 item.path = "C:/show/not-picture.wav"
 local rejected, rejected_error = service.review(adapter, fs)
 assert(not rejected and rejected_error:find("video", 1, true), "audio Item cannot become Picture")
 
-return 2
+return 3

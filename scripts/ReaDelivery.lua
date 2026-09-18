@@ -42,6 +42,7 @@ local source_decisions, import_mappings = {}, {}
 local source_save_as_decision
 local update_decisions, update_additions, update_lanes = {}, {}, {}
 local publish_anyway, import_picture_override, update_picture_override = false, false, false
+local picture_publish_anyway = false
 local show_unchanged = false
 local lock_info, lock_package_root
 
@@ -265,6 +266,14 @@ local function draw_source(state)
   draw_source_review()
 end
 
+local function refresh_picture_review()
+  local review, err = picture_publish.review(adapter, fs, {
+    publish_anyway = picture_publish_anyway,
+  })
+  picture_review = review
+  notify(review and "Picture Publish Review ready." or err, not review)
+end
+
 local function draw_picture_publish(state)
   ImGui.Text(ctx, "Authoritative Picture")
   if state.picture_revision > 0 then
@@ -276,24 +285,38 @@ local function draw_picture_publish(state)
   else
     ImGui.TextWrapped(ctx, "No Picture published yet.")
   end
-  if ImGui.Button(ctx, "Review Selected Picture Item") then
-    local review, err = picture_publish.review(adapter, fs)
-    picture_review = review
-    notify(review and "Picture Publish Review ready." or err, not review)
-  end
+  if ImGui.Button(ctx, "Review Selected Picture Item") then refresh_picture_review() end
   if not picture_review then return end
   ImGui.TextWrapped(ctx, string.format(
-    "Picture r%d | %s | %d samples",
-    picture_review.picture_revision,
+    "%s | %d samples",
     picture_review.video_file,
     picture_review.duration_samples
   ))
-  if ImGui.Button(ctx, "Save & Publish Picture") then
-    local result, err = picture_publish.publish(picture_review, adapter, fs, metadata())
-    if result then
-      notify("Published Picture revision " .. result.picture_revision .. ".")
-      picture_review = nil
-    else notify(err, true); inspect_lock(picture_review.package_root) end
+  if picture_review.unchanged then
+    ImGui.TextWrapped(ctx, string.format(
+      "This Picture is identical to published revision r%d.",
+      picture_review.base_revision
+    ))
+    local changed
+    changed, picture_publish_anyway = ImGui.Checkbox(
+      ctx,
+      "Publish Anyway for an unchanged Picture",
+      picture_publish_anyway
+    )
+    if changed then refresh_picture_review() end
+  end
+  if not picture_review.unchanged_blocker then
+    ImGui.TextWrapped(ctx, string.format(
+      "Will publish as r%d.",
+      picture_review.picture_revision
+    ))
+    if ImGui.Button(ctx, "Save & Publish Picture") then
+      local result, err = picture_publish.publish(picture_review, adapter, fs, metadata())
+      if result then
+        notify("Published Picture revision " .. result.picture_revision .. ".")
+        picture_review, picture_publish_anyway = nil, false
+      else notify(err, true); inspect_lock(picture_review.package_root) end
+    end
   end
 end
 

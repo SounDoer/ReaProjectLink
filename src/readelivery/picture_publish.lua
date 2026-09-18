@@ -24,6 +24,34 @@ local function load_pointer(fs, package_root)
   return pointer
 end
 
+local function load_snapshot(fs, package_root, pointer)
+  local path = fs.join(package_root, pointer.manifest)
+  if not fs.exists(path) then return nil end
+  local bytes = fs.read_file(path)
+  if not bytes then return nil end
+  local ok, snapshot = pcall(json.decode, bytes)
+  return ok and snapshot or nil
+end
+
+-- Every Picture Manifest field except the revision and publication metadata.
+local function matches_published(snapshot, state)
+  if not snapshot then return false end
+  local frame_rate = state.frame_rate or {}
+  local published_rate = snapshot.frameRate or {}
+  return snapshot.mixProjectName == state.mix_project_name and
+    snapshot.videoFile == state.video_file and
+    snapshot.videoHash == "sha256:" .. state.video_hash and
+    snapshot.sampleRate == state.sample_rate and
+    snapshot.pictureStartSamples == state.picture_start_samples and
+    snapshot.sourceOffsetSamples == state.source_offset_samples and
+    snapshot.durationSamples == state.duration_samples and
+    snapshot.playbackRate == state.playback_rate and
+    snapshot.projectTimecodeOffsetSamples == state.project_timecode_offset_samples and
+    published_rate.numerator == frame_rate.numerator and
+    published_rate.denominator == frame_rate.denominator and
+    (published_rate.dropFrame or false) == (frame_rate.drop_frame or false)
+end
+
 local VIDEO_EXTENSIONS = {
   mov = true,
   mp4 = true,
@@ -44,7 +72,8 @@ function M.create(dependencies)
   local writer = dependencies.picture_writer or default_picture_writer
   local service = {}
 
-  function service.review(adapter, fs)
+  function service.review(adapter, fs, options)
+    options = options or {}
     if adapter.get_project_value(constants.PROJECT_KEYS.project_mode) ~=
         constants.PROJECT_MODES.mix then
       return nil, "Only a Mix project can Publish Picture."
@@ -90,10 +119,20 @@ function M.create(dependencies)
     state.mix_project_name = project_name
     state.video_hash = fs.hash_file(state.video_file)
     if not state.video_hash then return nil, "Could not hash the selected Picture media." end
+
+    state.unchanged = pointer ~= nil and
+      matches_published(load_snapshot(fs, package_root, pointer), state)
+    if state.unchanged and not options.publish_anyway then
+      state.unchanged_blocker = string.format(
+        "This Picture is identical to published revision r%d.",
+        state.base_revision
+      )
+    end
     return state
   end
 
   function service.publish(review, adapter, fs, metadata)
+    if review.unchanged_blocker then return nil, review.unchanged_blocker end
     metadata = metadata or {}
     local picture_id = review.picture_id
     if not picture_id or picture_id == "" then picture_id = adapter.new_id() end

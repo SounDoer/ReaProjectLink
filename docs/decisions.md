@@ -437,3 +437,12 @@ adapter and ReaImGui presentation layers. Python, a standalone desktop app, and
 a native C++ REAPER extension are outside the initial implementation. A native
 extension may be reconsidered later if continuous monitoring or stronger
 filesystem and lifecycle integration becomes necessary.
+
+### D057 — An unchanged Picture does not publish a new revision by default
+
+Picture Publish Review compares the selected Item against the latest published
+snapshot across every manifest field except the revision number and publication
+metadata. An identical Picture blocks Publish and offers an explicit
+`Publish Anyway` override, because D014 makes every source project treat a newer
+Picture revision as a mandatory re-synchronize and re-review. This differs from
+D042, where each source Publish always advances `publishRevision`.
