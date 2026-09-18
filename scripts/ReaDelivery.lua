@@ -478,8 +478,9 @@ local function draw()
     elseif state.mode == constants.PROJECT_MODES.source then draw_source(state)
     elseif state.mode == constants.PROJECT_MODES.mix then draw_mix(state)
     else ImGui.TextWrapped(ctx, "Unsupported project mode: " .. tostring(state.mode)) end
+    -- ReaImGui only accepts End() when Begin() returned true, unlike Dear ImGui.
+    ImGui.End(ctx)
   end
-  ImGui.End(ctx)
 end
 
 local function loop()
