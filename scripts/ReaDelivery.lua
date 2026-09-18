@@ -403,11 +403,25 @@ local function begin_update(source_id)
   end
   for _, row in ipairs(review.additions) do update_additions[row.clip.clipId] = "import" end
   for _, lane in ipairs(review.unmapped_lanes) do update_lanes[lane.lane_id] = { kind = "skip" } end
-  notify("Source Update Review ready.")
+  if review.pending_count == 0 then
+    notify(string.format(
+      "Already up to date with Publish r%d.",
+      review.latest_revision
+    ))
+  else
+    notify("Source Update Review ready.")
+  end
 end
 
 local function draw_update()
   if not update_review then return end
+  if update_review.pending_count == 0 then
+    ImGui.TextWrapped(ctx, string.format(
+      "Already up to date with Publish r%d.",
+      update_review.latest_revision
+    ))
+    return
+  end
   ImGui.Text(ctx, "Update to Publish r" .. update_review.latest_revision)
   if update_review.picture_warning then
     local changed

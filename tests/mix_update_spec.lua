@@ -157,6 +157,10 @@ assert(review.instances[2].plan.fields.position_seconds.kind == "conflict", "loc
 assert(review.additions[1].clip.clipId == "clip-2", "new Clip detected")
 assert(review.unmapped_lanes[1].lane_id == "lane-2", "new Lane requires mapping")
 assert(review.unmapped_lanes[1].suggestions[1].track_guid == "existing-track", "new Lane offers existing Tracks")
+assert(review.pending_count > 0, "a real update reports pending work")
+
+local idle, idle_error = mix_update.apply({ pending_count = 0 }, adapter, {})
+assert(not idle and idle_error == "Nothing to update.", "an up-to-date Source is not applied")
 
 local result, apply_error = mix_update.apply(review, adapter, {
   instances = {

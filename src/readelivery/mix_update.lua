@@ -58,6 +58,16 @@ local function clip_state(clip, sample_rate)
   }
 end
 
+-- A `mix_only` or `same_change` field already matches the desired result, so
+-- applying it would change nothing.
+local function instance_has_work(plan)
+  if plan.retired or plan.media.pending then return true end
+  for _, field in pairs(plan.fields) do
+    if field.kind == "source_only" or field.kind == "conflict" then return true end
+  end
+  return false
+end
+
 local function find_subscription(subscriptions, source_project_id)
   for index, subscription in ipairs(subscriptions) do
     if subscription.sourceProjectId == source_project_id then
@@ -231,11 +241,19 @@ function M.review(adapter, fs, source_project_id)
       end
     end
   end
+
+  result.pending_count = #result.additions + #result.unmapped_lanes
+  for _, row in ipairs(result.instances) do
+    if instance_has_work(row.plan) then
+      result.pending_count = result.pending_count + 1
+    end
+  end
   return result
 end
 
 function M.apply(review, adapter, options)
   options = options or {}
+  if review.pending_count == 0 then return nil, "Nothing to update." end
   if review.blocker_count > 0 then return nil, "Update Review has blockers." end
   if review.picture_warning and not options.allow_picture_revision_mismatch then
     return nil, "Source was reviewed against a different Picture revision."
