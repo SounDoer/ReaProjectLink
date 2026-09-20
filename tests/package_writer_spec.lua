@@ -73,6 +73,7 @@ local fs = memory_filesystem({ ["source.wav"] = wav })
 local snapshot = {
   schemaVersion = 1,
   sourceProjectId = "source-1",
+  deliverySetId = "set-1",
   publishRevision = 1,
   publishedAt = "2026-09-20T10:00:00Z",
   publishedBy = "Alice",
@@ -81,6 +82,7 @@ local snapshot = {
 local pointer = {
   schemaVersion = 1,
   sourceProjectId = "source-1",
+  deliverySetId = "set-1",
   latestPublishRevision = 1,
   manifest = "history/publish-0001.json",
 }

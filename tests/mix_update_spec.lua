@@ -15,6 +15,7 @@ local function snapshot(revision, media_revision, position)
     schemaVersion = 1,
     sourceProjectId = "source-1",
     deliverySetId = "set-1",
+    sourceProjectName = "DX",
     publishRevision = revision,
     sampleRate = 48000,
     picture = { pictureId = "picture-1", reviewedRevision = 7 },
@@ -204,6 +205,14 @@ assert(not stale and stale_error:find("changed after Update Review", 1, true),
   "a locally edited Item makes Update Review stale")
 stale_instance_state = false
 
+values.picture_start_samples = "144000"
+local stale_picture, stale_picture_error = mix_update.apply(review, adapter, apply_options)
+assert(
+  not stale_picture and stale_picture_error:find("Picture state changed", 1, true),
+  "a changed Picture anchor makes Update Review stale"
+)
+values.picture_start_samples = "96000"
+
 local result, apply_error = mix_update.apply(review, adapter, {
   instances = {
     ["instance-1"] = { media_choice = "accept_new_take" },
@@ -326,4 +335,14 @@ assert(
 )
 adapter.delivery_instances = linked_instances
 
-return 9
+latest.sourceProjectId = "other-source"
+files[root .. "/history/publish-0002.json"] = json.encode(latest)
+local wrong_identity, wrong_identity_error = mix_update.review(adapter, fs, "source-1")
+assert(
+  not wrong_identity and wrong_identity_error:find("sourceProjectId", 1, true),
+  "a target snapshot from another Source is rejected"
+)
+latest.sourceProjectId = "source-1"
+files[root .. "/history/publish-0002.json"] = json.encode(latest)
+
+return 11

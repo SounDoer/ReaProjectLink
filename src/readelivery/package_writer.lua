@@ -1,4 +1,5 @@
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 
 local M = {}
 
@@ -22,8 +23,11 @@ local function current_revision(input, fs)
     error(read_error or "could not read current delivery.json", 3)
   end
   local pointer = json.decode(bytes)
-  if pointer.schemaVersion ~= 1 then
-    error("unsupported delivery schema version", 3)
+  local valid, validation_error = manifest_validation.delivery_pointer(pointer)
+  if not valid then error(validation_error, 3) end
+  if pointer.sourceProjectId ~= input.snapshot.sourceProjectId or
+      pointer.deliverySetId ~= input.snapshot.deliverySetId then
+    error("current delivery.json belongs to a different Source package", 3)
   end
   return pointer.latestPublishRevision
 end

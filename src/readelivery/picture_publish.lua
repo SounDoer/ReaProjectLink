@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 local picture_manifest = require("readelivery.picture_manifest")
 local project_guard = require("readelivery.project_guard")
 local default_picture_writer = require("readelivery.picture_writer")
@@ -35,20 +36,17 @@ local function load_published(fs, package_root)
   if not fs.exists(path) then return nil, nil end
   local pointer, pointer_error = read_json(fs, path, "picture.json")
   if not pointer then return nil, pointer_error end
-  if pointer.schemaVersion ~= 2 then
-    return nil, "picture.json uses an unsupported schema version."
-  end
+  local valid, validation_error = manifest_validation.picture_pointer(pointer)
+  if not valid then return nil, validation_error end
   local raw, snapshot_error = read_json(
     fs, fs.join(package_root, pointer.manifest), "Master Reference Manifest"
   )
   if not raw then return nil, snapshot_error end
-  if raw.pictureId ~= pointer.pictureId or
-      raw.pictureRevision ~= pointer.latestPictureRevision then
-    return nil, "Master Reference pointer and snapshot identities do not match."
-  end
-  if raw.schemaVersion ~= 2 then
-    return nil, "Master Reference Manifest uses an unsupported schema version."
-  end
+  valid, validation_error = manifest_validation.picture_snapshot(raw, {
+    picture_id = pointer.pictureId,
+    revision = pointer.latestPictureRevision,
+  })
+  if not valid then return nil, validation_error end
   return { pointer = pointer, snapshot = raw }
 end
 

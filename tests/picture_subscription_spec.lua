@@ -108,6 +108,17 @@ pointer.latestPictureRevision = 4
 pointer.manifest = "picture-history/picture-0004.json"
 files[pointer_path] = json.encode(pointer)
 files[revision_four_path] = json.encode(revision_four)
+
+snapshot.pictureId = "foreign-picture"
+files[manifest_path] = json.encode(snapshot)
+local foreign_history, foreign_history_error = picture_subscription.check(adapter, fs)
+assert(
+  not foreign_history and foreign_history_error:find("Picture history", 1, true),
+  "a synchronized history snapshot from another Picture is rejected"
+)
+snapshot.pictureId = "picture-1"
+files[manifest_path] = json.encode(snapshot)
+
 local shifted = assert(picture_subscription.check(adapter, fs))
 assert(shifted.can_shift_entire_project, "uniform Master Reference shift is detected")
 assert(math.abs(shifted.shift_seconds - 1) < 0.000001, "uniform shift delta is reported")
@@ -148,4 +159,4 @@ local mismatched = assert(picture_subscription.check(adapter, fs))
 assert(not mismatched.available, "same-path replacement detected")
 assert(mismatched.video_error:find("hash", 1, true), "hash mismatch explained")
 
-return 10
+return 11

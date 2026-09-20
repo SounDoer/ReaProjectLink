@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 local mix_update_plan = require("readelivery.mix_update_plan")
 local project_guard = require("readelivery.project_guard")
 local track_suggestions = require("readelivery.track_suggestions")
@@ -8,23 +9,6 @@ local M = {}
 
 local function cancel_undo(adapter, label)
   if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
-end
-
-local function normalize_path(path)
-  path = path:gsub("\\", "/")
-  local prefix = ""
-  if path:match("^%a:/") then
-    prefix, path = path:sub(1, 2), path:sub(4)
-  elseif path:sub(1, 2) == "//" then
-    prefix, path = "//", path:sub(3)
-  end
-  local parts = {}
-  for part in path:gmatch("[^/]+") do
-    if part == ".." then table.remove(parts)
-    elseif part ~= "." then table.insert(parts, part) end
-  end
-  local separator = prefix == "//" and "" or "/"
-  return prefix .. separator .. table.concat(parts, "/")
 end
 
 local function read_json(fs, path, label)
@@ -91,6 +75,8 @@ function M.review(adapter, fs, source_project_id, target_revision)
 
   local pointer, pointer_error = read_json(fs, subscription.pointerPath, "delivery.json")
   if not pointer then return nil, pointer_error end
+  local valid, validation_error = manifest_validation.delivery_pointer(pointer)
+  if not valid then return nil, validation_error end
   if pointer.sourceProjectId ~= subscription.sourceProjectId or
       pointer.deliverySetId ~= subscription.deliverySetId then
     return nil, "Subscribed Source or Delivery Set identity changed."
@@ -108,11 +94,13 @@ function M.review(adapter, fs, source_project_id, target_revision)
     fs.join(package_root, string.format("history/publish-%04d.json", target))
   local snapshot, snapshot_error = read_json(fs, target_path, "target Delivery Manifest")
   if not snapshot then return nil, snapshot_error end
-  if snapshot.publishRevision ~= target then
-    return nil, "Delivery snapshot does not carry the expected revision."
-  end
+  valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
+    source_project_id = subscription.sourceProjectId,
+    delivery_set_id = subscription.deliverySetId,
+    revision = target,
+  })
+  if not valid then return nil, validation_error end
   local target_clips = clip_index(snapshot)
-  local target_directory = target_path:match("^(.*)[/\\][^/\\]+$")
   local declined = {}
   for _, clip_id in ipairs(subscription.declinedClips or {}) do declined[clip_id] = true end
   local lane_bindings = {}
@@ -139,6 +127,14 @@ function M.review(adapter, fs, source_project_id, target_revision)
     picture_warning = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.picture_revision
     )) ~= snapshot.picture.reviewedRevision,
+    picture_context = {
+      picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id),
+      picture_revision = tonumber(adapter.get_project_value(
+        constants.PROJECT_KEYS.picture_revision
+      )) or 0,
+      picture_start_samples = adapter.get_project_value(constants.PROJECT_KEYS.picture_start_samples),
+      picture_start_sample_rate = adapter.get_project_value(constants.PROJECT_KEYS.picture_start_sample_rate),
+    },
   }
 
   local mix_picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id)
@@ -169,6 +165,12 @@ function M.review(adapter, fs, source_project_id, target_revision)
       local baseline_error
       baseline, baseline_error = read_json(fs, baseline_path, "handled Delivery Manifest")
       if not baseline then return nil, baseline_error end
+      valid, validation_error = manifest_validation.delivery_snapshot(baseline, {
+        source_project_id = subscription.sourceProjectId,
+        delivery_set_id = subscription.deliverySetId,
+        revision = baseline_revision,
+      })
+      if not valid then return nil, validation_error end
       baseline_cache[baseline_revision] = baseline
     end
     local baseline_clip = clip_index(baseline)[instance.clip_id]
@@ -199,7 +201,10 @@ function M.review(adapter, fs, source_project_id, target_revision)
       source_media_revision = target_clip and target_clip.mediaRevision,
     })
     if target_clip then
-      row.media_path = normalize_path(fs.join(target_directory, target_clip.mediaFile))
+      row.media_path, validation_error = manifest_validation.delivery_media_path(
+        fs, package_root, target_clip.mediaFile
+      )
+      if not row.media_path then return nil, validation_error end
       if row.plan.media.pending then
         local digest = fs.hash_file(row.media_path)
         if digest ~= target_clip.mediaHash:gsub("^sha256:", "") then
@@ -255,7 +260,10 @@ function M.review(adapter, fs, source_project_id, target_revision)
         else
           local copy = {}
           for key, value in pairs(clip) do copy[key] = value end
-          copy.media_path = normalize_path(fs.join(target_directory, clip.mediaFile))
+          copy.media_path, validation_error = manifest_validation.delivery_media_path(
+            fs, package_root, clip.mediaFile
+          )
+          if not copy.media_path then return nil, validation_error end
           local digest = fs.hash_file(copy.media_path)
           if digest ~= clip.mediaHash:gsub("^sha256:", "") then
             copy.blocked = true
@@ -302,7 +310,10 @@ function M.review(adapter, fs, source_project_id, target_revision)
             lane_display_name = lane.displayName,
           })
         elseif not instance_clips[clip.clipId] then
-          local media_path = normalize_path(fs.join(target_directory, clip.mediaFile))
+          local media_path, media_error = manifest_validation.delivery_media_path(
+            fs, package_root, clip.mediaFile
+          )
+          if not media_path then return nil, media_error end
           local digest = fs.hash_file(media_path)
           local addition = {
             lane_id = lane.laneId,
@@ -340,6 +351,16 @@ function M.apply(review, adapter, options)
     return nil, "Nothing to update."
   end
   if review.blocker_count > 0 then return nil, "Update Review has blockers." end
+  local picture_context = review.picture_context or {}
+  local current_picture_revision = tonumber(adapter.get_project_value(
+    constants.PROJECT_KEYS.picture_revision
+  )) or 0
+  if adapter.get_project_value(constants.PROJECT_KEYS.picture_id) ~= picture_context.picture_id or
+      current_picture_revision ~= picture_context.picture_revision or
+      adapter.get_project_value(constants.PROJECT_KEYS.picture_start_samples) ~= picture_context.picture_start_samples or
+      adapter.get_project_value(constants.PROJECT_KEYS.picture_start_sample_rate) ~= picture_context.picture_start_sample_rate then
+    return nil, "Mix Picture state changed after Update Review. Refresh the Review first."
+  end
   if review.picture_warning and not options.allow_picture_revision_mismatch then
     return nil, "Source was reviewed against a different Picture revision."
   end

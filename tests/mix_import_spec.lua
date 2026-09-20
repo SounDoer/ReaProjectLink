@@ -93,6 +93,49 @@ assert(#review.lanes[1].suggestions == 1, "unrelated Tracks are not suggested")
 assert(#review.lanes[2].suggestions == 0, "a Lane without a name match has no suggestion")
 assert(review.lanes[1].clips[1].media_path == media_path, "relative media path resolved")
 
+snapshot.lanes[1].clips[1].mediaFile = "../../outside.wav"
+files[snapshot_path] = json.encode(snapshot)
+local escaped, escaped_error = mix_import.review(adapter, fs, pointer_path)
+assert(
+  not escaped and escaped_error:find("mediaFile", 1, true),
+  "Delivery media cannot escape the managed package"
+)
+snapshot.lanes[1].clips[1].mediaFile = "../media/clip-1/Line_r0002.wav"
+files[snapshot_path] = json.encode(snapshot)
+
+table.insert(snapshot.lanes[1].clips, snapshot.lanes[1].clips[1])
+files[snapshot_path] = json.encode(snapshot)
+local duplicated, duplicated_error = mix_import.review(adapter, fs, pointer_path)
+assert(
+  not duplicated and duplicated_error:find("duplicated", 1, true),
+  "duplicate Clip identities are rejected"
+)
+table.remove(snapshot.lanes[1].clips)
+
+snapshot.sampleRate = "48000"
+files[snapshot_path] = json.encode(snapshot)
+local malformed, malformed_error = mix_import.review(adapter, fs, pointer_path)
+assert(
+  not malformed and malformed_error:find("sampleRate", 1, true),
+  "malformed field types are reported before REAPER mutation"
+)
+snapshot.sampleRate = 48000
+files[snapshot_path] = json.encode(snapshot)
+
+values.picture_start_samples = "144000"
+local stale_picture, stale_picture_error = mix_import.apply(review, adapter, {
+  allow_picture_revision_mismatch = true,
+  mappings = {
+    ["lane-1"] = { kind = "create" },
+    ["lane-2"] = { kind = "skip" },
+  },
+})
+assert(
+  not stale_picture and stale_picture_error:find("Picture state changed", 1, true),
+  "a changed Picture anchor makes Import Review stale"
+)
+values.picture_start_samples = "96000"
+
 local result, apply_error = mix_import.apply(review, adapter, {
   allow_picture_revision_mismatch = true,
   mappings = {
@@ -132,4 +175,4 @@ local failed, failed_error = mix_import.apply(review, adapter, {
 assert(not failed and failed_error == "simulated media open failure", "runtime import failure is reported")
 assert(events[#events] == "cancel:Import ReaDelivery Source", "failed import rolls back its undo block")
 
-return 5
+return 9

@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 local project_guard = require("readelivery.project_guard")
 local track_suggestions = require("readelivery.track_suggestions")
 
@@ -7,28 +8,6 @@ local M = {}
 
 local function cancel_undo(adapter, label)
   if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
-end
-
-local function normalize_path(path)
-  path = path:gsub("\\", "/")
-  local prefix = ""
-  if path:match("^%a:/") then
-    prefix, path = path:sub(1, 2), path:sub(4)
-  elseif path:sub(1, 2) == "//" then
-    prefix, path = "//", path:sub(3)
-  elseif path:sub(1, 1) == "/" then
-    prefix, path = "/", path:sub(2)
-  end
-  local parts = {}
-  for part in path:gmatch("[^/]+") do
-    if part == ".." then
-      table.remove(parts)
-    elseif part ~= "." then
-      table.insert(parts, part)
-    end
-  end
-  local separator = prefix == "//" and "" or "/"
-  return prefix .. separator .. table.concat(parts, "/")
 end
 
 local function read_json(fs, path, label)
@@ -43,20 +22,22 @@ end
 local function load_delivery(fs, pointer_path)
   local pointer, pointer_error = read_json(fs, pointer_path, "delivery.json")
   if not pointer then return nil, pointer_error end
+  local valid, validation_error = manifest_validation.delivery_pointer(pointer)
+  if not valid then return nil, validation_error end
   local package_root = pointer_path:match("^(.*)[/\\][^/\\]+$")
   local snapshot_path = fs.join(package_root, pointer.manifest)
   local snapshot, snapshot_error = read_json(fs, snapshot_path, "Delivery Manifest")
   if not snapshot then return nil, snapshot_error end
-  if snapshot.sourceProjectId ~= pointer.sourceProjectId or
-      snapshot.deliverySetId ~= pointer.deliverySetId or
-      snapshot.publishRevision ~= pointer.latestPublishRevision then
-    return nil, "Delivery pointer and snapshot identities do not match."
-  end
+  valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
+    source_project_id = pointer.sourceProjectId,
+    delivery_set_id = pointer.deliverySetId,
+    revision = pointer.latestPublishRevision,
+  })
+  if not valid then return nil, validation_error end
   return {
     pointer = pointer,
     snapshot = snapshot,
     package_root = package_root,
-    snapshot_directory = snapshot_path:match("^(.*)[/\\][^/\\]+$"),
   }
 end
 
@@ -92,6 +73,12 @@ function M.review(adapter, fs, pointer_path)
     lanes = {},
     blocker_count = 0,
     picture_warning = mix_picture_revision ~= snapshot.picture.reviewedRevision,
+    picture_context = {
+      picture_id = mix_picture_id,
+      picture_revision = mix_picture_revision,
+      picture_start_samples = adapter.get_project_value(constants.PROJECT_KEYS.picture_start_samples),
+      picture_start_sample_rate = adapter.get_project_value(constants.PROJECT_KEYS.picture_start_sample_rate),
+    },
   }
   if not mix_picture_id or mix_picture_id == "" or
       mix_picture_id ~= snapshot.picture.pictureId then
@@ -112,10 +99,11 @@ function M.review(adapter, fs, pointer_path)
     for _, clip in ipairs(lane.clips or {}) do
       local reviewed_clip = {}
       for key, value in pairs(clip) do reviewed_clip[key] = value end
-      reviewed_clip.media_path = normalize_path(fs.join(
-        loaded.snapshot_directory,
-        clip.mediaFile
-      ))
+      local media_path, media_error = manifest_validation.delivery_media_path(
+        fs, loaded.package_root, clip.mediaFile
+      )
+      if not media_path then return nil, media_error end
+      reviewed_clip.media_path = media_path
       local actual_hash = fs.hash_file(reviewed_clip.media_path)
       if actual_hash ~= clip.mediaHash:gsub("^sha256:", "") then
         reviewed_clip.blocked = true
@@ -135,6 +123,16 @@ function M.apply(review, adapter, options)
   if not current then return nil, context_error end
   options = options or {}
   if review.blocker_count > 0 then return nil, "Import Review has blockers." end
+  local picture_context = review.picture_context or {}
+  local current_picture_revision = tonumber(adapter.get_project_value(
+    constants.PROJECT_KEYS.picture_revision
+  )) or 0
+  if adapter.get_project_value(constants.PROJECT_KEYS.picture_id) ~= picture_context.picture_id or
+      current_picture_revision ~= picture_context.picture_revision or
+      adapter.get_project_value(constants.PROJECT_KEYS.picture_start_samples) ~= picture_context.picture_start_samples or
+      adapter.get_project_value(constants.PROJECT_KEYS.picture_start_sample_rate) ~= picture_context.picture_start_sample_rate then
+    return nil, "Mix Picture state changed after Import Review. Refresh the Review first."
+  end
   if review.picture_warning and not options.allow_picture_revision_mismatch then
     return nil, "Source was reviewed against an older Picture revision."
   end

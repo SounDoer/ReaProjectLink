@@ -1,6 +1,7 @@
 local constants = require("readelivery.constants")
 local delivery_manifest = require("readelivery.delivery_manifest")
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 local default_package_writer = require("readelivery.package_writer")
 local publish_plan = require("readelivery.publish_plan")
 local project_guard = require("readelivery.project_guard")
@@ -37,17 +38,20 @@ local function load_previous(fs, package_root)
 
   local pointer, pointer_error = read_json(fs, pointer_path, "delivery.json")
   if not pointer then return nil, nil, pointer_error end
+  local valid, validation_error = manifest_validation.delivery_pointer(pointer)
+  if not valid then return nil, nil, validation_error end
   local snapshot, snapshot_error = read_json(
     fs,
     fs.join(package_root, pointer.manifest),
     "published Delivery Manifest"
   )
   if not snapshot then return nil, nil, snapshot_error end
-  if snapshot.sourceProjectId ~= pointer.sourceProjectId or
-      snapshot.deliverySetId ~= pointer.deliverySetId or
-      snapshot.publishRevision ~= pointer.latestPublishRevision then
-    return nil, nil, "Published Delivery pointer and snapshot identities do not match."
-  end
+  valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
+    source_project_id = pointer.sourceProjectId,
+    delivery_set_id = pointer.deliverySetId,
+    revision = pointer.latestPublishRevision,
+  })
+  if not valid then return nil, nil, validation_error end
   return pointer, snapshot
 end
 

@@ -79,6 +79,9 @@ manifest are complete and validated.
 - A history manifest is a full snapshot, never a delta.
 - An unchanged Clip reuses its prior `mediaRevision` and managed WAV.
 - Media paths are relative to the history manifest.
+- A Delivery `mediaFile` must use the canonical `../media/...` form and resolve
+  inside the current managed package. Absolute paths and directory traversal are
+  rejected. Picture `videoFile` remains an intentional external NAS reference.
 - Position, duration, source offset, and fades use integer samples.
 - `displayName` and `order` support presentation only and never establish
   identity.
@@ -166,3 +169,8 @@ tool may convert a supported older manifest into its current in-memory model. An
 unsupported newer version blocks import, update, and Publish and tells the user
 to upgrade ReaDelivery. Before publishing, a writer checks the package's current
 schema and must not overwrite it with an older schema version.
+
+Readers validate pointer paths, required field types, package identity, revision
+identity, and unique Lane, Clip, Item, Marker, and Region IDs before using a
+Manifest. A malformed or mismatched historical Manifest blocks the operation
+rather than being interpreted as another Source or Picture.

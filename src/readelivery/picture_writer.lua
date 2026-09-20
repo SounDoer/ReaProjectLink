@@ -1,4 +1,5 @@
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 
 local M = {}
 
@@ -32,8 +33,10 @@ local function current_revision(input, fs)
   local bytes, read_error = fs.read_file(path)
   if not bytes then error(read_error or "could not read picture.json", 3) end
   local pointer = json.decode(bytes)
-  if pointer.schemaVersion ~= 2 then
-    error("unsupported Master Reference schema version", 3)
+  local valid, validation_error = manifest_validation.picture_pointer(pointer)
+  if not valid then error(validation_error, 3) end
+  if pointer.pictureId ~= input.snapshot.pictureId then
+    error("current picture.json belongs to a different Master Reference", 3)
   end
   return pointer.latestPictureRevision
 end

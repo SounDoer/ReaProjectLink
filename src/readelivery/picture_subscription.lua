@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local manifest_validation = require("readelivery.manifest_validation")
 local project_guard = require("readelivery.project_guard")
 
 local M = {}
@@ -22,6 +23,8 @@ end
 local function load(fs, pointer_path)
   local pointer, pointer_error = read_json(fs, pointer_path, "picture.json")
   if not pointer then return nil, pointer_error end
+  local valid, validation_error = manifest_validation.picture_pointer(pointer)
+  if not valid then return nil, validation_error end
   local directory = pointer_path:match("^(.*)[/\\][^/\\]+$")
   if not directory then return nil, "Picture pointer path has no parent directory." end
   local snapshot, snapshot_error = read_json(
@@ -30,21 +33,27 @@ local function load(fs, pointer_path)
     "Picture Manifest"
   )
   if not snapshot then return nil, snapshot_error end
-  if snapshot.pictureId ~= pointer.pictureId or
-      snapshot.pictureRevision ~= pointer.latestPictureRevision then
-    return nil, "Picture pointer and snapshot identities do not match."
-  end
+  valid, validation_error = manifest_validation.picture_snapshot(snapshot, {
+    picture_id = pointer.pictureId,
+    revision = pointer.latestPictureRevision,
+  })
+  if not valid then return nil, validation_error end
   return { pointer = pointer, snapshot = snapshot, directory = directory }
 end
 
-local function load_revision(fs, directory, revision)
+local function load_revision(fs, directory, picture_id, revision)
   if revision < 1 then return nil end
-  local raw = read_json(
+  local raw, read_error = read_json(
     fs,
     fs.join(directory, "picture-history", string.format("picture-%04d.json", revision)),
     "previous Master Reference Manifest"
   )
-  if not raw then return nil end
+  if not raw then return nil, read_error end
+  local valid, validation_error = manifest_validation.picture_snapshot(raw, {
+    picture_id = picture_id,
+    revision = revision,
+  })
+  if not valid then return nil, validation_error end
   return raw
 end
 
@@ -195,8 +204,16 @@ function M.check(adapter, fs)
   local synchronized = tonumber(adapter.get_project_value(
     constants.PROJECT_KEYS.synchronized_picture_revision
   )) or 0
-  local previous = synchronized > 0 and
-    load_revision(fs, loaded.directory, synchronized) or nil
+  local previous, previous_error
+  if synchronized > 0 then
+    previous, previous_error = load_revision(
+      fs, loaded.directory, loaded.pointer.pictureId, synchronized
+    )
+    if not previous then
+      return nil, "Could not validate the synchronized Picture history: " ..
+        tostring(previous_error)
+    end
+  end
   local shift_seconds = uniform_timeline_shift(previous, loaded.snapshot) or 0
   return project_guard.bind({
     pointer_path = pointer_path,
