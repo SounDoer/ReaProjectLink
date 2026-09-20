@@ -36,9 +36,9 @@ function fs.acquire_lock()
 end
 function fs.release_lock() locked = false; return true end
 
-local snapshot = { schemaVersion = 1, pictureId = "picture-1", pictureRevision = 1 }
+local snapshot = { schemaVersion = 2, pictureId = "picture-1", pictureRevision = 1 }
 local pointer = {
-  schemaVersion = 1,
+  schemaVersion = 2,
   pictureId = "picture-1",
   latestPictureRevision = 1,
   manifest = "picture-history/picture-0001.json",
@@ -57,14 +57,14 @@ assert(json.decode(files["package/picture.json"]).latestPictureRevision == 1, "p
 assert(json.decode(files["package/picture-history/picture-0001.json"]).pictureRevision == 1, "history visible")
 
 local snapshot_two = {
-  schemaVersion = 1,
+  schemaVersion = 2,
   pictureId = "picture-1",
   pictureRevision = 2,
   publishedAt = "2026-09-20T10:00:00Z",
   publishedBy = "Alice",
 }
 local pointer_two = {
-  schemaVersion = 1,
+  schemaVersion = 2,
   pictureId = "picture-1",
   latestPictureRevision = 2,
   manifest = "picture-history/picture-0002.json",
@@ -90,4 +90,18 @@ local retried, retry_error = picture_writer.publish(fresh_retry, fs)
 assert(retried, retry_error)
 assert(json.decode(files["package/picture.json"]).latestPictureRevision == 2, "Picture retry commits pointer")
 
-return 2
+local rejected = picture_writer.publish({
+  package_root = "old-package",
+  expected_revision = 0,
+  transaction_id = "tx-old",
+  snapshot = { schemaVersion = 1, pictureId = "old", pictureRevision = 1 },
+  pointer = {
+    schemaVersion = 1,
+    pictureId = "old",
+    latestPictureRevision = 1,
+    manifest = "picture-history/picture-0001.json",
+  },
+}, fs)
+assert(not rejected, "unpublished Picture schema version 1 is rejected")
+
+return 3

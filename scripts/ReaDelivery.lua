@@ -45,8 +45,25 @@ local update_rebindings = {}
 local update_target_input = 0
 local publish_anyway, import_picture_override, update_picture_override = false, false, false
 local picture_publish_anyway = false
+local source_shift_entire_project = false
 local show_unchanged = false
 local lock_info, lock_package_root
+local active_project_token = adapter.project_token()
+
+local function reset_transient_state()
+  message, message_is_error = nil, nil
+  source_picture, source_review, picture_review = nil, nil, nil
+  import_review, update_review = nil, nil
+  source_decisions, import_mappings = {}, {}
+  source_save_as_decision = nil
+  update_decisions, update_additions, update_lanes = {}, {}, {}
+  update_rebindings = {}
+  update_target_input = 0
+  publish_anyway, import_picture_override = false, false
+  update_picture_override, picture_publish_anyway = false, false
+  source_shift_entire_project, show_unchanged = false, false
+  lock_info, lock_package_root = nil, nil
+end
 
 local function notify(value, is_error)
   message, message_is_error = value, is_error or false
@@ -166,11 +183,40 @@ local function draw_source_picture(state)
     source_picture.synchronized_revision,
     source_picture.reviewed_revision
   ))
+  local mirror = source_picture.alignment_mode ~= "relative"
+  local changed, next_mirror = ImGui.Checkbox(ctx, "Mirror Master Timeline", mirror)
+  if changed then
+    local result, err = picture_subscription.set_alignment_mode(
+      adapter, next_mirror and "mirror" or "relative"
+    )
+    if result then check_source_picture() else notify(err, true) end
+  end
   if source_picture.video_error then ImGui.TextWrapped(ctx, "Blocked: " .. source_picture.video_error) end
+  if ImGui.Button(ctx, "Detach Selected Picture Items") then
+    local result, err = picture_subscription.detach_selected_picture_items(adapter)
+    notify(result and string.format("Detached %d Picture Item(s).", result.detached) or err, not result)
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Detach Selected Picture Tracks") then
+    local result, err = picture_subscription.detach_selected_picture_tracks(adapter)
+    notify(result and string.format("Detached %d Picture Track(s).", result.detached) or err, not result)
+  end
+  if source_picture.can_shift_entire_project then
+    ImGui.TextWrapped(ctx, string.format(
+      "The entire Master Reference moved by %.3f seconds.", source_picture.shift_seconds
+    ))
+    local changed
+    changed, source_shift_entire_project = ImGui.Checkbox(
+      ctx, "Shift entire Source project by this amount", source_shift_entire_project
+    )
+  end
   if source_picture.available and
       source_picture.synchronized_revision ~= source_picture.latest_revision and
       ImGui.Button(ctx, "Synchronize Picture") then
-    local result, err = picture_subscription.synchronize(adapter, source_picture)
+    local result, err = picture_subscription.synchronize(adapter, source_picture, {
+      shift_entire_project = source_shift_entire_project,
+    })
+    source_shift_entire_project = false
     if result then check_source_picture() else notify(err, true) end
   end
   if source_picture.synchronized_revision == source_picture.latest_revision and
@@ -194,6 +240,12 @@ end
 local function draw_source_review()
   if not source_review then return end
   ImGui.Separator(ctx)
+  if source_review.project_change_count and
+      source_review.project_change_count ~= adapter.project_change_count() then
+    ImGui.TextWrapped(ctx, "Publish Review is stale because the project changed.")
+    if ImGui.Button(ctx, "Refresh Publish Review") then refresh_source_review() end
+    return
+  end
   ImGui.Text(ctx, string.format(
     "Publish r%d | Picture r%s | %d blocker(s)",
     source_review.publish_revision,
@@ -326,23 +378,81 @@ local function refresh_picture_review()
 end
 
 local function draw_picture_publish(state)
-  ImGui.Text(ctx, "Authoritative Picture")
+  ImGui.Text(ctx, "Master Reference")
   if state.picture_revision > 0 then
     ImGui.TextWrapped(ctx, string.format(
-      "Published Picture (%s) | r%d",
+      "Published Master Reference (%s) | r%d",
       short_id(state.picture_id),
       state.picture_revision
     ))
   else
-    ImGui.TextWrapped(ctx, "No Picture published yet.")
+    ImGui.TextWrapped(ctx, "No Master Reference published yet.")
   end
-  if ImGui.Button(ctx, "Review Selected Picture Item") then refresh_picture_review() end
-  if not picture_review then return end
+  if ImGui.Button(ctx, "Add Selected Picture Tracks") then
+    local result, err = picture_publish.register_selected_tracks(adapter)
+    notify(result and string.format("Registered %d Picture Track(s).", result.added) or err, not result)
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Remove Selected Picture Tracks") then
+    local result, err = picture_publish.unregister_selected_tracks(adapter)
+    notify(result and string.format("Removed %d Picture Track(s).", result.removed) or err, not result)
+  end
+  if ImGui.Button(ctx, "Make Selected Picture Items New") then
+    local result, err = picture_publish.reset_selected_picture_items(adapter)
+    notify(result and string.format("Reset %d Picture Item identity/identities.", result.reset) or err, not result)
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Make Selected Picture Tracks New") then
+    local result, err = picture_publish.reset_selected_picture_tracks(adapter)
+    notify(result and string.format("Reset %d Picture Track identity/identities.", result.reset) or err, not result)
+  end
+  if ImGui.Button(ctx, "Register Selected Markers/Regions") then
+    local result, err = picture_publish.register_selected_timeline_entries(adapter)
+    notify(result and string.format("Registered %d timeline entry/entries.", result.added) or err, not result)
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Unregister Selected Markers/Regions") then
+    local result, err = picture_publish.unregister_selected_timeline_entries(adapter)
+    notify(result and string.format("Removed %d timeline entry/entries.", result.removed) or err, not result)
+  end
+  if ImGui.Button(ctx, "Set Selected Registered Marker as FFOP") then
+    local result, err = picture_publish.set_selected_ffop(adapter)
+    notify(result and "FFOP assigned as the Reference Start." or err, not result)
+  end
+  local registered_timeline, timeline_error = picture_publish.timeline_entries(adapter)
   ImGui.TextWrapped(ctx, string.format(
-    "%s | %d samples",
-    picture_review.video_file,
-    picture_review.duration_samples
+    "%d Picture Track(s), %d registered Marker/Region entries.",
+    #picture_publish.picture_tracks(adapter),
+    (function()
+      local count = 0
+      for _, entry in ipairs(registered_timeline or {}) do
+        if entry.registered then count = count + 1 end
+      end
+      return count
+    end)()
   ))
+  if timeline_error then ImGui.TextWrapped(ctx, "Blocked: " .. timeline_error) end
+  if ImGui.Button(ctx, "Open Master Reference Publish Review") then refresh_picture_review() end
+  if not picture_review then return end
+  if picture_review.project_change_count and
+      picture_review.project_change_count ~= adapter.project_change_count() then
+    ImGui.TextWrapped(ctx, "Master Reference Publish Review is stale because the project changed.")
+    if ImGui.Button(ctx, "Refresh Master Reference Publish Review") then
+      refresh_picture_review()
+    end
+    return
+  end
+  ImGui.TextWrapped(ctx, string.format(
+    "%d Track(s) | %d video Item(s) | %d Marker(s) | %d Region(s) | %d blocker(s)",
+    #picture_review.lanes, picture_review.item_count,
+    #picture_review.markers, #picture_review.regions, picture_review.blocker_count
+  ))
+  if picture_review.empty_blocker then ImGui.TextWrapped(ctx, picture_review.empty_blocker) end
+  for _, blocker in ipairs(picture_review.blockers or {}) do
+    if blocker ~= picture_review.empty_blocker then
+      ImGui.TextWrapped(ctx, "Blocked: " .. blocker)
+    end
+  end
   if picture_review.unchanged then
     ImGui.TextWrapped(ctx, string.format(
       "This Picture is identical to published revision r%d.",
@@ -356,7 +466,7 @@ local function draw_picture_publish(state)
     )
     if changed then refresh_picture_review() end
   end
-  if not picture_review.unchanged_blocker then
+  if picture_review.blocker_count == 0 and not picture_review.unchanged_blocker then
     ImGui.TextWrapped(ctx, string.format(
       "Will publish as r%d.",
       picture_review.picture_revision
@@ -725,6 +835,12 @@ local function draw_mix(state)
 end
 
 local function draw()
+  local project_token = adapter.project_token()
+  if project_token ~= active_project_token then
+    reset_transient_state()
+    active_project_token = project_token
+    notify("Current REAPER project changed; cached reviews and decisions were cleared.")
+  end
   ImGui.SetNextWindowSize(ctx, 820, 680, ImGui.Cond_FirstUseEver)
   local visible
   visible, window_open = ImGui.Begin(ctx, "ReaDelivery", window_open)

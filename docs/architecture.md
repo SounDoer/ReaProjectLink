@@ -332,34 +332,47 @@ markers, take markers, and complex source wrappers are outside automatic
 migration; detecting any of them requires a warning and an explicit skip or
 replace-anyway decision.
 
-## Picture dependency
+## Master Reference dependency
 
-The mix project's authoritative video item is assigned a stable Picture ID. An
-explicit picture Publish creates a manifest containing at least:
+The mix project publishes one atomic Master Reference Set. Its stable Picture ID
+identifies the set rather than any individual video Item. The publication surface
+contains every Item on explicitly registered Picture Tracks plus explicitly
+registered Markers and Regions. Tracks, Items, Markers, and Regions receive stable
+cross-project identities so later revisions can update or retire the corresponding
+managed content without relying on names or REAPER-local GUIDs.
 
-- picture revision;
-- media path and content hash;
-- timeline position;
-- source offset;
-- duration and playback rate;
-- frame rate and project timecode offset.
+Each immutable Master Reference manifest contains the complete current surface:
 
-For the initial design, the authoritative picture item's left edge defines
-Picture Start. Source projects synchronize this reference, and delivery clip
-placement is expressed as an integer sample offset from Picture Start. On import,
-the mix project adds that offset to its own Picture Start. This avoids depending
-on identical absolute REAPER project positions while retaining sub-frame audio
-precision. Project state stores both the Picture Start sample count and the sample
-rate that gives that count meaning. Synchronization converts the anchor into the
-receiving project's sample rate, and later reads retain the stored rate so a
-project-rate change cannot reinterpret the same count as a different time.
+- picture revision and stable lane, Item, Marker, and Region identities;
+- each video's external media path and content hash;
+- Item position, source offset, duration, and playback rate;
+- Marker and Region names, colors, and positions;
+- project sample rate, frame rate, and project timecode offset;
+- an optional registered Marker with semantic role `FFOP`.
+
+`FFOP` is optional. When present it is the Reference Start; otherwise Reference
+Start is project zero. It is an alignment anchor and semantic label, not a
+requirement for publishing or synchronizing a Master Reference.
+
+Source subscriptions default to Mirror Master Timeline. Synchronization adopts
+the Master's timecode offset and frame rate and places managed video Items,
+Markers, and Regions at the same absolute timeline positions. It does not force
+the Source project's sample rate. Relative Reference remains an explicit
+alternative and maps published positions relative to the Source's existing
+Reference Start.
+
+If a later revision moves every stable Master Reference timeline element by the
+same amount, the Source UI reports that delta and may explicitly shift the entire
+Source project, including all Items, Markers, and Regions, before synchronizing.
+This operation is never automatic. Moving only FFOP or only part of the Master
+Reference does not offer the full-project shift.
 
 Source projects may automatically detect a new picture revision, but they do not
 automatically adopt it. A source project records separate synchronized and
 reviewed states. Audio Publish records the reviewed picture revision.
 
-Picture Publish references the authoritative video file at its existing NAS path
-and records a content hash; it does not duplicate the video under `_Delivery`.
+Picture Publish references each authoritative video file at its existing NAS path
+and records a content hash; it does not duplicate videos under `_Delivery`.
 Video-file retention and historical recovery remain the responsibility of the
 external picture-asset workflow.
 

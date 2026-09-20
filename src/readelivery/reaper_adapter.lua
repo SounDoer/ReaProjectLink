@@ -1,4 +1,5 @@
 local constants = require("readelivery.constants")
+local json = require("readelivery.json")
 
 local M = {}
 
@@ -9,6 +10,23 @@ end
 function M.project_path()
   local _, path = reaper.EnumProjects(-1, "")
   return path or ""
+end
+
+function M.project_token()
+  local current, path = reaper.EnumProjects(-1, "")
+  return tostring(current) .. "\31" .. tostring(path or "")
+end
+
+function M.project_change_count()
+  return reaper.GetProjectStateChangeCount(project())
+end
+
+function M.valid_track(track)
+  return track and reaper.ValidatePtr2(project(), track, "MediaTrack*") or false
+end
+
+function M.valid_item(item)
+  return item and reaper.ValidatePtr2(project(), item, "MediaItem*") or false
 end
 
 function M.new_id()
@@ -80,6 +98,32 @@ function M.set_track_lane_id(track, lane_id)
   )
 end
 
+function M.get_track_picture_lane_id(track)
+  local _, value = reaper.GetSetMediaTrackInfo_String(
+    track, constants.TRACK_KEYS.picture_lane_id, "", false
+  )
+  return value
+end
+
+function M.set_track_picture_lane_id(track, lane_id)
+  reaper.GetSetMediaTrackInfo_String(
+    track, constants.TRACK_KEYS.picture_lane_id, lane_id or "", true
+  )
+end
+
+function M.get_track_picture_set_id(track)
+  local _, value = reaper.GetSetMediaTrackInfo_String(
+    track, constants.TRACK_KEYS.picture_set_id, "", false
+  )
+  return value
+end
+
+function M.set_track_picture_set_id(track, picture_id)
+  reaper.GetSetMediaTrackInfo_String(
+    track, constants.TRACK_KEYS.picture_set_id, picture_id or "", true
+  )
+end
+
 function M.get_item_clip_id(item)
   local _, value = reaper.GetSetMediaItemInfo_String(
     item,
@@ -115,6 +159,19 @@ function M.set_item_picture_id(item, picture_id)
     constants.ITEM_KEYS.picture_id,
     picture_id,
     true
+  )
+end
+
+function M.get_item_picture_item_id(item)
+  local _, value = reaper.GetSetMediaItemInfo_String(
+    item, constants.ITEM_KEYS.picture_item_id, "", false
+  )
+  return value
+end
+
+function M.set_item_picture_item_id(item, item_id)
+  reaper.GetSetMediaItemInfo_String(
+    item, constants.ITEM_KEYS.picture_item_id, tostring(item_id or ""), true
   )
 end
 
@@ -335,51 +392,266 @@ function M.picture_item_state(item)
   }
 end
 
-local function picture_items(picture_id)
-  local items = {}
+function M.timeline_state()
+  local sample_rate = M.project_sample_rate()
+  local frame_rate, drop_frame = reaper.TimeMap_curFrameRate(project())
+  local numerator, denominator = frame_rate_ratio(frame_rate)
+  return {
+    sample_rate = sample_rate,
+    project_timecode_offset_samples = seconds_to_samples(
+      reaper.GetProjectTimeOffset(project(), false), sample_rate
+    ),
+    frame_rate = {
+      numerator = numerator,
+      denominator = denominator,
+      drop_frame = drop_frame,
+    },
+  }
+end
+
+function M.timeline_entries()
+  local result = {}
+  local sample_rate = M.project_sample_rate()
+  for index = 0, reaper.GetNumRegionsOrMarkers(project()) - 1 do
+    local retval, is_region, position, region_end, name, number, color =
+      reaper.EnumProjectMarkers3(project(), index)
+    if retval and retval > 0 then
+      local marker = reaper.GetRegionOrMarker and
+        reaper.GetRegionOrMarker(project(), index, "") or nil
+      local guid
+      local selected = false
+      if marker then
+        local _, value = reaper.GetSetRegionOrMarkerInfo_String(
+          project(), marker, "GUID", "", false
+        )
+        guid = value
+        selected = reaper.GetRegionOrMarkerInfo_Value(
+          project(), marker, "B_UISEL"
+        ) ~= 0
+      end
+      table.insert(result, {
+        ref = marker,
+        guid = guid and guid ~= "" and guid or
+          string.format("%s:%d", is_region and "region" or "marker", number),
+        kind = is_region and "region" or "marker",
+        number = number,
+        name = name,
+        start_samples = seconds_to_samples(position, sample_rate),
+        end_samples = seconds_to_samples(region_end, sample_rate),
+        color = color,
+        selected = selected,
+      })
+    end
+  end
+  return result
+end
+
+function M.set_timeline_state(timeline)
+  local sample_rate = timeline.sampleRate
+  local offset = timeline.projectTimecodeOffsetSamples / sample_rate
+  local frame_rate = timeline.frameRate
+  local nominal = frame_rate.numerator / frame_rate.denominator
+  local base, fractional_mode
+  if frame_rate.denominator == 1 then
+    base, fractional_mode = frame_rate.numerator, 0
+  elseif frame_rate.denominator == 1001 and
+      (frame_rate.numerator == 24000 or frame_rate.numerator == 30000 or
+       frame_rate.numerator == 60000) then
+    base = math.floor(nominal + 0.5)
+    fractional_mode = frame_rate.dropFrame and 1 or 2
+  else
+    return nil, "The Master uses a frame rate that REAPER cannot mirror safely."
+  end
+  if reaper.set_config_var_string(
+      "projtimeoffs", string.format("%.17g", offset), 0
+    ) ~= 2 then
+    return nil, "REAPER could not mirror the Master project timecode offset."
+  end
+  if reaper.set_config_var_string("projfrbase", tostring(base), 0) ~= 2 or
+      reaper.set_config_var_string("projfrdrop", tostring(fractional_mode), 0) ~= 2 then
+    return nil, "REAPER could not mirror the Master frame rate."
+  end
+
+  local actual_rate, actual_drop = reaper.TimeMap_curFrameRate(project())
+  if math.abs(actual_rate - nominal) > 0.001 or
+      not not actual_drop ~= not not frame_rate.dropFrame then
+    return nil, "REAPER did not adopt the Master frame rate and drop-frame mode."
+  end
+  return true
+end
+
+function M.shift_entire_project(delta_seconds)
+  if delta_seconds == 0 then return true end
   for _, track in ipairs(M.all_tracks()) do
     for _, item in ipairs(M.track_items(track)) do
-      if M.get_item_picture_id(item) == picture_id then
-        table.insert(items, item)
+      reaper.SetMediaItemInfo_Value(
+        item, "D_POSITION",
+        reaper.GetMediaItemInfo_Value(item, "D_POSITION") + delta_seconds
+      )
+    end
+  end
+  local entries = M.timeline_entries()
+  for _, entry in ipairs(entries) do
+    reaper.SetProjectMarker3(
+      project(), entry.number, entry.kind == "region",
+      entry.start_samples / M.project_sample_rate() + delta_seconds,
+      entry.end_samples / M.project_sample_rate() + delta_seconds,
+      entry.name, entry.color
+    )
+  end
+  return true
+end
+
+function M.sync_picture(snapshot, options)
+  options = options or {}
+  local timeline = snapshot.timeline
+  local sample_rate = timeline.sampleRate
+  if options.alignment_mode ~= "relative" then
+    local timeline_set, timeline_error = M.set_timeline_state(timeline)
+    if not timeline_set then return nil, timeline_error end
+  end
+
+  local existing_tracks, existing_items = {}, {}
+  for _, track in ipairs(M.all_tracks()) do
+    local lane_id = M.get_track_picture_lane_id(track)
+    if lane_id and lane_id ~= "" then
+      if existing_tracks[lane_id] then
+        return nil, "Duplicate local Picture Track identity; make one Track new before synchronizing."
+      end
+      existing_tracks[lane_id] = track
+    end
+    for _, item in ipairs(M.track_items(track)) do
+      if M.get_item_picture_id(item) == snapshot.pictureId then
+        local item_id = M.get_item_picture_item_id(item)
+        if item_id and item_id ~= "" then
+          if existing_items[item_id] then
+            return nil, "Duplicate local Picture Item identity; make one Item new before synchronizing."
+          end
+          existing_items[item_id] = { item = item, track = track }
+        end
       end
     end
   end
-  return items
-end
 
-function M.sync_picture(snapshot)
-  local matches = picture_items(snapshot.pictureId)
-  if #matches > 1 then
-    return nil, "Multiple Items carry the subscribed Picture ID."
+  local expected_lanes, expected_items = {}, {}
+  local created_tracks, created_items, updated_items, removed_items = 0, 0, 0, 0
+  for _, lane in ipairs(snapshot.lanes or {}) do
+    expected_lanes[lane.laneId] = true
+    local track = existing_tracks[lane.laneId]
+    if not track then
+      track = M.create_mix_track(lane.displayName)
+      M.set_track_picture_lane_id(track, lane.laneId)
+      created_tracks = created_tracks + 1
+    end
+    M.set_track_picture_set_id(track, snapshot.pictureId)
+    for _, published in ipairs(lane.items or {}) do
+      expected_items[published.itemId] = true
+      local existing = existing_items[published.itemId]
+      local item = existing and existing.item or reaper.AddMediaItemToTrack(track)
+      if existing and existing.track ~= track then
+        reaper.MoveMediaItemToTrack(item, track)
+        existing.track = track
+      end
+      local source = reaper.PCM_Source_CreateFromFile(published.videoFile)
+      if not source then return nil, "Could not open Master Reference video: " .. published.videoFile end
+      local take = reaper.GetActiveTake(item)
+      if not take then take = reaper.AddTakeToMediaItem(item) end
+      local old_source = reaper.GetMediaItemTake_Source(take)
+      reaper.SetMediaItemTake_Source(take, source)
+      if old_source then reaper.PCM_Source_Destroy(old_source) end
+      reaper.SetActiveTake(take)
+      local start_seconds = published.startSamples / sample_rate
+      if options.alignment_mode == "relative" then
+        local local_start = tonumber(M.get_project_value(
+          constants.PROJECT_KEYS.picture_start_samples
+        )) or 0
+        local local_rate = tonumber(M.get_project_value(
+          constants.PROJECT_KEYS.picture_start_sample_rate
+        )) or M.project_sample_rate()
+        start_seconds = local_start / local_rate +
+          (published.startSamples - timeline.referenceStartSamples) / sample_rate
+      end
+      reaper.SetMediaItemInfo_Value(item, "D_POSITION", start_seconds)
+      reaper.SetMediaItemInfo_Value(item, "D_LENGTH", published.durationSamples / sample_rate)
+      reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", published.sourceOffsetSamples / sample_rate)
+      reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", published.playbackRate)
+      reaper.GetSetMediaItemTakeInfo_String(take, "P_NAME", published.displayName or "", true)
+      M.set_item_picture_id(item, snapshot.pictureId)
+      M.set_item_picture_item_id(item, published.itemId)
+      if existing then updated_items = updated_items + 1 else created_items = created_items + 1 end
+    end
   end
 
-  local item = matches[1]
-  local created = false
-  if not item then
-    reaper.InsertTrackAtIndex(reaper.CountTracks(project()), true)
-    local track = reaper.GetTrack(project(), reaper.CountTracks(project()) - 1)
-    reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "ReaDelivery Picture", true)
-    item = reaper.AddMediaItemToTrack(track)
-    created = true
+  for item_id, existing in pairs(existing_items) do
+    if not expected_items[item_id] then
+      reaper.DeleteTrackMediaItem(existing.track, existing.item)
+      removed_items = removed_items + 1
+    end
+  end
+  for lane_id, track in pairs(existing_tracks) do
+    if not expected_lanes[lane_id] and
+        M.get_track_picture_set_id(track) == snapshot.pictureId then
+      M.set_track_picture_lane_id(track, "")
+      M.set_track_picture_set_id(track, "")
+    end
   end
 
-  local source = reaper.PCM_Source_CreateFromFile(snapshot.videoFile)
-  if not source then return nil, "Could not open the published Picture video." end
-  local take = reaper.GetActiveTake(item)
-  if not take then take = reaper.AddTakeToMediaItem(item) end
-  local old_source = reaper.GetMediaItemTake_Source(take)
-  reaper.SetMediaItemTake_Source(take, source)
-  if old_source then reaper.PCM_Source_Destroy(old_source) end
-  reaper.SetActiveTake(take)
-
-  local sample_rate = snapshot.sampleRate
-  reaper.SetMediaItemInfo_Value(item, "D_POSITION", snapshot.pictureStartSamples / sample_rate)
-  reaper.SetMediaItemInfo_Value(item, "D_LENGTH", snapshot.durationSamples / sample_rate)
-  reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", snapshot.sourceOffsetSamples / sample_rate)
-  reaper.SetMediaItemTakeInfo_Value(take, "D_PLAYRATE", snapshot.playbackRate)
-  M.set_item_picture_id(item, snapshot.pictureId)
+  local stored = M.get_project_value(constants.PROJECT_KEYS.picture_timeline_entries)
+  local ok, mappings = pcall(json.decode, stored or "")
+  if not ok or type(mappings) ~= "table" then mappings = {} end
+  local by_id = {}
+  for _, mapping in ipairs(mappings) do by_id[mapping.entryId] = mapping end
+  local next_mappings = {}
+  local function sync_entry(entry, is_region)
+    local mapping = by_id[entry.entryId]
+    local position = entry.startSamples / sample_rate
+    local region_end = is_region and entry.endSamples / sample_rate or 0
+    if options.alignment_mode == "relative" then
+      local local_start = tonumber(M.get_project_value(
+        constants.PROJECT_KEYS.picture_start_samples
+      )) or 0
+      local local_rate = tonumber(M.get_project_value(
+        constants.PROJECT_KEYS.picture_start_sample_rate
+      )) or M.project_sample_rate()
+      local anchor = local_start / local_rate
+      position = anchor + (entry.startSamples - timeline.referenceStartSamples) / sample_rate
+      if is_region then
+        region_end = anchor + (entry.endSamples - timeline.referenceStartSamples) / sample_rate
+      end
+    end
+    local number = mapping and mapping.number or -1
+    local actual = reaper.AddProjectMarker(
+      project(), is_region, position, region_end, entry.name or "", number
+    )
+    if actual < 0 then return nil, "Could not synchronize Marker or Region." end
+    reaper.SetProjectMarker3(
+      project(), actual, is_region, position, region_end, entry.name or "", entry.color or 0
+    )
+    table.insert(next_mappings, {
+      entryId = entry.entryId,
+      kind = is_region and "region" or "marker",
+      number = actual,
+    })
+    return true
+  end
+  -- Recreate managed entries to avoid relying on display-number ordering.
+  for _, mapping in ipairs(mappings) do
+    reaper.DeleteProjectMarker(project(), mapping.number, mapping.kind == "region")
+  end
+  for _, entry in ipairs(snapshot.markers or {}) do
+    local synced, err = sync_entry(entry, false); if not synced then return nil, err end
+  end
+  for _, entry in ipairs(snapshot.regions or {}) do
+    local synced, err = sync_entry(entry, true); if not synced then return nil, err end
+  end
+  M.set_project_value(constants.PROJECT_KEYS.picture_timeline_entries, json.encode(next_mappings))
   reaper.UpdateArrange()
-  return { item_ref = item, created = created }
+  return {
+    created_tracks = created_tracks,
+    created_items = created_items,
+    updated_items = updated_items,
+    removed_items = removed_items,
+  }
 end
 
 local function set_item_string(item, key, value)
@@ -445,6 +717,20 @@ local function current_instance_state(item, picture_start_seconds)
     take_channel_mode = reaper.GetMediaItemTakeInfo_Value(take, "I_CHANMODE"),
     take_polarity_inverted = take_volume < 0,
   }
+end
+
+function M.delivery_instance_state(item)
+  local sample_rate = M.project_sample_rate()
+  local picture_start_samples = tonumber(M.get_project_value(
+    constants.PROJECT_KEYS.picture_start_samples
+  )) or 0
+  local picture_start_sample_rate = tonumber(M.get_project_value(
+    constants.PROJECT_KEYS.picture_start_sample_rate
+  )) or sample_rate
+  return current_instance_state(
+    item,
+    picture_start_samples / picture_start_sample_rate
+  )
 end
 
 local function has_advanced_take_state(take)

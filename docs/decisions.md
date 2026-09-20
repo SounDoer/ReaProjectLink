@@ -155,10 +155,9 @@ bound mix track or items.
 
 ### D025 — Picture Start is the timeline anchor
 
-For the initial design, the left edge of the authoritative picture item is the
-Picture Start. Delivery clip positions are stored as integer sample offsets
-relative to Picture Start rather than as absolute REAPER project positions.
-Frame rate and displayed timecode are validation and presentation metadata.
+This early design used the left edge of one authoritative picture Item as the
+alignment anchor. It was withdrawn before release and is superseded by D063 and
+D064; no compatibility path for this unpublished design is maintained.
 
 ### D026 — A delivery clip may have multiple mix instances
 
@@ -442,9 +441,10 @@ filesystem and lifecycle integration becomes necessary.
 
 ### D057 — An unchanged Picture does not publish a new revision by default
 
-Picture Publish Review compares the selected Item against the latest published
-snapshot across every manifest field except the revision number and publication
-metadata. An identical Picture blocks Publish and offers an explicit
+Picture Publish Review compares the complete registered Master Reference surface
+against the latest published snapshot across every manifest field except the
+revision number and publication metadata. An identical Picture blocks Publish
+and offers an explicit
 `Publish Anyway` override, because D014 makes every source project treat a newer
 Picture revision as a mandatory re-synchronize and re-review. This differs from
 D042, where each source Publish always advances `publishRevision`.
@@ -474,3 +474,57 @@ Rolling back is the same per-field review as moving forward, so Mix edits are
 never overwritten silently, and a media revision that merely differs from the
 accepted one counts as pending. The target only governs ReaDelivery-managed
 fields; restoring the rest of a Mix project remains REAPER's own concern.
+
+### D061 — Master Reference replaces the single-Item Picture surface
+
+The Mix project publishes one authoritative Master Reference Set. Its complete
+snapshot may contain multiple registered Picture Tracks, multiple video Items,
+registered Markers, and registered Regions. Track, Item, Marker, and Region
+continuity uses internal stable IDs rather than names or paths. The existing
+`picture.json` location and Picture ID remain the compatibility entry point.
+
+### D062 — Picture Tracks and timeline entries are explicitly registered
+
+Mix users register Picture Tracks, Markers, and Regions through ReaDelivery.
+Publish scans every registered Picture Track and includes every video Item on
+it. Unregistered timeline annotations remain private to the Mix project. A
+deleted registered Marker or Region is retired by the next complete snapshot.
+
+### D063 — FFOP is an optional semantic role
+
+A registered Marker may be assigned the unique `FFOP` semantic role. FFOP is
+not required, but when present it is the Master Reference Start used for
+relative offsets and alignment validation. The tool never infers this role from
+the Marker name alone. Without a semantic Reference Start, project zero is the
+reference position.
+
+### D064 — Source subscriptions mirror the Master timeline by default
+
+First subscription defaults to Mirror Master Timeline. Source projects adopt
+the Master project timecode offset and frame rate, and synchronized video Items,
+Markers, and Regions use the same absolute project positions. Project sample
+rate is not forced. Relative Reference remains an explicit alternative.
+
+### D065 — Timeline rebases require explicit whole-project confirmation
+
+When every stable element in an already synchronized Master Reference moves by
+the same delta, Update Review shows that exact delta. The user may explicitly
+shift every Source media Item, Marker, and Region before synchronizing the
+managed Master Reference surface. ReaDelivery never performs this project-wide
+move silently, and a partial move or an isolated FFOP change does not offer it.
+
+### D066 — Master Reference schema version 2
+
+Multi-track video and timeline annotations use Picture Manifest schema version
+2. The unpublished single-video schema is unsupported and has no migration path.
+Delivery Manifest schema versioning is independent.
+
+### D067 — Transient workflow state is scoped to one open REAPER project
+
+Picture status, Publish Reviews, Import and Update Reviews, mapping decisions,
+warning overrides, whole-project shift choices, and observed Publish locks belong
+only to the REAPER project in which they were created. Switching Project Tabs,
+loading another project, or changing the project path clears this transient UI
+state. Every mutating action also validates its captured runtime project token;
+Source and Master Reference Publish Reviews additionally become stale after the
+project changes and must be refreshed before Publish.

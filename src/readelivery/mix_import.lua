@@ -1,5 +1,6 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
+local project_guard = require("readelivery.project_guard")
 local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
@@ -126,10 +127,12 @@ function M.review(adapter, fs, pointer_path)
     end
     table.insert(result.lanes, reviewed_lane)
   end
-  return result
+  return project_guard.bind(result, adapter, false)
 end
 
 function M.apply(review, adapter, options)
+  local current, context_error = project_guard.check(review, adapter, "Import Review")
+  if not current then return nil, context_error end
   options = options or {}
   if review.blocker_count > 0 then return nil, "Import Review has blockers." end
   if review.picture_warning and not options.allow_picture_revision_mismatch then
@@ -153,6 +156,15 @@ function M.apply(review, adapter, options)
     constants.PROJECT_KEYS.picture_start_sample_rate
   )) or mix_sample_rate
 
+  if adapter.valid_track then
+    for _, mapping in pairs(mappings) do
+      if (mapping.track_ref and not adapter.valid_track(mapping.track_ref)) or
+          (mapping.parent_track_ref and not adapter.valid_track(mapping.parent_track_ref)) then
+        return nil, "A mapped Track belongs to a different or closed REAPER project."
+      end
+    end
+  end
+
   adapter.begin_undo("Import ReaDelivery Source")
   for _, lane in ipairs(review.lanes) do
     local mapping = mappings[lane.lane_id]
@@ -172,7 +184,7 @@ function M.apply(review, adapter, options)
         cancel_undo(adapter, "Import ReaDelivery Source")
         return nil, "Unknown Lane mapping decision."
       end
-      if not track then
+      if not track or adapter.valid_track and not adapter.valid_track(track) then
         cancel_undo(adapter, "Import ReaDelivery Source")
         return nil, "Mapped Track is unavailable."
       end

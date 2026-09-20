@@ -32,11 +32,16 @@ local function current_revision(input, fs)
   local bytes, read_error = fs.read_file(path)
   if not bytes then error(read_error or "could not read picture.json", 3) end
   local pointer = json.decode(bytes)
-  if pointer.schemaVersion ~= 1 then error("unsupported Picture schema version", 3) end
+  if pointer.schemaVersion ~= 2 then
+    error("unsupported Master Reference schema version", 3)
+  end
   return pointer.latestPictureRevision
 end
 
 local function perform_publish(input, fs)
+  if input.pointer.schemaVersion ~= 2 or input.snapshot.schemaVersion ~= 2 then
+    error("Picture Publish only supports Master Reference schema version 2", 2)
+  end
   local found_revision = current_revision(input, fs)
   if found_revision ~= input.expected_revision then
     error(string.format(

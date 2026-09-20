@@ -81,10 +81,12 @@ The integration project:
 
 The picture relationship runs in the opposite direction:
 
-1. The mix project owns one authoritative picture track.
-2. A picture change is explicitly published as a picture revision.
+1. The mix project owns one authoritative Master Reference Set containing
+   registered Picture Tracks, video Items, Markers, and Regions.
+2. A Master Reference change is explicitly published as a picture revision.
 3. Source projects detect that revision and ask the user to synchronize it.
-4. Synchronization and review are distinct states.
+4. Synchronization mirrors the Master timeline by default; synchronization and
+   review remain distinct states.
 5. A source audio Publish records the picture revision against which it was
    reviewed.
 6. The mix project warns when a source delivery was produced against an older

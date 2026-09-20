@@ -1,38 +1,53 @@
+local json = require("readelivery.json")
+
 local M = {}
 
 local function required(input, key)
   local value = input[key]
   if value == nil or value == "" then
-    error("missing Picture Manifest field: " .. key, 3)
+    error("missing Master Reference Manifest field: " .. key, 3)
   end
   return value
+end
+
+local function build_frame_rate(input)
+  input = input or {}
+  return {
+    numerator = required(input, "numerator"),
+    denominator = required(input, "denominator"),
+    dropFrame = input.drop_frame ~= nil and input.drop_frame or input.dropFrame or false,
+  }
+end
+
+local function build_lanes(input)
+  local lanes = json.array(input or {})
+  for _, lane in ipairs(lanes) do lane.items = json.array(lane.items or {}) end
+  return lanes
 end
 
 function M.build(input)
   local revision = required(input, "picture_revision")
   local snapshot = {
-    schemaVersion = 1,
+    schemaVersion = 2,
     pictureId = required(input, "picture_id"),
     pictureRevision = revision,
     mixProjectName = required(input, "mix_project_name"),
     publishedAt = required(input, "published_at"),
     publishedBy = required(input, "published_by"),
-    videoFile = required(input, "video_file"),
-    videoHash = "sha256:" .. required(input, "video_hash"),
-    sampleRate = required(input, "sample_rate"),
-    pictureStartSamples = required(input, "picture_start_samples"),
-    sourceOffsetSamples = required(input, "source_offset_samples"),
-    durationSamples = required(input, "duration_samples"),
-    playbackRate = required(input, "playback_rate"),
-    frameRate = {
-      numerator = required(input.frame_rate or {}, "numerator"),
-      denominator = required(input.frame_rate or {}, "denominator"),
-      dropFrame = input.frame_rate and input.frame_rate.drop_frame or false,
+    alignmentMode = input.alignment_mode or "mirror",
+    timeline = {
+      sampleRate = required(input, "sample_rate"),
+      projectTimecodeOffsetSamples = required(input, "project_timecode_offset_samples"),
+      frameRate = build_frame_rate(input.frame_rate),
+      referenceStartSamples = input.reference_start_samples or 0,
+      referenceRole = input.reference_role,
     },
-    projectTimecodeOffsetSamples = required(input, "project_timecode_offset_samples"),
+    lanes = build_lanes(input.lanes),
+    markers = json.array(input.markers or {}),
+    regions = json.array(input.regions or {}),
   }
   local pointer = {
-    schemaVersion = 1,
+    schemaVersion = 2,
     pictureId = input.picture_id,
     latestPictureRevision = revision,
     manifest = string.format("picture-history/picture-%04d.json", revision),

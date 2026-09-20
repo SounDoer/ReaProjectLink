@@ -32,8 +32,8 @@ The working principle is:
 The local MVP is implemented in Lua 5.4 ReaScript with ReaImGui. It includes:
 
 - Source and Mix project initialization;
-- authoritative Picture publication, Source subscription, synchronization, and
-  explicit review;
+- multi-track Master Reference publication with registered video Items,
+  Markers, Regions, optional FFOP, Source timeline mirroring, and explicit review;
 - Delivery Track registration, complete Publish Review, immutable WAV revisions,
   and atomic manifests;
 - Mix-side Source subscription, Lane mapping, first import, new-Take updates,

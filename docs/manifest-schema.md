@@ -94,43 +94,66 @@ The stable Picture entry point is
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "pictureId": "cin030-picture",
   "latestPictureRevision": 12,
   "manifest": "picture-history/picture-0012.json"
 }
 ```
 
-The referenced immutable Picture manifest records the externally managed video
-and its timing context:
+The referenced immutable Master Reference manifest records registered video
+Tracks, Items, Markers, Regions, and their shared timing context:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "pictureId": "cin030-picture",
   "pictureRevision": 12,
   "mixProjectName": "CIN_030_MIX",
   "publishedAt": "2026-09-13T10:30:00+08:00",
   "publishedBy": "Alice",
-  "videoFile": "\\\\nas\\project\\picture\\CIN_030_v0012.mov",
-  "videoHash": "sha256:...",
-  "sampleRate": 48000,
-  "pictureStartSamples": 0,
-  "sourceOffsetSamples": 0,
-  "durationSamples": 14400000,
-  "playbackRate": 1.0,
-  "frameRate": {
-    "numerator": 24000,
-    "denominator": 1001,
-    "dropFrame": false
+  "alignmentMode": "mirror",
+  "timeline": {
+    "sampleRate": 48000,
+    "projectTimecodeOffsetSamples": 172800000,
+    "referenceStartSamples": 172800000,
+    "referenceRole": "FFOP",
+    "frameRate": {
+      "numerator": 24000,
+      "denominator": 1001,
+      "dropFrame": false
+    }
   },
-  "projectTimecodeOffsetSamples": 0
+  "lanes": [{
+    "laneId": "picture-lane-main",
+    "displayName": "Picture Main",
+    "order": 0,
+    "items": [{
+      "itemId": "picture-item-12",
+      "displayName": "CIN_030 v12",
+      "videoFile": "\\\\nas\\project\\picture\\CIN_030_v0012.mov",
+      "videoHash": "sha256:...",
+      "startSamples": 172800000,
+      "sourceOffsetSamples": 0,
+      "durationSamples": 14400000,
+      "playbackRate": 1.0
+    }]
+  }],
+  "markers": [{
+    "entryId": "marker-ffop",
+    "name": "FFOP",
+    "startSamples": 172800000,
+    "semanticRole": "FFOP"
+  }],
+  "regions": []
 }
 ```
 
-`videoFile` references the original NAS asset and is not copied into `_Delivery`.
-Consumers verify `videoHash`; the historical manifest remains valid as a record
-even when its external video is no longer available.
+Every `videoFile` references its original NAS asset and is not copied into
+`_Delivery`. Consumers verify each `videoHash`; the historical manifest remains
+valid as a record even when external video is no longer available. The
+unpublished single-video Picture schema is unsupported; development builds must
+regenerate their Picture package using schema version 2.
 
 ## Schema compatibility
 

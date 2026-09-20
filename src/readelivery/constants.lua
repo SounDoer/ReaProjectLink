@@ -18,17 +18,22 @@ M.PROJECT_KEYS = {
   reviewed_picture_revision = "reviewed_picture_revision",
   picture_start_samples = "picture_start_samples",
   picture_start_sample_rate = "picture_start_sample_rate",
+  picture_alignment_mode = "picture_alignment_mode",
+  picture_timeline_entries = "picture_timeline_entries",
   source_subscriptions = "source_subscriptions",
 }
 
 M.TRACK_KEYS = {
   lane_id = "P_EXT:ReaDelivery_lane_id",
   bound_lane_id = "P_EXT:ReaDelivery_bound_lane_id",
+  picture_lane_id = "P_EXT:ReaDelivery_picture_lane_id",
+  picture_set_id = "P_EXT:ReaDelivery_picture_set_id",
 }
 
 M.ITEM_KEYS = {
   clip_id = "P_EXT:ReaDelivery_clip_id",
   picture_id = "P_EXT:ReaDelivery_picture_id",
+  picture_item_id = "P_EXT:ReaDelivery_picture_item_id",
   source_project_id = "P_EXT:ReaDelivery_source_project_id",
   instance_id = "P_EXT:ReaDelivery_instance_id",
   accepted_media_revision = "P_EXT:ReaDelivery_accepted_media_revision",

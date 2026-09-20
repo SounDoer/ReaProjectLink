@@ -3,6 +3,7 @@ local delivery_manifest = require("readelivery.delivery_manifest")
 local json = require("readelivery.json")
 local default_package_writer = require("readelivery.package_writer")
 local publish_plan = require("readelivery.publish_plan")
+local project_guard = require("readelivery.project_guard")
 local source_review = require("readelivery.source_review")
 local source_service = require("readelivery.source_service")
 
@@ -150,10 +151,12 @@ function M.create(dependencies)
       review.blocker_count = review.blocker_count + 1
       review.picture_blocker = "Subscribe to and review a Picture revision before audio Publish."
     end
-    return review
+    return project_guard.bind(review, adapter, true)
   end
 
   function service.publish(review, adapter, fs, metadata)
+    local current, context_error = project_guard.check(review, adapter, "Publish Review")
+    if not current then return nil, context_error end
     metadata = metadata or {}
     if review.blocker_count ~= 0 then
       return nil, "Publish Review still has blockers or unresolved decisions."

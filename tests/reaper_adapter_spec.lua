@@ -1,4 +1,5 @@
 local adapter = require("readelivery.reaper_adapter")
+local json = require("readelivery.json")
 
 reaper.GetSetProjectInfo(0, "PROJECT_SRATE", 48000, true)
 reaper.InsertTrackAtIndex(0, false)
@@ -114,6 +115,93 @@ assert(instances[1].accepted_media_revision == 5, "accepted media revision")
 assert(instances[1].handled_publish_revision == 9, "handled Publish revision")
 assert(adapter.detach_instance(imported), "detach Instance")
 assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
+
+local reference = {
+  schemaVersion = 2,
+  pictureId = "picture-set-1",
+  pictureRevision = 1,
+  timeline = {
+    sampleRate = 48000,
+    projectTimecodeOffsetSamples = 3600000,
+    referenceStartSamples = 48000,
+    frameRate = { numerator = 30000, denominator = 1001, dropFrame = true },
+  },
+  lanes = {
+    { laneId = "picture-lane-1", displayName = "Picture Main", order = 0, items = {
+      { itemId = "picture-item-1", displayName = "Shot A", videoFile = wav_path,
+        videoHash = "sha256:test", startSamples = 48000, sourceOffsetSamples = 0,
+        durationSamples = 48000, playbackRate = 1 },
+    } },
+    { laneId = "picture-lane-2", displayName = "Picture Overlay", order = 1, items = {
+      { itemId = "picture-item-2", displayName = "Overlay", videoFile = wav_path,
+        videoHash = "sha256:test", startSamples = 96000, sourceOffsetSamples = 0,
+        durationSamples = 24000, playbackRate = 1 },
+    } },
+  },
+  markers = {
+    { entryId = "marker-ffop", name = "FFOP", startSamples = 48000, color = 0, semanticRole = "FFOP" },
+  },
+  regions = {
+    { entryId = "region-scene", name = "Scene", startSamples = 48000, endSamples = 144000, color = 0 },
+  },
+}
+local synced_reference = assert(adapter.sync_picture(reference, { alignment_mode = "mirror" }))
+assert(synced_reference.created_tracks == 2, "multi-track Master Reference creates Picture Tracks")
+assert(synced_reference.created_items == 2, "multi-track Master Reference creates video Items")
+local mirrored_timeline = adapter.timeline_state()
+assert(mirrored_timeline.frame_rate.numerator == 30000 and
+  mirrored_timeline.frame_rate.denominator == 1001,
+  string.format("Master frame rate is mirrored (got %s/%s)",
+    tostring(mirrored_timeline.frame_rate.numerator),
+    tostring(mirrored_timeline.frame_rate.denominator)))
+assert(mirrored_timeline.frame_rate.drop_frame,
+  "Master drop-frame mode is mirrored")
+assert(mirrored_timeline.project_timecode_offset_samples == 3600000,
+  "Master project timecode offset is mirrored")
+assert(adapter.set_timeline_state({
+  sampleRate = 48000,
+  projectTimecodeOffsetSamples = 0,
+  frameRate = { numerator = 24000, denominator = 1001, dropFrame = false },
+}))
+local fractional_timeline = adapter.timeline_state()
+assert(fractional_timeline.frame_rate.numerator == 24000 and
+  fractional_timeline.frame_rate.denominator == 1001 and
+  not fractional_timeline.frame_rate.drop_frame,
+  "23.976 non-drop frame rate is mirrored")
+local picture_item_count = 0
+for _, candidate_track in ipairs(adapter.all_tracks()) do
+  for _, candidate_item in ipairs(adapter.track_items(candidate_track)) do
+    if adapter.get_item_picture_id(candidate_item) == "picture-set-1" then
+      picture_item_count = picture_item_count + 1
+    end
+  end
+end
+assert(picture_item_count == 2, "both managed Picture Items are present")
+local has_ffop, has_scene = false, false
+for _, entry in ipairs(adapter.timeline_entries()) do
+  if entry.name == "FFOP" then has_ffop = true end
+  if entry.name == "Scene" and entry.kind == "region" then has_scene = true end
+end
+assert(has_ffop and has_scene, "Marker and Region synchronized")
+
+reference.pictureRevision = 2
+table.remove(reference.lanes, 2)
+reference.regions = {}
+local reduced_reference = assert(adapter.sync_picture(reference, { alignment_mode = "mirror" }))
+assert(reduced_reference.removed_items == 1, "retired Picture Item is removed")
+for index = reaper.CountTracks(0) - 1, 0, -1 do
+  local candidate_track = reaper.GetTrack(0, index)
+  if adapter.get_track_picture_set_id(candidate_track) == "picture-set-1" or
+      adapter.get_track_picture_lane_id(candidate_track) ~= "" or
+      adapter.track_name(candidate_track) == "Picture Main" or
+      adapter.track_name(candidate_track) == "Picture Overlay" then
+    reaper.DeleteTrack(candidate_track)
+  end
+end
+for _, mapping in ipairs(json.decode(adapter.get_project_value("picture_timeline_entries") or "[]")) do
+  reaper.DeleteProjectMarker(0, mapping.number, mapping.kind == "region")
+end
+adapter.set_project_value("picture_timeline_entries", "")
 os.remove(wav_path)
 
 local folder = adapter.create_mix_track("Delivery Folder")
@@ -131,5 +219,13 @@ reaper.DeleteTrack(child_one)
 reaper.DeleteTrack(folder)
 
 reaper.DeleteTrack(track)
+
+local original_project_token = adapter.project_token()
+reaper.Main_OnCommand(40859, 0)
+assert(adapter.project_token() ~= original_project_token,
+  "a new Project Tab has a distinct runtime token")
+reaper.Main_OnCommand(40860, 0)
+assert(adapter.project_token() == original_project_token,
+  "returning to the original Project Tab restores its runtime token")
 
 return 1

@@ -1,6 +1,7 @@
 local constants = require("readelivery.constants")
 local json = require("readelivery.json")
 local mix_update_plan = require("readelivery.mix_update_plan")
+local project_guard = require("readelivery.project_guard")
 local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
@@ -327,10 +328,12 @@ function M.review(adapter, fs, source_project_id, target_revision)
       result.pending_count = result.pending_count + 1
     end
   end
-  return result
+  return project_guard.bind(result, adapter, false)
 end
 
 function M.apply(review, adapter, options)
+  local current, context_error = project_guard.check(review, adapter, "Update Review")
+  if not current then return nil, context_error end
   options = options or {}
   local rebindings = options.lane_rebindings or {}
   if review.pending_count == 0 and next(rebindings) == nil then
@@ -352,6 +355,30 @@ function M.apply(review, adapter, options)
   for _, lane in ipairs(review.unmapped_lanes) do
     if not lane_mappings[lane.lane_id] then
       return nil, "Every new Delivery Lane requires a mapping decision."
+    end
+  end
+  if adapter.valid_item then
+    for _, row in ipairs(review.instances) do
+      if not adapter.valid_item(row.item_ref) then
+        return nil, "An Update Review Item belongs to a different or closed REAPER project."
+      end
+      if adapter.delivery_instance_state and
+          json.encode(adapter.delivery_instance_state(row.item_ref)) ~= json.encode(row.mix) then
+        return nil, "An Item changed after Update Review. Refresh the Review first."
+      end
+    end
+  end
+  if adapter.valid_track then
+    for _, mapping in pairs(lane_mappings) do
+      if (mapping.track_ref and not adapter.valid_track(mapping.track_ref)) or
+          (mapping.parent_track_ref and not adapter.valid_track(mapping.parent_track_ref)) then
+        return nil, "A mapped Track belongs to a different or closed REAPER project."
+      end
+    end
+    for _, track in pairs(rebindings) do
+      if not adapter.valid_track(track) then
+        return nil, "A rebound Track belongs to a different or closed REAPER project."
+      end
     end
   end
   -- Work on a private copy so a failed, rolled-back Apply does not mutate the

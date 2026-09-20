@@ -99,6 +99,7 @@ local values = {
 local first_item, second_item = {}, {}
 local events = {}
 local duplicate_instances = false
+local stale_instance_state = false
 local adapter = {}
 function adapter.get_project_value(key) return values[key] end
 function adapter.set_project_value(key, value) values[key] = value end
@@ -127,6 +128,19 @@ function adapter.delivery_instances()
       state = { position_seconds = 0.25, length_seconds = 1, source_offset_seconds = 0, item_gain = 1, fade_in_seconds = 0, fade_out_seconds = 0, take_volume = 1, take_pan = 0, take_playback_rate = 1, take_pitch = 0, take_channel_mode = 0, take_polarity_inverted = false },
     },
   }
+end
+function adapter.valid_item() return true end
+function adapter.delivery_instance_state(item)
+  for _, instance in ipairs(adapter.delivery_instances()) do
+    if instance.item_ref == item then
+      local state = {}
+      for key, value in pairs(instance.state) do state[key] = value end
+      if stale_instance_state and item == first_item then
+        state.position_seconds = state.position_seconds + 1
+      end
+      return state
+    end
+  end
 end
 function adapter.begin_undo() table.insert(events, "begin") end
 function adapter.end_undo() table.insert(events, "end") end
@@ -175,6 +189,20 @@ assert(
 
 local idle, idle_error = mix_update.apply({ pending_count = 0 }, adapter, {})
 assert(not idle and idle_error == "Nothing to update.", "an up-to-date Source is not applied")
+
+local apply_options = {
+  instances = {
+    ["instance-1"] = { media_choice = "accept_new_take" },
+    ["instance-2"] = { media_choice = "skip" },
+  },
+  additions = { ["clip-2"] = "import" },
+  lane_mappings = { ["lane-2"] = { kind = "skip" } },
+}
+stale_instance_state = true
+local stale, stale_error = mix_update.apply(review, adapter, apply_options)
+assert(not stale and stale_error:find("changed after Update Review", 1, true),
+  "a locally edited Item makes Update Review stale")
+stale_instance_state = false
 
 local result, apply_error = mix_update.apply(review, adapter, {
   instances = {
@@ -298,4 +326,4 @@ assert(
 )
 adapter.delivery_instances = linked_instances
 
-return 8
+return 9
