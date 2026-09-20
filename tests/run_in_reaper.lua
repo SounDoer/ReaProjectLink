@@ -8,6 +8,8 @@ end
 
 package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
 
+assert(require("readelivery.runtime_requirements").check_reaper(reaper))
+
 local ok, result = xpcall(function()
   local entry, entry_error = loadfile(root .. "/scripts/ReaDelivery.lua")
   assert(entry, entry_error)
@@ -26,7 +28,9 @@ local ok, result = xpcall(function()
   end
 
   local passed = dofile(root .. "/tests/source_service_spec.lua")
+  passed = passed + dofile(root .. "/tests/runtime_requirements_spec.lua")
   passed = passed + dofile(root .. "/tests/reaper_adapter_spec.lua")
+  passed = passed + dofile(root .. "/tests/workflow_rollback_spec.lua")
   passed = passed + dofile(root .. "/tests/manifest_spec.lua")
   passed = passed + dofile(root .. "/tests/hash_spec.lua")
   passed = passed + dofile(root .. "/tests/delivery_manifest_spec.lua")
@@ -58,6 +62,7 @@ end
 
 reaper.atexit(function()
   os.remove(root .. "/tests/.adapter-fixture.wav")
+  os.remove(root .. "/tests/.rollback-fixture.wav")
   os.remove(root .. "/tests/.runner-project.rpp")
 end)
 reaper.Main_SaveProjectEx(0, root .. "/tests/.runner-project.rpp", 8)

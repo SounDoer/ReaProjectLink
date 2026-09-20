@@ -42,3 +42,6 @@ The local MVP is implemented in Lua 5.4 ReaScript with ReaImGui. It includes:
 
 The current scope assumes new projects initialized through ReaDelivery and does
 not infer bindings for existing legacy Mix Items.
+
+Runtime requirements are REAPER 7.74 or newer and a ReaImGui 0.9-compatible
+release or newer.

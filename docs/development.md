@@ -2,8 +2,15 @@
 
 ## Runtime
 
-- REAPER with embedded Lua 5.4;
+- REAPER 7.74 or newer with embedded Lua 5.4;
 - ReaImGui 0.9-compatible API or newer, installed through ReaPack.
+
+REAPER 7.74 is the minimum because Master Reference synchronization uses the
+ProjectMarker APIs introduced in REAPER 7.62 and `set_config_var_string`, added
+in REAPER 7.74, to mirror project timecode and frame-rate state. The main script
+checks the REAPER version and required APIs before opening the UI; loading
+ReaImGui through its `0.9` compatibility API provides the corresponding UI
+version check.
 
 No standalone Lua or Python runtime is required by the REAPER scripts.
 
@@ -34,5 +41,8 @@ does not need to be copied into REAPER's resource directory during development.
 
 The automated suite exercises pure domain behavior, in-memory transaction
 failures, the real Windows filesystem, real REAPER Track/Item/Take APIs, and a
-ReaImGui frame. Run `ReaDelivery - Run Tests` from the Action List after changing
-workflow, manifest, filesystem, or adapter behavior.
+ReaImGui frame. It also injects failures after partial Import, Update, and Picture
+synchronization mutations and verifies that REAPER Undo restores Tracks, Items,
+Takes, fields, timeline state, and project extension state. Run
+`ReaDelivery - Run Tests` from the Action List after changing workflow, manifest,
+filesystem, or adapter behavior.

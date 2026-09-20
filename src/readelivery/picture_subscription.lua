@@ -241,6 +241,22 @@ function M.synchronize(adapter, status, options)
   if not current then return nil, context_error end
   options = options or {}
   if not status.available then return nil, status.video_error end
+  local previous_timeline = adapter.timeline_state and adapter.timeline_state() or nil
+  local function restore_timeline(original_error)
+    if not previous_timeline or not adapter.set_timeline_state then return original_error end
+    local restored, restore_error = adapter.set_timeline_state({
+      sampleRate = previous_timeline.sample_rate,
+      projectTimecodeOffsetSamples = previous_timeline.project_timecode_offset_samples,
+      frameRate = {
+        numerator = previous_timeline.frame_rate.numerator,
+        denominator = previous_timeline.frame_rate.denominator,
+        dropFrame = previous_timeline.frame_rate.drop_frame,
+      },
+    })
+    if restored then return original_error end
+    return tostring(original_error) .. " Timeline restoration also failed: " ..
+      tostring(restore_error)
+  end
   adapter.begin_undo("Synchronize ReaDelivery Picture")
   if options.shift_entire_project and status.can_shift_entire_project and
       status.shift_seconds ~= 0 then
@@ -255,7 +271,7 @@ function M.synchronize(adapter, status, options)
   })
   if not result then
     cancel_undo(adapter, "Synchronize ReaDelivery Picture")
-    return nil, sync_error
+    return nil, restore_timeline(sync_error)
   end
   adapter.set_project_value(
     constants.PROJECT_KEYS.synchronized_picture_revision,

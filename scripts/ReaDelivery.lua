@@ -10,14 +10,30 @@ if not root then
   return
 end
 package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
+local runtime_requirements = require("readelivery.runtime_requirements")
+local runtime_ok, runtime_error = runtime_requirements.check_reaper(reaper)
+if not runtime_ok then
+  reaper.ShowMessageBox(runtime_error, "ReaDelivery", 0)
+  return
+end
 if not reaper.ImGui_GetBuiltinPath then
-  reaper.ShowMessageBox("Install ReaImGui through ReaPack and restart REAPER.", "ReaDelivery", 0)
+  reaper.ShowMessageBox(
+    "Install ReaImGui " .. runtime_requirements.minimum_reaimgui_api ..
+      " or newer through ReaPack and restart REAPER.",
+    "ReaDelivery",
+    0
+  )
   return
 end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua;" .. package.path
 local ok_imgui, ImGui = pcall(function() return require("imgui")("0.9") end)
 if not ok_imgui then
-  reaper.ShowMessageBox("Could not load ReaImGui:\n" .. tostring(ImGui), "ReaDelivery", 0)
+  reaper.ShowMessageBox(
+    "Could not load the ReaImGui " .. runtime_requirements.minimum_reaimgui_api ..
+      " compatibility API:\n" .. tostring(ImGui),
+    "ReaDelivery",
+    0
+  )
   return
 end
 
