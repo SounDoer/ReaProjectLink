@@ -49,6 +49,16 @@ assert(rolled_back.media.pending, "an older target offers its own audio back")
 
 local retired = delivery_update_plan.build({ baseline = {}, local_state = {}, delivery = nil })
 assert(retired.retired, "missing Source Clip is retired")
+assert(retired.retirement_pending, "new retirement requires a decision")
 assert(retired.media.choice == "keep_current_media", "retirement never deletes media")
 
-return 3
+local kept_retired = delivery_update_plan.build({
+  baseline = nil,
+  local_state = {},
+  delivery = nil,
+  retirement_handled = true,
+})
+assert(kept_retired.retired and not kept_retired.retirement_pending,
+  "confirmed retirement does not repeatedly require a decision")
+
+return 4

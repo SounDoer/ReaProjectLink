@@ -131,8 +131,21 @@ local update_item = assert(adapter.create_delivery_item(
     instance_id = "rollback-instance",
   }
 ))
+local retired_item = assert(adapter.create_delivery_item(
+  update_track,
+  clip("rollback-retired-clip", 1),
+  {
+    source_sample_rate = 48000,
+    position_seconds = 2,
+    source_project_id = "rollback-update-source",
+    delivery_revision = 1,
+    reference_revision = 7,
+    instance_id = "rollback-retired-instance",
+  }
+))
 adapter.end_undo("Prepare rollback Update fixture")
 local current_state = adapter.delivery_instance_state(update_item)
+local retired_state = adapter.delivery_instance_state(retired_item)
 local source_state = {}
 for key, value in pairs(current_state) do source_state[key] = value end
 source_state.position_seconds = 1
@@ -146,7 +159,7 @@ local update_subscription = {
 }
 local update_review = {
   project_token = adapter.project_token(),
-  pending_count = 2,
+  pending_count = 3,
   blocker_count = 0,
   reference_warning = false,
   reference_context = reference_context(),
@@ -170,6 +183,18 @@ local update_review = {
       accepted_media_revision = 1,
       target_clip = clip("rollback-update-clip", 2),
       media_path = wav_path,
+      plan = { retired = false },
+    },
+    {
+      item_ref = retired_item,
+      decision_key = "rollback-retired-instance",
+      needs_new_instance_id = false,
+      baseline = retired_state,
+      delivery = nil,
+      local_state = retired_state,
+      accepted_media_revision = 1,
+      target_clip = nil,
+      plan = { retired = true },
     },
   },
   additions = {
@@ -193,11 +218,19 @@ local handled_before_update = adapter.delivery_instances(
 local updated, update_error = delivery_update.apply(update_review, failing_update_adapter, {
   instances = {
     ["rollback-instance"] = { media_choice = "add_new_take" },
+    ["rollback-retired-instance"] = { retired_choice = "delete" },
   },
   additions = { ["rollback-addition"] = "import" },
 })
 assert(not updated and update_error == "injected addition failure", "Update failure injected")
 assert(reaper.CountTakes(update_item) == takes_before_update, "failed Update rolls back added Take")
+local restored_retired
+for _, instance in ipairs(adapter.delivery_instances("rollback-update-source")) do
+  if instance.clip_id == "rollback-retired-clip" then restored_retired = instance end
+end
+assert(restored_retired, "failed Update restores deleted retired Item")
+assert(restored_retired.instance_id == "rollback-retired-instance",
+  "failed Update restores retired Item identity")
 assert(
   math.abs(reaper.GetMediaItemInfo_Value(update_item, "D_POSITION")) < 0.000001,
   "failed Update rolls back field changes"

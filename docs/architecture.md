@@ -309,6 +309,13 @@ Changes to duration, timeline position, source offset, channel layout, or sample
 rate require a warning and explicit handling policy. The tool must not silently
 delete items when a source clip disappears from a later publish.
 
+A Linked Item whose Delivery Clip is absent from the target revision is shown as
+Retired. Keep Retired Item is the default. The Master User may instead detach it
+from Delivery updates or explicitly delete it. Match Source Structure is a bulk
+review decision that deletes Retired Linked Items and imports all Pending Clips;
+it requires confirmation and is applied in the same REAPER Undo step as the
+rest of the update.
+
 The Delivery Update Review compares Baseline, Delivery, and Local state for each
 Linked Item. A
 Delivery-only change defaults to Use Delivery, a Local-only change remains local, and

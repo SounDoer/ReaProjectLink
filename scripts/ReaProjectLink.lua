@@ -656,7 +656,11 @@ local function begin_update(source_id, target_revision)
   update_rebindings = {}
   update_target_input = review.target_revision
   for _, row in ipairs(review.instances) do
-    update_decisions[row.decision_key] = { media_choice = row.plan.media.choice, field_choices = {} }
+    update_decisions[row.decision_key] = {
+      media_choice = row.plan.media.choice,
+      field_choices = {},
+      retired_choice = row.plan.retired and "keep" or nil,
+    }
   end
   for _, row in ipairs(review.additions) do update_additions[row.clip.clipId] = "import" end
   for _, lane in ipairs(review.unmapped_lanes) do
@@ -769,6 +773,30 @@ local function draw_update()
     local changed
     changed, update_reference_override = ImGui.Checkbox(ctx, "Allow Reference revision difference##update", update_reference_override)
   end
+  local retired_count = 0
+  for _, row in ipairs(update_review.instances) do
+    if row.plan.retired then retired_count = retired_count + 1 end
+  end
+  if retired_count > 0 then
+    ImGui.Separator(ctx)
+    ImGui.Text(ctx, string.format(
+      "Structural Change: %d Retired Linked Item(s), %d Pending Clip(s)",
+      retired_count,
+      #update_review.additions
+    ))
+    ImGui.TextWrapped(ctx,
+      "Keep preserves Master edits. Match Source Structure deletes retired Linked Items and imports all Pending Clips.")
+    if ImGui.Button(ctx, "Match Source Structure") then
+      for _, row in ipairs(update_review.instances) do
+        if row.plan.retired then
+          update_decisions[row.decision_key].retired_choice = "delete"
+        end
+      end
+      for _, addition in ipairs(update_review.additions) do
+        update_additions[addition.clip.clipId] = "import"
+      end
+    end
+  end
   for _, row in ipairs(update_review.instances) do
     local decision = update_decisions[row.decision_key]
     local label = string.format(
@@ -784,7 +812,26 @@ local function draw_update()
       )
     end
     if ImGui.TreeNode(ctx, label .. "##" .. row.decision_key) then
-      if row.plan.retired then ImGui.TextWrapped(ctx, "Retired upstream; the Item will not be deleted.")
+      if row.plan.retired then
+        ImGui.TextWrapped(ctx, "Retired upstream. Choose what happens to this Linked Item.")
+        local retired_labels = {
+          keep = "Keep Retired Item",
+          detach = "Detach Retired Item",
+          delete = "Delete Retired Item",
+        }
+        ImGui.Text(ctx, "Action: " ..
+          (retired_labels[decision.retired_choice] or "Keep Retired Item"))
+        if ImGui.Button(ctx, "Keep Retired Item##" .. row.decision_key) then
+          decision.retired_choice = "keep"
+        end
+        ImGui.SameLine(ctx)
+        if ImGui.Button(ctx, "Detach Retired Item##" .. row.decision_key) then
+          decision.retired_choice = "detach"
+        end
+        ImGui.SameLine(ctx)
+        if ImGui.Button(ctx, "Delete Retired Item##" .. row.decision_key) then
+          decision.retired_choice = "delete"
+        end
       else
         if row.plan.media.pending then
           local accept = decision.media_choice == "add_new_take"
@@ -851,17 +898,41 @@ local function draw_update()
   draw_declined_clips()
   draw_bound_lanes()
   if update_review.blocker_count == 0 and ImGui.Button(ctx, "Apply Delivery Update") then
-    local result, err = delivery_update.apply(update_review, adapter, {
-      instances = update_decisions,
-      additions = update_additions,
-      lane_mappings = update_lanes,
-      lane_rebindings = update_rebindings,
-      allow_reference_revision_mismatch = update_reference_override,
-    })
-    if result then
-      notify(string.format("Updated %d Linked Item(s), added %d Take(s) and %d Item(s).", result.updated_instances, result.new_takes, result.new_items))
-      update_review = nil
-    else notify(err, true) end
+    local delete_count = 0
+    for _, row in ipairs(update_review.instances) do
+      local decision = update_decisions[row.decision_key]
+      if row.plan.retired and decision.retired_choice == "delete" then
+        delete_count = delete_count + 1
+      end
+    end
+    local confirmed = delete_count == 0 or reaper.ShowMessageBox(
+      string.format(
+        "Delete %d retired Linked Item(s)? The Delivery Update will be one REAPER Undo step.",
+        delete_count
+      ),
+      "Delete Retired Linked Items",
+      1
+    ) == 1
+    if confirmed then
+      local result, err = delivery_update.apply(update_review, adapter, {
+        instances = update_decisions,
+        additions = update_additions,
+        lane_mappings = update_lanes,
+        lane_rebindings = update_rebindings,
+        allow_reference_revision_mismatch = update_reference_override,
+      })
+      if result then
+        notify(string.format(
+          "Updated %d Linked Item(s), detached %d, deleted %d, added %d Take(s) and %d Item(s).",
+          result.updated_instances,
+          result.detached_instances,
+          result.deleted_instances,
+          result.new_takes,
+          result.new_items
+        ))
+        update_review = nil
+      else notify(err, true) end
+    end
   end
 end
 

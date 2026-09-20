@@ -26,6 +26,7 @@ function M.build(input)
   if not input.delivery then
     return {
       retired = true,
+      retirement_pending = not input.retirement_handled,
       fields = {},
       conflict_count = 0,
       media = { pending = false, choice = "keep_current_media" },
@@ -34,6 +35,7 @@ function M.build(input)
 
   local result = {
     retired = false,
+    retirement_pending = false,
     fields = {},
     conflict_count = 0,
     media = {

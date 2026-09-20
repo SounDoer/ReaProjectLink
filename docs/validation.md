@@ -74,6 +74,10 @@ the projects and test media on the team's normal shared-storage arrangement.
 5. Decline a Pending Clip, then use Reconsider Clip and confirm it is offered
    again.
 6. Detach a Linked Item and confirm later updates no longer include it.
+7. Replace one Source Clip with multiple new Clips and publish. Confirm Retired
+   Linked Items default to Keep, while Detach and Delete are available. Choose
+   Match Source Structure, confirm deletion, and verify the retired Items are
+   deleted and all Pending Clips are imported in one undoable update.
 
 ## Publish locking
 

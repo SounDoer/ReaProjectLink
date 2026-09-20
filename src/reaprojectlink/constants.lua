@@ -40,6 +40,7 @@ M.ITEM_KEYS = {
   accepted_media_revision = "P_EXT:ReaProjectLink_accepted_media_revision",
   handled_delivery_revision = "P_EXT:ReaProjectLink_handled_delivery_revision",
   reference_revision = "P_EXT:ReaProjectLink_reference_revision",
+  retired = "P_EXT:ReaProjectLink_retired",
 }
 
 M.PROJECT_TYPES = {

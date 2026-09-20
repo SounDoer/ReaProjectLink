@@ -795,3 +795,17 @@ full values remain available in Technical Details.
 The Source Project UI is organized around Reference Subscription, Delivery
 Tracks, and Delivery Publishing. The Master Project UI is organized around
 Reference Publishing and Delivery Subscriptions.
+
+### D082 — Retired Linked Items require an explicit Master-side decision
+
+A Delivery Clip that is absent from a later Delivery Revision is Retired. Each
+of its Linked Items defaults to Keep Retired Item so Source-side structural
+changes never silently delete Master Project work. The Master User may instead
+choose Detach Retired Item, which preserves the REAPER Item without its Delivery
+identity, or Delete Retired Item.
+
+Delivery Update Review groups Retired Linked Items and Pending Clips as a
+structural change. Match Source Structure sets every Retired Linked Item to
+Delete and every Pending Clip to Import. Applying any Delete choice requires
+confirmation; deletion, detachment, imports, and the rest of the Delivery Update
+are committed as one REAPER Undo step.

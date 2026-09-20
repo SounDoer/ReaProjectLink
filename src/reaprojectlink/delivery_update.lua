@@ -50,7 +50,7 @@ end
 -- A `local_only` or `same_change` field already matches the desired result, so
 -- applying it would change nothing.
 local function instance_has_work(plan)
-  if plan.retired or plan.media.pending then return true end
+  if plan.retirement_pending or plan.media.pending then return true end
   for _, field in pairs(plan.fields) do
     if field.kind == "delivery_only" or field.kind == "conflict" then return true end
   end
@@ -180,13 +180,14 @@ function M.review(adapter, fs, source_project_id, target_revision)
       clip_id = instance.clip_id,
       instance_id = instance.instance_id,
       display_name = (target_clip and target_clip.displayName) or
-        (baseline_clip and baseline_clip.displayName),
+        (baseline_clip and baseline_clip.displayName) or instance.display_name,
       clip_instance_index = clip_seen[instance.clip_id],
       clip_instance_total = clip_totals[instance.clip_id],
       decision_key = occurrence == 1 and instance_id or
         (instance_id .. "#" .. occurrence),
       needs_new_instance_id = instance_id == "" or occurrence > 1,
       accepted_media_revision = instance.accepted_media_revision,
+      retirement_handled = instance.retired,
       baseline = clip_state(baseline_clip, baseline.sampleRate),
       delivery = clip_state(target_clip, snapshot.sampleRate),
       local_state = instance.state,
@@ -199,6 +200,7 @@ function M.review(adapter, fs, source_project_id, target_revision)
       local_state = row.local_state,
       accepted_media_revision = instance.accepted_media_revision,
       delivery_media_revision = target_clip and target_clip.mediaRevision,
+      retirement_handled = instance.retired,
     })
     if target_clip then
       row.media_path, validation_error = manifest_validation.delivery_media_path(
@@ -367,6 +369,15 @@ function M.apply(review, adapter, options)
   local decisions = options.instances or {}
   local addition_decisions = options.additions or {}
   local lane_mappings = options.lane_mappings or {}
+  for _, row in ipairs(review.instances) do
+    if row.plan.retirement_pending then
+      local retired_choice = (decisions[row.decision_key] or {}).retired_choice or "keep"
+      if retired_choice ~= "keep" and retired_choice ~= "detach" and
+          retired_choice ~= "delete" then
+        return nil, "Every Retired Linked Item requires Keep, Detach, or Delete."
+      end
+    end
+  end
   for _, addition in ipairs(review.additions) do
     if addition_decisions[addition.clip.clipId] ~= "import" and
         addition_decisions[addition.clip.clipId] ~= "decline" then
@@ -411,6 +422,8 @@ function M.apply(review, adapter, options)
     new_items = 0,
     new_tracks = 0,
     updated_instances = 0,
+    detached_instances = 0,
+    deleted_instances = 0,
     reassigned_instances = 0,
     rebound_lanes = 0,
   }
@@ -418,60 +431,80 @@ function M.apply(review, adapter, options)
   adapter.begin_undo("Apply ReaProjectLink Delivery Update")
   for _, row in ipairs(review.instances) do
     local decision = decisions[row.decision_key] or {}
-    if row.needs_new_instance_id then
-      adapter.set_instance_id(row.item_ref, adapter.new_id())
-      result.reassigned_instances = result.reassigned_instances + 1
-    end
-    local plan = delivery_update_plan.build({
-      baseline = row.baseline,
-      delivery = row.delivery,
-      local_state = row.local_state,
-      accepted_media_revision = row.accepted_media_revision,
-      delivery_media_revision = row.target_clip and row.target_clip.mediaRevision,
-      media_choice = decision.media_choice,
-      field_choices = decision.field_choices,
-    })
-    local accepted_media_revision = row.accepted_media_revision
-    if plan.media.pending and plan.media.choice == "add_new_take" then
-      if row.advanced_take_state and not decision.replace_anyway then
+    local retired_choice = row.plan.retired and
+      (decision.retired_choice or "keep") or nil
+    if retired_choice == "detach" then
+      local detached, detach_error = adapter.detach_instance(row.item_ref)
+      if not detached then
         cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
-        return nil, "Unsupported Take data requires Keep Current Media or confirmed Add New Take."
+        return nil, detach_error
       end
-      local added, add_error = adapter.add_delivery_take(
+      result.detached_instances = result.detached_instances + 1
+    elseif retired_choice == "delete" then
+      local deleted, delete_error = adapter.delete_linked_item(row.item_ref)
+      if not deleted then
+        cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
+        return nil, delete_error
+      end
+      result.deleted_instances = result.deleted_instances + 1
+    else
+      if row.needs_new_instance_id then
+        adapter.set_instance_id(row.item_ref, adapter.new_id())
+        result.reassigned_instances = result.reassigned_instances + 1
+      end
+      local plan = delivery_update_plan.build({
+        baseline = row.baseline,
+        delivery = row.delivery,
+        local_state = row.local_state,
+        accepted_media_revision = row.accepted_media_revision,
+        delivery_media_revision = row.target_clip and row.target_clip.mediaRevision,
+        retirement_handled = row.retirement_handled,
+        media_choice = decision.media_choice,
+        field_choices = decision.field_choices,
+      })
+      local accepted_media_revision = row.accepted_media_revision
+      if plan.media.pending and plan.media.choice == "add_new_take" then
+        if row.advanced_take_state and not decision.replace_anyway then
+          cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
+          return nil, "Unsupported Take data requires Keep Current Media or confirmed Add New Take."
+        end
+        local added, add_error = adapter.add_delivery_take(
+          row.item_ref,
+          row.target_clip,
+          row.media_path,
+          { source_sample_rate = review.target_snapshot.sampleRate }
+        )
+        if not added then
+          cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
+          return nil, add_error
+        end
+        accepted_media_revision = row.target_clip.mediaRevision
+        result.new_takes = result.new_takes + 1
+      end
+      if not plan.retired then
+        local applied, apply_error = adapter.apply_delivery_fields(
+          row.item_ref,
+          plan.fields,
+          { reference_start_samples = tonumber(adapter.get_project_value(
+              constants.PROJECT_KEYS.reference_start_samples
+            )) or 0,
+            project_sample_rate = tonumber(adapter.get_project_value(
+              constants.PROJECT_KEYS.reference_start_sample_rate
+            )) or adapter.project_sample_rate() }
+        )
+        if not applied then
+          cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
+          return nil, apply_error
+        end
+      end
+      adapter.set_instance_revisions(
         row.item_ref,
-        row.target_clip,
-        row.media_path,
-        { source_sample_rate = review.target_snapshot.sampleRate }
+        accepted_media_revision,
+        review.target_revision
       )
-      if not added then
-        cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
-        return nil, add_error
-      end
-      accepted_media_revision = row.target_clip.mediaRevision
-      result.new_takes = result.new_takes + 1
+      adapter.set_instance_retired(row.item_ref, plan.retired)
+      result.updated_instances = result.updated_instances + 1
     end
-    if not plan.retired then
-      local applied, apply_error = adapter.apply_delivery_fields(
-        row.item_ref,
-        plan.fields,
-        { reference_start_samples = tonumber(adapter.get_project_value(
-            constants.PROJECT_KEYS.reference_start_samples
-          )) or 0,
-          project_sample_rate = tonumber(adapter.get_project_value(
-            constants.PROJECT_KEYS.reference_start_sample_rate
-          )) or adapter.project_sample_rate() }
-      )
-      if not applied then
-        cancel_undo(adapter, "Apply ReaProjectLink Delivery Update")
-        return nil, apply_error
-      end
-    end
-    adapter.set_instance_revisions(
-      row.item_ref,
-      accepted_media_revision,
-      review.target_revision
-    )
-    result.updated_instances = result.updated_instances + 1
   end
 
   local reference_start = tonumber(adapter.get_project_value(

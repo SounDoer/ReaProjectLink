@@ -799,6 +799,7 @@ function M.delivery_instances(source_project_id)
           item_ref = item,
           track_ref = track,
           clip_id = M.get_item_clip_id(item),
+          display_name = M.item_display_name(item),
           instance_id = get_item_string(item, constants.ITEM_KEYS.instance_id),
           accepted_media_revision = tonumber(get_item_string(
             item,
@@ -808,6 +809,7 @@ function M.delivery_instances(source_project_id)
             item,
             constants.ITEM_KEYS.handled_delivery_revision
           )) or 0,
+          retired = get_item_string(item, constants.ITEM_KEYS.retired) == "true",
           state = current_instance_state(item, reference_start_seconds),
           advanced_take_state = take and has_advanced_take_state(take) or false,
         })
@@ -906,6 +908,10 @@ function M.set_instance_id(item, instance_id)
   set_item_string(item, constants.ITEM_KEYS.instance_id, instance_id)
 end
 
+function M.set_instance_retired(item, retired)
+  set_item_string(item, constants.ITEM_KEYS.retired, retired and "true" or "")
+end
+
 function M.is_linked_item(item)
   local source_project_id = get_item_string(
     item,
@@ -924,6 +930,19 @@ function M.detach_instance(item)
   set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, "")
   set_item_string(item, constants.ITEM_KEYS.handled_delivery_revision, "")
   set_item_string(item, constants.ITEM_KEYS.reference_revision, "")
+  set_item_string(item, constants.ITEM_KEYS.retired, "")
+  M.mark_project_dirty()
+  return true
+end
+
+function M.delete_linked_item(item)
+  if not M.is_linked_item(item) then
+    return nil, "Selected Item is not a Linked Item."
+  end
+  local track = reaper.GetMediaItem_Track(item)
+  if not track or not reaper.DeleteTrackMediaItem(track, item) then
+    return nil, "Could not delete the retired Linked Item."
+  end
   M.mark_project_dirty()
   return true
 end

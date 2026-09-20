@@ -34,6 +34,9 @@ local ordinary_detach, ordinary_detach_error = adapter.detach_instance(item)
 assert(not ordinary_detach and ordinary_detach_error == "Selected Item is not a Linked Item.",
   "ordinary Item identity is protected from Detach")
 assert(adapter.get_item_clip_id(item) == "clip-1", "rejected Detach preserves Item identity")
+local ordinary_delete, ordinary_delete_error = adapter.delete_linked_item(item)
+assert(not ordinary_delete and ordinary_delete_error == "Selected Item is not a Linked Item.",
+  "ordinary Item is protected from Delete")
 assert(state.start_offset_samples == 96000, "timeline position conversion")
 assert(state.source_offset_samples == 2400, "source offset conversion")
 assert(state.length_samples == 48000, "length conversion")
@@ -93,6 +96,10 @@ assert(adapter.is_linked_item(imported), "imported Item is linked")
 
 local instances = adapter.delivery_instances("source-1")
 assert(#instances == 1 and instances[1].instance_id == "instance-1", "linked Instance scan")
+assert(not instances[1].retired, "new Linked Item is not retired")
+adapter.set_instance_retired(imported, true)
+assert(adapter.delivery_instances("source-1")[1].retired, "retirement decision persists")
+adapter.set_instance_retired(imported, false)
 assert(adapter.add_delivery_take(imported, {
   displayName = "Imported Line",
   mediaRevision = 5,
@@ -122,6 +129,26 @@ assert(instances[1].handled_delivery_revision == 9, "handled Publish revision")
 assert(adapter.detach_instance(imported), "detach Instance")
 assert(not adapter.is_linked_item(imported), "detached Item is no longer linked")
 assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
+
+local deletable = assert(adapter.create_delivery_item(track, {
+  clipId = "delete-clip",
+  displayName = "Delete Line",
+  media_path = wav_path,
+  mediaRevision = 1,
+  sourceOffsetSamples = 0,
+  lengthSamples = 480,
+  itemGain = 1,
+  take = {},
+}, {
+  source_sample_rate = 48000,
+  position_seconds = 5,
+  source_project_id = "source-1",
+  delivery_revision = 1,
+  reference_revision = 7,
+  instance_id = "delete-instance",
+}))
+assert(adapter.delete_linked_item(deletable), "delete retired Linked Item")
+assert(not adapter.valid_item(deletable), "deleted Linked Item is removed")
 
 local reference = {
   schemaVersion = 2,

@@ -154,9 +154,16 @@ function adapter.new_id() return "instance-repaired" end
 function adapter.set_instance_id(item, instance_id)
   table.insert(events, { "instance", item, instance_id })
 end
+function adapter.set_instance_retired(item, retired)
+  table.insert(events, { "retired", item, retired })
+end
 function adapter.is_linked_item(item) return item == first_item end
 function adapter.detach_instance(item)
   table.insert(events, { "detach", item })
+  return true
+end
+function adapter.delete_linked_item(item)
+  table.insert(events, { "delete", item })
   return true
 end
 function adapter.mark_project_dirty() table.insert(events, "dirty") end
@@ -188,6 +195,28 @@ assert(
   review.instances[2].clip_instance_index == 2 and review.instances[2].clip_instance_total == 2,
   "Instances sharing one Clip are numbered"
 )
+
+local latest_clips = latest.lanes[1].clips
+latest.lanes[1].clips = { latest_clips[2] }
+files[root .. "/history/delivery-0002.json"] = json.encode(latest)
+local retired_review = assert(delivery_update.review(adapter, fs, "source-1"))
+assert(retired_review.instances[1].plan.retired and retired_review.instances[2].plan.retired,
+  "missing target Clip retires every Linked Item")
+local retired_result = assert(delivery_update.apply(retired_review, adapter, {
+  instances = {
+    ["instance-1"] = { retired_choice = "detach" },
+    ["instance-2"] = { retired_choice = "delete" },
+  },
+  additions = { ["clip-2"] = "import" },
+  lane_mappings = { ["lane-2"] = { kind = "unmapped" } },
+}))
+assert(retired_result.detached_instances == 1, "retired Linked Item can be detached")
+assert(retired_result.deleted_instances == 1, "retired Linked Item can be deleted")
+assert(retired_result.new_items == 1, "matching Source structure imports Pending Clips")
+latest.lanes[1].clips = latest_clips
+files[root .. "/history/delivery-0002.json"] = json.encode(latest)
+values.delivery_subscriptions = json.encode(subscriptions)
+events = {}
 
 local idle, idle_error = delivery_update.apply({ pending_count = 0 }, adapter, {})
 assert(not idle and idle_error == "Nothing to update.", "an up-to-date Source is not applied")
@@ -349,4 +378,4 @@ assert(
 latest.sourceProjectId = "source-1"
 files[root .. "/history/delivery-0002.json"] = json.encode(latest)
 
-return 12
+return 15
