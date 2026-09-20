@@ -1,22 +1,21 @@
-# ReaDelivery
+# ReaProjectLink
 
-ReaDelivery is a REAPER-native publish and dependency-update system for
-sound-post teams working on shared storage.
+ReaProjectLink provides Source-Master project coordination for REAPER on shared
+storage.
 
 It is intended for game-audio cinematic production where dialogue, music, and
 sound-design teams work in separate REAPER projects and periodically deliver
-rendered audio into a master mixing project. It uses an existing NAS rather than
+rendered audio into a Master Project. It uses an existing NAS rather than
 a cloud service or central project database, and it does not attempt to make
 multiple users edit the same REAPER project.
 
 The working principle is:
 
-- source projects keep their own folder structures and working conventions;
-- source teams explicitly publish bounced audio as versioned deliveries;
-- the mix project reads published manifests and manages all downstream imports;
-- updates become new takes on existing mix items;
-- the authoritative picture lives in the mix project and is published back to
-  source projects as a reviewed picture revision.
+- Source Projects keep their own folder structures and working conventions;
+- Source Teams explicitly publish bounced audio as versioned Deliveries;
+- the Master Project subscribes to Deliveries and manages downstream imports;
+- updates become new Takes on existing Linked Items;
+- the Master Project publishes the shared Reference back to Source Projects.
 
 ## Documentation
 
@@ -31,17 +30,19 @@ The working principle is:
 
 The local MVP is implemented in Lua 5.4 ReaScript with ReaImGui. It includes:
 
-- Source and Mix project initialization;
-- multi-track Master Reference publication with registered video Items,
-  Markers, Regions, optional FFOP, Source timeline mirroring, and explicit review;
+- Source Project and Master Project initialization;
+- multi-track Reference publication with registered video Items, Markers,
+  Regions, an optional Reference Start Marker, timeline mirroring, and explicit
+  review;
 - Delivery Track registration, complete Publish Review, immutable WAV revisions,
   and atomic manifests;
-- Mix-side Source subscription, Lane mapping, first import, new-Take updates,
-  per-Instance three-way field resolution, and explicit detach;
-- NAS Publish locking, stale-lock inspection, and interrupted-commit recovery.
+- Master-side Delivery Subscription, Lane Mapping, first import, new-Take
+  updates, per-Linked-Item three-way field resolution, and explicit detach;
+- NAS Publish locking, explicit Unlock Publishing, and interrupted-commit
+  recovery.
 
-The current scope assumes new projects initialized through ReaDelivery and does
-not infer bindings for existing legacy Mix Items.
+The current scope assumes new projects initialized through ReaProjectLink and does
+not infer Links or Lane Bindings for existing unregistered Items.
 
 Runtime requirements are REAPER 7.74 or newer and a ReaImGui 0.9-compatible
 release or newer.

@@ -5,15 +5,15 @@ separate machine-readable JSON Schema document.
 
 ## Stable entry point
 
-The mix project repeatedly reads `_Delivery/<project-name>/delivery.json`:
+The Master Project repeatedly reads `_ReaProjectLink/<project-name>/delivery.json`:
 
 ```json
 {
   "schemaVersion": 1,
   "sourceProjectId": "24703b21-...",
-  "deliverySetId": "8aa9cb40-...",
-  "latestPublishRevision": 18,
-  "manifest": "history/publish-0018.json"
+  "deliveryId": "8aa9cb40-...",
+  "latestDeliveryRevision": 18,
+  "manifest": "history/delivery-0018.json"
 }
 ```
 
@@ -22,20 +22,20 @@ manifest are complete and validated.
 
 ## Complete publish snapshot
 
-`history/publish-0018.json` contains the complete effective delivery state:
+`history/delivery-0018.json` contains the complete effective Delivery state:
 
 ```json
 {
   "schemaVersion": 1,
   "sourceProjectId": "24703b21-...",
-  "deliverySetId": "8aa9cb40-...",
+  "deliveryId": "8aa9cb40-...",
   "sourceProjectName": "CIN_030_DX",
   "sourceProjectFile": "../../../CIN_030_DX.rpp",
-  "publishRevision": 18,
+  "deliveryRevision": 18,
   "publishedAt": "2026-09-13T10:30:00+08:00",
   "publishedBy": "Alice",
-  "picture": {
-    "pictureId": "cin030-picture",
+  "reference": {
+    "referenceId": "cin030-reference",
     "reviewedRevision": 12
   },
   "sampleRate": 48000,
@@ -81,7 +81,7 @@ manifest are complete and validated.
 - Media paths are relative to the history manifest.
 - A Delivery `mediaFile` must use the canonical `../media/...` form and resolve
   inside the current managed package. Absolute paths and directory traversal are
-  rejected. Picture `videoFile` remains an intentional external NAS reference.
+  rejected. Reference `videoFile` remains an intentional external NAS reference.
 - Position, duration, source offset, and fades use integer samples.
 - `displayName` and `order` support presentation only and never establish
   identity.
@@ -90,29 +90,31 @@ manifest are complete and validated.
   exposed as cross-project identity.
 - `publishedAt` and `publishedBy` are audit metadata.
 
-## Picture Manifest
+## Reference Manifest
 
-The stable Picture entry point is
-`_Delivery/<mix-project-name>/picture.json`:
+The stable Reference entry point is
+`_ReaProjectLink/<master-project-name>/reference.json`:
 
 ```json
 {
   "schemaVersion": 2,
-  "pictureId": "cin030-picture",
-  "latestPictureRevision": 12,
-  "manifest": "picture-history/picture-0012.json"
+  "masterProjectId": "f962b473-...",
+  "referenceId": "cin030-reference",
+  "latestReferenceRevision": 12,
+  "manifest": "history/reference-0012.json"
 }
 ```
 
-The referenced immutable Master Reference manifest records registered video
+The referenced immutable Reference Manifest records registered video
 Tracks, Items, Markers, Regions, and their shared timing context:
 
 ```json
 {
   "schemaVersion": 2,
-  "pictureId": "cin030-picture",
-  "pictureRevision": 12,
-  "mixProjectName": "CIN_030_MIX",
+  "masterProjectId": "f962b473-...",
+  "referenceId": "cin030-reference",
+  "referenceRevision": 12,
+  "masterProjectName": "CIN_030_MASTER",
   "publishedAt": "2026-09-13T10:30:00+08:00",
   "publishedBy": "Alice",
   "alignmentMode": "mirror",
@@ -120,7 +122,7 @@ Tracks, Items, Markers, Regions, and their shared timing context:
     "sampleRate": 48000,
     "projectTimecodeOffsetSamples": 172800000,
     "referenceStartSamples": 172800000,
-    "referenceRole": "FFOP",
+    "referenceStartMarkerId": "marker-reference-start",
     "frameRate": {
       "numerator": 24000,
       "denominator": 1001,
@@ -128,13 +130,13 @@ Tracks, Items, Markers, Regions, and their shared timing context:
     }
   },
   "lanes": [{
-    "laneId": "picture-lane-main",
-    "displayName": "Picture Main",
+    "laneId": "reference-lane-main",
+    "displayName": "Reference Main",
     "order": 0,
     "items": [{
-      "itemId": "picture-item-12",
+      "itemId": "reference-item-12",
       "displayName": "CIN_030 v12",
-      "videoFile": "\\\\nas\\project\\picture\\CIN_030_v0012.mov",
+      "videoFile": "\\\\nas\\project\\reference\\CIN_030_v0012.mov",
       "videoHash": "sha256:...",
       "startSamples": 172800000,
       "sourceOffsetSamples": 0,
@@ -143,20 +145,23 @@ Tracks, Items, Markers, Regions, and their shared timing context:
     }]
   }],
   "markers": [{
-    "entryId": "marker-ffop",
+    "entryId": "marker-reference-start",
     "name": "FFOP",
-    "startSamples": 172800000,
-    "semanticRole": "FFOP"
+    "startSamples": 172800000
   }],
   "regions": []
 }
 ```
 
 Every `videoFile` references its original NAS asset and is not copied into
-`_Delivery`. Consumers verify each `videoHash`; the historical manifest remains
+`_ReaProjectLink`. Consumers verify each `videoHash`; the historical manifest remains
 valid as a record even when external video is no longer available. The
-unpublished single-video Picture schema is unsupported; development builds must
-regenerate their Picture package using schema version 2.
+unpublished single-video Reference schema is unsupported; development builds must
+regenerate their Reference package using schema version 2.
+
+`referenceStartMarkerId` is optional. It identifies one registered Marker as
+the Reference Start without assigning meaning to the Marker's name. When it is
+absent, `referenceStartSamples` is zero and project zero is the Reference Start.
 
 ## Schema compatibility
 
@@ -167,10 +172,10 @@ changing their type or meaning requires a new version.
 Historical manifests remain immutable and are never migrated in place. A newer
 tool may convert a supported older manifest into its current in-memory model. An
 unsupported newer version blocks import, update, and Publish and tells the user
-to upgrade ReaDelivery. Before publishing, a writer checks the package's current
+to upgrade ReaProjectLink. Before publishing, a writer checks the package's current
 schema and must not overwrite it with an older schema version.
 
 Readers validate pointer paths, required field types, package identity, revision
 identity, and unique Lane, Clip, Item, Marker, and Region IDs before using a
 Manifest. A malformed or mismatched historical Manifest blocks the operation
-rather than being interpreted as another Source or Picture.
+rather than being interpreted as another Source or Reference.

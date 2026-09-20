@@ -1,6 +1,6 @@
-# AGENTS.md — ReaDelivery
+# AGENTS.md — ReaProjectLink
 
-ReaDelivery is a local, NAS-based delivery and dependency manager for REAPER
+ReaProjectLink is a local, NAS-based delivery and dependency manager for REAPER
 projects.
 
 This file records only general development conventions that cannot be inferred

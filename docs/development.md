@@ -5,7 +5,7 @@
 - REAPER 7.74 or newer with embedded Lua 5.4;
 - ReaImGui 0.9-compatible API or newer, installed through ReaPack.
 
-REAPER 7.74 is the minimum because Master Reference synchronization uses the
+REAPER 7.74 is the minimum because Reference synchronization uses the
 ProjectMarker APIs introduced in REAPER 7.62 and `set_config_var_string`, added
 in REAPER 7.74, to mirror project timecode and frame-rate state. The main script
 checks the REAPER version and required APIs before opening the UI; loading
@@ -27,8 +27,8 @@ docs/      product and architecture documentation
 
 Load these files from REAPER's Action List:
 
-- `scripts/ReaDelivery.lua` opens the current development UI;
-- `scripts/ReaDelivery_RunTests.lua` runs the Lua unit tests and reports the
+- `scripts/ReaProjectLink.lua` opens the current development UI;
+- `scripts/ReaProjectLink_RunTests.lua` runs the Lua unit tests and reports the
   result in both the REAPER console and a message box.
 
 The test action creates and closes an isolated temporary Project Tab. It does not
@@ -41,8 +41,8 @@ does not need to be copied into REAPER's resource directory during development.
 
 The automated suite exercises pure domain behavior, in-memory transaction
 failures, the real Windows filesystem, real REAPER Track/Item/Take APIs, and a
-ReaImGui frame. It also injects failures after partial Import, Update, and Picture
+ReaImGui frame. It also injects failures after partial Import, Update, and Reference
 synchronization mutations and verifies that REAPER Undo restores Tracks, Items,
 Takes, fields, timeline state, and project extension state. Run
-`ReaDelivery - Run Tests` from the Action List after changing workflow, manifest,
+`ReaProjectLink - Run Tests` from the Action List after changing workflow, manifest,
 filesystem, or adapter behavior.

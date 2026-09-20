@@ -1,0 +1,147 @@
+local json = require("reaprojectlink.json")
+local reference_publish = require("reaprojectlink.reference_publish")
+
+local project_values = {
+  project_type = "master",
+  project_id = "master-1",
+  reference_timeline_entries = json.encode({
+    { guid = "marker-guid", entryId = "marker-1", kind = "marker", referenceStart = true },
+  }),
+}
+local item = { reference_id = "", reference_item_id = "", path = "C:/show/reference.mov" }
+local track = { reference_lane_id = "lane-1", name = "Reference Main", items = { item } }
+local events = {}
+local project_change_count = 1
+local ids = { "reference-1", "reference-item-1", "tx-1" }
+local id_index = 0
+local adapter = {}
+function adapter.project_path() return "C:/show/CIN_030_MIX.rpp" end
+function adapter.project_token() return "master-project-1" end
+function adapter.project_change_count() return project_change_count end
+function adapter.get_project_value(key) return project_values[key] end
+function adapter.set_project_value(key, value) project_values[key] = tostring(value) end
+function adapter.all_tracks() return { track } end
+function adapter.selected_tracks() return { track } end
+function adapter.track_items(value) return value.items end
+function adapter.track_name(value) return value.name end
+function adapter.get_track_reference_lane_id(value) return value.reference_lane_id end
+function adapter.set_track_reference_lane_id(value, id) value.reference_lane_id = id end
+function adapter.set_track_reference_id(value, id) value.reference_id = id end
+function adapter.get_item_reference_id(value) return value.reference_id end
+function adapter.set_item_reference_id(value, id) value.reference_id = id end
+function adapter.get_item_reference_item_id(value) return value.reference_item_id end
+function adapter.set_item_reference_item_id(value, id) value.reference_item_id = id end
+function adapter.item_display_name() return "Main Reference" end
+function adapter.reference_item_state(value)
+  return {
+    video_file = value.path,
+    sample_rate = 48000,
+    reference_start_samples = 96000,
+    source_offset_samples = 0,
+    duration_samples = 144000,
+    playback_rate = 1,
+    frame_rate = { numerator = 24000, denominator = 1001, drop_frame = false },
+    project_timecode_offset_samples = 3600000,
+  }
+end
+function adapter.timeline_state()
+  return {
+    sample_rate = 48000,
+    project_timecode_offset_samples = 3600000,
+    frame_rate = { numerator = 24000, denominator = 1001, drop_frame = false },
+  }
+end
+function adapter.timeline_entries()
+  return {
+    {
+      guid = "marker-guid", kind = "marker", selected = true,
+      name = "FFOP", start_samples = 96000, end_samples = 96000, color = 0,
+    },
+  }
+end
+function adapter.new_id() id_index = id_index + 1; return ids[id_index] end
+function adapter.begin_undo() table.insert(events, "begin") end
+function adapter.end_undo() table.insert(events, "end") end
+function adapter.mark_project_dirty() table.insert(events, "dirty") end
+function adapter.save_project() table.insert(events, "save"); return true end
+
+local published_files = {}
+local fs = {}
+function fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
+function fs.exists(path) return path == item.path or published_files[path] ~= nil end
+function fs.read_file(path) return published_files[path] end
+function fs.hash_file(path) if path == item.path then return "video-hash" end end
+
+local captured
+local writer = {}
+function writer.publish(input)
+  table.insert(events, "publish")
+  captured = input
+  return { reference_revision = input.pointer.latestReferenceRevision }
+end
+
+local service = reference_publish.create({ reference_writer = writer })
+local review = assert(service.review(adapter, fs))
+assert(review.package_root == "C:/show/_ReaProjectLink/CIN_030_MIX", "Reference package root")
+assert(review.reference_revision == 1, "first Reference revision")
+assert(review.lanes[1].items[1].videoHash == "sha256:video-hash", "video is hashed on review")
+assert(review.reference_start_samples == 96000, "assigned Marker is the Reference Start")
+assert(review.reference_start_marker_id == "marker-1", "Reference Start Marker identity")
+
+project_change_count = 2
+local stale, stale_error = service.publish(review, adapter, fs, {})
+assert(not stale and stale_error:find("Out of Date", 1, true),
+  "Reference Publish rejects an out-of-date Review")
+project_change_count = 1
+
+local result, err = service.publish(review, adapter, fs, {
+  published_at = "2026-09-13T14:30:00+08:00",
+  published_by = "Alice",
+})
+assert(result, err)
+assert(item.reference_id == "reference-1", "Reference identity attached to Item")
+assert(item.reference_item_id == "reference-item-1", "stable Reference Item identity attached")
+assert(track.reference_id == "reference-1", "Reference identity attached to Track")
+assert(project_values.reference_id == "reference-1", "Reference identity attached to project")
+assert(project_values.reference_start_samples == "96000", "Reference Start persisted")
+assert(project_values.reference_start_sample_rate == "48000", "Reference Start sample rate persisted")
+assert(captured.snapshot.masterProjectId == "master-1", "Master Project identity published")
+local save_index, publish_index
+for index, event in ipairs(events) do
+  if event == "save" and not save_index then save_index = index end
+  if event == "publish" and not publish_index then publish_index = index end
+end
+assert(save_index and publish_index and save_index < publish_index, "identity saved before Reference Publish")
+assert(captured.snapshot.lanes[1].items[1].videoFile == item.path, "original video is referenced")
+assert(captured.snapshot.lanes[1].items[1].videoHash == "sha256:video-hash", "published video hash")
+assert(captured.snapshot.timeline.referenceStartSamples == 96000, "Reference Start")
+
+published_files[fs.join(review.package_root, "reference.json")] = json.encode(captured.pointer)
+published_files[fs.join(review.package_root, captured.pointer.manifest)] =
+  json.encode(captured.snapshot)
+
+local unchanged = assert(service.review(adapter, fs))
+assert(unchanged.reference_revision == 2, "next Reference revision")
+assert(unchanged.unchanged, "an identical Reference is detected")
+assert(unchanged.unchanged_blocker, "an identical Reference blocks Publish by default")
+local refused, refused_error = service.publish(unchanged, adapter, fs, {})
+assert(not refused and refused_error == unchanged.unchanged_blocker, "unchanged Publish is refused")
+
+local overridden = assert(service.review(adapter, fs, { publish_anyway = true }))
+assert(overridden.unchanged, "Publish Anyway still reports the Reference as unchanged")
+assert(not overridden.unchanged_blocker, "Publish Anyway clears the blocker")
+
+local publish_events = 0
+for _, event in ipairs(events) do if event == "publish" then publish_events = publish_events + 1 end end
+function adapter.save_project() return nil, "simulated save failure" end
+local unsaved, unsaved_error = service.publish(overridden, adapter, fs, {})
+assert(not unsaved and unsaved_error == "simulated save failure", "save failure blocks Reference Publish")
+local publish_events_after = 0
+for _, event in ipairs(events) do if event == "publish" then publish_events_after = publish_events_after + 1 end end
+assert(publish_events_after == publish_events, "Reference writer is not called after save failure")
+
+item.path = "C:/show/not-reference.wav"
+local rejected = assert(service.review(adapter, fs))
+assert(rejected.blocker_count > 0, "audio Item cannot become Reference")
+
+return 5

@@ -1,4 +1,4 @@
-local requirements = require("readelivery.runtime_requirements")
+local requirements = require("reaprojectlink.runtime_requirements")
 
 assert(requirements.version_at_least("7.74/x64", "7.74"), "minimum REAPER version")
 assert(requirements.version_at_least("7.80", "7.74"), "newer REAPER version")

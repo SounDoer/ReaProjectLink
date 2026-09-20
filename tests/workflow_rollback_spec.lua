@@ -1,9 +1,9 @@
-local constants = require("readelivery.constants")
-local json = require("readelivery.json")
-local mix_import = require("readelivery.mix_import")
-local mix_update = require("readelivery.mix_update")
-local picture_subscription = require("readelivery.picture_subscription")
-local adapter = require("readelivery.reaper_adapter")
+local constants = require("reaprojectlink.constants")
+local json = require("reaprojectlink.json")
+local delivery_import = require("reaprojectlink.delivery_import")
+local delivery_update = require("reaprojectlink.delivery_update")
+local reference_subscription = require("reaprojectlink.reference_subscription")
+local adapter = require("reaprojectlink.reaper_adapter")
 
 local source = debug.getinfo(1, "S").source:sub(2)
 local tests_dir = assert(source:match("^(.*)[/\\]"))
@@ -22,17 +22,17 @@ local function proxy(overrides)
   return setmetatable(overrides or {}, { __index = adapter })
 end
 
-local function picture_context()
+local function reference_context()
   return {
-    picture_id = adapter.get_project_value(constants.PROJECT_KEYS.picture_id),
-    picture_revision = tonumber(adapter.get_project_value(
-      constants.PROJECT_KEYS.picture_revision
+    reference_id = adapter.get_project_value(constants.PROJECT_KEYS.reference_id),
+    reference_revision = tonumber(adapter.get_project_value(
+      constants.PROJECT_KEYS.reference_revision
     )) or 0,
-    picture_start_samples = adapter.get_project_value(
-      constants.PROJECT_KEYS.picture_start_samples
+    reference_start_samples = adapter.get_project_value(
+      constants.PROJECT_KEYS.reference_start_samples
     ),
-    picture_start_sample_rate = adapter.get_project_value(
-      constants.PROJECT_KEYS.picture_start_sample_rate
+    reference_start_sample_rate = adapter.get_project_value(
+      constants.PROJECT_KEYS.reference_start_sample_rate
     ),
   }
 end
@@ -60,29 +60,29 @@ local function clip(id, revision, position)
   }
 end
 
-adapter.set_project_value(constants.PROJECT_KEYS.picture_id, "rollback-picture")
-adapter.set_project_value(constants.PROJECT_KEYS.picture_revision, "7")
-adapter.set_project_value(constants.PROJECT_KEYS.picture_start_samples, "0")
-adapter.set_project_value(constants.PROJECT_KEYS.picture_start_sample_rate, "48000")
-adapter.set_project_value(constants.PROJECT_KEYS.source_subscriptions, "[]")
+adapter.set_project_value(constants.PROJECT_KEYS.reference_id, "rollback-reference")
+adapter.set_project_value(constants.PROJECT_KEYS.reference_revision, "7")
+adapter.set_project_value(constants.PROJECT_KEYS.reference_start_samples, "0")
+adapter.set_project_value(constants.PROJECT_KEYS.reference_start_sample_rate, "48000")
+adapter.set_project_value(constants.PROJECT_KEYS.delivery_subscriptions, "[]")
 
 -- Import creates a Track and one Item before the injected second-media failure.
 -- The real Undo path must remove both and preserve project extension state.
 local import_review = {
   project_token = adapter.project_token(),
   blocker_count = 0,
-  picture_warning = false,
-  picture_context = picture_context(),
+  reference_warning = false,
+  reference_context = reference_context(),
   pointer_path = "C:/not-used/delivery.json",
   pointer = {
     sourceProjectId = "rollback-source",
-    deliverySetId = "rollback-set",
-    latestPublishRevision = 1,
+    deliveryId = "rollback-set",
+    latestDeliveryRevision = 1,
   },
   snapshot = {
     sourceProjectName = "Rollback Source",
     sampleRate = 48000,
-    picture = { reviewedRevision = 7 },
+    reference = { reviewedRevision = 7 },
   },
   lanes = {
     {
@@ -102,15 +102,15 @@ local failing_import_adapter = proxy({
 })
 local tracks_before_import = reaper.CountTracks(0)
 local subscriptions_before_import = adapter.get_project_value(
-  constants.PROJECT_KEYS.source_subscriptions
+  constants.PROJECT_KEYS.delivery_subscriptions
 )
-local imported, import_error = mix_import.apply(import_review, failing_import_adapter, {
+local imported, import_error = delivery_import.apply(import_review, failing_import_adapter, {
   mappings = { ["rollback-lane"] = { kind = "create" } },
 })
 assert(not imported and import_error == "injected second import failure", "Import failure injected")
 assert(reaper.CountTracks(0) == tracks_before_import, "failed Import rolls back created Track and Item")
 assert(
-  adapter.get_project_value(constants.PROJECT_KEYS.source_subscriptions) ==
+  adapter.get_project_value(constants.PROJECT_KEYS.delivery_subscriptions) ==
     subscriptions_before_import,
   "failed Import preserves subscription state"
 )
@@ -118,7 +118,7 @@ assert(
 -- Update adds a Take, moves the Item, and writes Instance revisions before a
 -- later new-Clip failure. Real Undo must restore all three mutations.
 adapter.begin_undo("Prepare rollback Update fixture")
-local update_track = adapter.create_mix_track("Rollback Update")
+local update_track = adapter.create_master_track("Rollback Update")
 local update_item = assert(adapter.create_delivery_item(
   update_track,
   clip("rollback-update-clip", 1),
@@ -126,36 +126,36 @@ local update_item = assert(adapter.create_delivery_item(
     source_sample_rate = 48000,
     position_seconds = 0,
     source_project_id = "rollback-update-source",
-    publish_revision = 1,
-    picture_revision = 7,
+    delivery_revision = 1,
+    reference_revision = 7,
     instance_id = "rollback-instance",
   }
 ))
 adapter.end_undo("Prepare rollback Update fixture")
-local mix_state = adapter.delivery_instance_state(update_item)
+local current_state = adapter.delivery_instance_state(update_item)
 local source_state = {}
-for key, value in pairs(mix_state) do source_state[key] = value end
+for key, value in pairs(current_state) do source_state[key] = value end
 source_state.position_seconds = 1
 local update_subscription = {
   pointerPath = "C:/not-used/delivery.json",
   sourceProjectId = "rollback-update-source",
   sourceProjectName = "Rollback Update Source",
-  deliverySetId = "rollback-update-set",
-  acceptedPublishRevision = 1,
+  deliveryId = "rollback-update-set",
+  acceptedDeliveryRevision = 1,
   lanes = { { laneId = "rollback-update-lane", trackGuid = adapter.track_guid(update_track) } },
 }
 local update_review = {
   project_token = adapter.project_token(),
   pending_count = 2,
   blocker_count = 0,
-  picture_warning = false,
-  picture_context = picture_context(),
+  reference_warning = false,
+  reference_context = reference_context(),
   source_project_id = "rollback-update-source",
   target_revision = 2,
   target_snapshot = {
     sampleRate = 48000,
     sourceProjectName = "Rollback Update Source",
-    picture = { reviewedRevision = 7 },
+    reference = { reviewedRevision = 7 },
   },
   subscription_index = 1,
   subscriptions = { update_subscription },
@@ -164,9 +164,9 @@ local update_review = {
       item_ref = update_item,
       decision_key = "rollback-instance",
       needs_new_instance_id = false,
-      baseline = mix_state,
-      source = source_state,
-      mix = mix_state,
+      baseline = current_state,
+      delivery = source_state,
+      local_state = current_state,
       accepted_media_revision = 1,
       target_clip = clip("rollback-update-clip", 2),
       media_path = wav_path,
@@ -189,10 +189,10 @@ local failing_update_adapter = proxy({
 local takes_before_update = reaper.CountTakes(update_item)
 local handled_before_update = adapter.delivery_instances(
   "rollback-update-source"
-)[1].handled_publish_revision
-local updated, update_error = mix_update.apply(update_review, failing_update_adapter, {
+)[1].handled_delivery_revision
+local updated, update_error = delivery_update.apply(update_review, failing_update_adapter, {
   instances = {
-    ["rollback-instance"] = { media_choice = "accept_new_take" },
+    ["rollback-instance"] = { media_choice = "add_new_take" },
   },
   additions = { ["rollback-addition"] = "import" },
 })
@@ -203,7 +203,7 @@ assert(
   "failed Update rolls back field changes"
 )
 assert(
-  adapter.delivery_instances("rollback-update-source")[1].handled_publish_revision ==
+  adapter.delivery_instances("rollback-update-source")[1].handled_delivery_revision ==
     handled_before_update,
   "failed Update rolls back Instance revisions"
 )
@@ -211,11 +211,11 @@ adapter.begin_undo("Clean rollback Update fixture")
 reaper.DeleteTrack(update_track)
 adapter.end_undo("Clean rollback Update fixture")
 
--- Picture synchronization changes timeline state and creates managed Tracks and
+-- Reference synchronization changes timeline state and creates managed Tracks and
 -- Items before the injected missing-video failure. Undo must restore both.
 local timeline_before = adapter.timeline_state()
-local tracks_before_picture = reaper.CountTracks(0)
-local picture_status = {
+local tracks_before_reference = reaper.CountTracks(0)
+local reference_status = {
   project_token = adapter.project_token(),
   available = true,
   alignment_mode = "mirror",
@@ -223,8 +223,8 @@ local picture_status = {
   shift_seconds = 0,
   latest_revision = 8,
   snapshot = {
-    pictureId = "rollback-picture",
-    pictureRevision = 8,
+    referenceId = "rollback-reference",
+    referenceRevision = 8,
     timeline = {
       sampleRate = 48000,
       projectTimecodeOffsetSamples = 48000,
@@ -233,11 +233,11 @@ local picture_status = {
     },
     lanes = {
       {
-        laneId = "rollback-picture-lane-1",
-        displayName = "Rollback Picture A",
+        laneId = "rollback-reference-lane-1",
+        displayName = "Rollback Reference A",
         items = {
           {
-            itemId = "rollback-picture-item-1",
+            itemId = "rollback-reference-item-1",
             displayName = "Valid",
             videoFile = wav_path,
             startSamples = 0,
@@ -248,11 +248,11 @@ local picture_status = {
         },
       },
       {
-        laneId = "rollback-picture-lane-2",
-        displayName = "Rollback Picture B",
+        laneId = "rollback-reference-lane-2",
+        displayName = "Rollback Reference B",
         items = {
           {
-            itemId = "rollback-picture-item-2",
+            itemId = "rollback-reference-item-2",
             displayName = "Injected Failure",
             videoFile = wav_path,
             startSamples = 4800,
@@ -267,28 +267,28 @@ local picture_status = {
     regions = {},
   },
 }
-local failing_picture_adapter = proxy({
-  sync_picture = function(snapshot, options)
-    local result, sync_error = adapter.sync_picture(snapshot, options)
+local failing_reference_adapter = proxy({
+  sync_reference = function(snapshot, options)
+    local result, sync_error = adapter.sync_reference(snapshot, options)
     if not result then return nil, sync_error end
     return nil, "injected post-synchronization failure"
   end,
 })
-local synchronized, synchronize_error = picture_subscription.synchronize(
-  failing_picture_adapter, picture_status
+local synchronized, synchronize_error = reference_subscription.synchronize(
+  failing_reference_adapter, reference_status
 )
 assert(
   not synchronized and synchronize_error == "injected post-synchronization failure",
-  "Picture synchronization failure injected: " .. tostring(synchronize_error)
+  "Reference synchronization failure injected: " .. tostring(synchronize_error)
 )
-assert(reaper.CountTracks(0) == tracks_before_picture, "failed Picture sync rolls back Tracks and Items")
+assert(reaper.CountTracks(0) == tracks_before_reference, "failed Reference sync rolls back Tracks and Items")
 local timeline_after = adapter.timeline_state()
 assert(
   timeline_after.project_timecode_offset_samples == timeline_before.project_timecode_offset_samples and
     timeline_after.frame_rate.numerator == timeline_before.frame_rate.numerator and
     timeline_after.frame_rate.denominator == timeline_before.frame_rate.denominator and
     timeline_after.frame_rate.drop_frame == timeline_before.frame_rate.drop_frame,
-  "failed Picture sync rolls back timeline state"
+  "failed Reference sync rolls back timeline state"
 )
 
 os.remove(wav_path)

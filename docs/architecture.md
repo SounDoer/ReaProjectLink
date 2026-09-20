@@ -4,20 +4,21 @@
 
 ```text
 Dialogue.rpp --Publish--\
-Music.rpp    --Publish----> Delivery manifests/WAVs --> Mix dependency manager
+Music.rpp    --Publish----> Delivery manifests/WAVs --> Master Project
 SFX.rpp      --Publish--/                                  |
                                                             v
-                                                     Cinematic Mix.rpp
+                                                     Cinematic Master.rpp
 
-Cinematic Mix.rpp --Publish picture revision--> Dialogue/Music/SFX projects
+Cinematic Master.rpp --Publish Reference--> Dialogue/Music/SFX projects
 ```
 
 The NAS is shared storage. No cloud service or central database is required for
 the initial design.
 
-Each `.rpp` is initialized in one explicit MVP mode. Source mode owns Delivery
-Tracks, Picture subscription, and audio Publish. Mix mode owns Picture Publish,
-source subscriptions, first import, and revision updates.
+Each `.rpp` is initialized with exactly one Project Type. A Source Project owns
+Delivery Tracks, a Reference Subscription, and Delivery Publish. A Master
+Project owns Reference Publish, Delivery Subscriptions, first import, and
+Delivery updates.
 
 ## Managed delivery package
 
@@ -28,14 +29,14 @@ the saved `.rpp` location:
 <source-rpp-directory>\
   CIN_030_DX.rpp
 
-  _Delivery\
+  _ReaProjectLink\
     CIN_030_DX\
       delivery.json
       media\
       history\
 ```
 
-`_Delivery` indicates that the directory is managed by the tool. The project-name
+`_ReaProjectLink` indicates that the directory is managed by the tool. The project-name
 level prevents collisions if multiple `.rpp` files share a directory.
 
 The stable `delivery.json` entry point identifies the latest successful publish.
@@ -62,20 +63,20 @@ or Active Take display name may make the file readable, for example
 Identity and revision come from the manifest and Clip ID directory, never from
 this filename.
 
-A mix project uses the same managed-root convention for Picture publication:
+A Master Project uses the same managed-root convention for Reference publication:
 
 ```text
-<mix-rpp-directory>\
-  CIN_030_MIX.rpp
+<master-rpp-directory>\
+  CIN_030_MASTER.rpp
 
-  _Delivery\
-    CIN_030_MIX\
-      picture.json
-      picture-history\
+  _ReaProjectLink\
+    CIN_030_MASTER\
+      reference.json
+      history\
 ```
 
-A source project manually selects `picture.json` on first subscription and then
-tracks its stable Picture ID and manifest path.
+A source project manually selects `reference.json` on first subscription and then
+tracks its stable Reference ID and manifest path.
 
 Publication should be atomic:
 
@@ -83,7 +84,7 @@ Publication should be atomic:
 2. validate every output's file size and content hash;
 3. write an immutable history manifest;
 4. move completed media into its final location;
-5. replace the stable pointer (`delivery.json` or `picture.json`) last, using a
+5. replace the stable pointer (`delivery.json` or `reference.json`) last, using a
    temporary file and same-filesystem rename.
 
 Until the last step succeeds, consumers continue to see the previous successful
@@ -102,16 +103,17 @@ ordinary `.rpp` editing. Lock metadata identifies the user, machine, and start
 time so a blocked publisher can understand who owns it.
 
 After acquiring the lock, the publisher rereads the stable manifest and compares
-its revision with the revision used by the Publish review. A mismatch aborts the
+its revision with the revision used by the Publish Review. A mismatch aborts the
 transaction and requires a fresh scan and review. Normal completion and handled
 failure release the lock. A lock left by a crash is never stolen or expired
-automatically; the UI offers an explicit stale-lock removal action.
+automatically. The UI explains Publishing Is Locked and offers the explicitly
+confirmed Unlock Publishing action.
 
 ## Retention
 
 The MVP retains every published manifest and managed WAV revision indefinitely.
-This is necessary because historical Takes in any consuming Mix project may
-still reference those files, while ReaDelivery has no global consumer registry
+This is necessary because historical Takes in any consuming Master Project may
+still reference those files, while ReaProjectLink has no global consumer registry
 that could prove a revision is unused. The tool may report package size but does
 not offer automatic or manual garbage collection within its UI.
 
@@ -122,7 +124,7 @@ identities:
 
 ```text
 Source Project ID
-  -> Delivery Set ID
+  -> Delivery ID
        -> Delivery Lane ID
             -> Delivery Clip ID
                  -> Media Revision
@@ -130,37 +132,37 @@ Source Project ID
 
 - **Source Project:** one logical authoring project, independent of its filename
   or path.
-- **Delivery Set:** an atomic group published together.
+- **Delivery:** an atomic group published together.
 - **Delivery Lane:** a designated source track and its logical counterpart in a
-  mix project.
+  Master Project.
 - **Delivery Clip:** one persistent deliverable represented by an item.
 - **Media Revision:** one bounced WAV version of that clip.
 
 REAPER project, track, item, and take GUIDs may be recorded as implementation
-handles, but they are not the cross-project domain identity. ReaDelivery IDs are
+handles, but they are not the cross-project domain identity. ReaProjectLink IDs are
 stored in REAPER extension data and repeated in manifests.
 
 Durable authoring state is stored inside the `.rpp`, not in a sibling sidecar.
-Project extension state holds the project mode, project identity, subscriptions,
-accepted revision pointers, and Mix bindings. Source Tracks carry Lane IDs;
-source Items carry Clip IDs. A linked Mix Item carries its upstream Clip ID plus
-a distinct local Instance ID. Historical manifests provide three-way-comparison
+Project extension state holds the Project Type, Project ID, Subscriptions,
+revision pointers, and Lane Bindings. Source Tracks carry Lane IDs; Source Items
+carry Clip IDs. A Linked Item carries its upstream Clip ID plus a distinct
+internal Instance ID. Historical Manifests provide three-way-comparison
 baselines without embedding full prior snapshots in the project.
 
-Copy and split operations in a Mix retain Clip identity but produce distinct
-Instance identities. A duplicate Clip ID discovered among Source Items is not
-silently repaired: Publish review requires the user to classify the relationship.
+Copy and split operations in a Master Project retain Clip identity but produce
+distinct internal Instance IDs. A duplicate Clip ID discovered among Source Items is not
+silently repaired: Delivery Publish Review requires the user to classify the relationship.
 
-After review resolves any new or ambiguous identities, Source and Picture
+After review resolves any new or ambiguous identities, Source and Reference
 Publish save the `.rpp` before touching the managed package. This guarantees that
 the IDs behind a published manifest survive reopening the project. A save
 failure aborts publication; IDs saved before a later package failure remain safe
-to reuse on retry. Normal REAPER Save is not a publication action. Mix import and
+to reuse on retry. Normal REAPER Save is not a publication action. Delivery import and
 update operations follow normal REAPER editing semantics and leave the project
 dirty for the user to save.
 
 Publication is not part of REAPER's undo history. Once the stable manifest points
-to a successful immutable revision, ReaDelivery does not delete, overwrite, or
+to a successful immutable revision, ReaProjectLink does not delete, overwrite, or
 rewind it. Corrections are expressed as later revisions. Undoing the Source after
 Publish only changes the working project, which the tool then reports as
 different from the latest published snapshot.
@@ -198,19 +200,19 @@ published snapshot:
 - a previously published clip that is absent becomes a removal candidate and is
   not automatically deleted downstream.
 
-The Publish review classifies changes as Added, Audio Changed, Placement Changed,
-Metadata Changed, Unchanged, Retired, Needs Decision, or Blocked. An unresolved
-item blocks publication until the user classifies it or removes it from the
+The Delivery Publish Review classifies changes as Added, Audio Changed,
+Placement Changed, Metadata Changed, Unchanged, Retired, Needs Classification,
+or Blocked. An unresolved Item blocks publication until the user classifies it or removes it from the
 delivery surface. Filename, duration, and audio similarity are never
 authoritative identity signals.
 
 The MVP presents this as a table grouped by Delivery Lane. The header shows the
-outgoing publish revision, reviewed Picture revision, output path, and blocker
+outgoing Delivery Revision, Reviewed Reference Revision, output path, and blocker
 count. Row labels are Added, Audio Changed, Placement Changed, Metadata Changed,
-Unchanged, Retired, Needs Decision, and Blocked; Unchanged is collapsed by
+Unchanged, Retired, Needs Classification, and Blocked; Unchanged is collapsed by
 default. Users resolve new or ambiguous identities and any FX override in this
-review, but cannot select only part of the set. The final action is `Save &
-Publish` for the complete snapshot.
+Review, but cannot select only part of the set. The final action is `Save &
+Publish Delivery` for the complete snapshot.
 
 Identity matching is advisory rather than score-driven. For an untagged current
 Item, the candidate set contains only prior Clips missing from the current scan.
@@ -224,74 +226,75 @@ One-to-many and many-to-one replacements are structural changes. The initial
 model retires the old logical clips and creates new clips; it does not collapse
 those changes into a routine revision or automatically delete downstream items.
 
-Every successful source Publish increments `publishRevision`. Each Clip's
+Every successful source Publish increments `deliveryRevision`. Each Clip's
 `mediaRevision` increments only when its WAV content hash changes. Metadata-only
-changes reuse the previous media revision. Picture publication maintains its own
-independent `pictureRevision`; there is no `clipRevision` in the MVP.
+changes reuse the previous media revision. Reference publication maintains its own
+independent `referenceRevision`; there is no `clipRevision` in the MVP.
 
 `delivery.json` is a small stable entry point that references the latest
 immutable, complete history manifest. Historical manifests are snapshots rather
 than deltas. See `manifest-schema.md` for the implemented MVP fields.
 
-Each Publish scans all registered Delivery Tracks and uses every item's active
-take. Track and item mute state are playback choices and do not affect delivery
-membership. Empty items and non-audio media are ineligible; missing or offline
-audio blocks publication. The resulting manifest is a complete snapshot even
+Each Delivery Publish scans all registered Delivery Tracks and uses every Item's
+active Take. Track and Item mute state are playback choices and do not affect
+Delivery membership. Empty Items and non-audio media are ineligible; Media File
+Not Found blocks publication. The resulting Manifest is a complete snapshot even
 though unchanged clips reuse their existing media revisions. Partial publication
 is outside the MVP.
 
-## Mix-side bindings
+## Master-side bindings
 
-The MVP assumes a new mix workflow initialized through ReaDelivery. It does not
-scan legacy mix projects to infer bindings for previously imported WAVs.
+The MVP assumes a new Master Project workflow initialized through ReaProjectLink. It does not
+scan legacy Master Projects to infer bindings for previously imported WAVs.
 
-The mix project owns all integration mappings:
+The Master Project owns all integration mappings:
 
 ```text
-Delivery Lane ID <-> Mix Track GUID
-Delivery Clip ID <-> one or more Mix Item Instance GUIDs
+Delivery Lane ID <-> Master Track GUID
+Delivery Clip ID <-> one or more Linked Item Instance IDs
 ```
 
-A source project never stores mix-project paths or target-track GUIDs. This makes
-one source publish reusable by multiple mix projects and guarantees that only
-the active mix project process modifies its `.rpp`.
+A Source Project never stores Master Project paths or target Track GUIDs. This makes
+one source publish reusable by multiple Master Projects and guarantees that only
+the active Master Project process modifies its `.rpp`.
 
-On first import, the mix user maps each delivery lane to an existing track, asks
-the tool to create a corresponding track under a selected folder, or skips it.
+On first import, the Master user maps each delivery lane to an existing track, asks
+the tool to create a corresponding Track under a selected Folder Track, or
+chooses Leave Unmapped.
 One lane to one track is the default suggestion, but multiple lanes may target
 the same track. Name matching may suggest an initial mapping but requires user
 confirmation; the persisted binding uses Lane ID and Track GUID.
 
 The tool then creates and tags items using the published media, timeline
 position, source offset, duration, display metadata, Clip ID, media revision, and
-picture revision. Initial item state also includes fades, item gain, and basic
+reference revision. Initial item state also includes fades, item gain, and basic
 non-plug-in take parameters. It does not copy source-project FX, Track
 Volume/Pan, routing, automation, Take FX, track layout, or the full source folder
-hierarchy. Those properties are owned by the mix project after import.
+hierarchy. Those properties are owned by the Master Project after import.
 
 The first-import screen presents this as a compact Lane mapping table. Bulk
 controls create new tracks under one selected Folder Track, offer name-based
-mapping suggestions, or skip selected rows. Created tracks follow Lane order and
+mapping suggestions, or leave selected Lanes unmapped. Created Tracks follow Lane order and
 display names. One confirmed operation creates Tracks, Items, bindings, and the
 accepted revision as a single undo point. Removing a subscription later leaves
 imported project content intact.
 
-The screen compares the Source's reviewed Picture identity and revision with the
-Mix's authoritative Picture. Different Picture IDs block import. The same ID at
-different revisions produces a prominent warning that the mix user may
+The screen compares the Source's reviewed Reference identity and revision with the
+Master Project's authoritative Reference. Different Reference IDs block import. The same ID at
+different revisions produces a prominent warning that the Master user may
 explicitly override.
 
-A Delivery Lane added by a later Publish remains unmapped until the mix user
+A Delivery Lane added by a later Publish remains unmapped until the Master User
 chooses or creates its target track. A retired source lane does not cause its
-bound mix track or items to be deleted.
+bound Master Track or items to be deleted.
 
 ## Revision update
 
 For an existing delivery clip, an accepted update should:
 
-1. locate every still-linked mix instance by internal Delivery Clip ID;
-2. let the user include or exclude individual instances from the update;
-3. duplicate each included instance's current active take where appropriate;
+1. locate every Linked Item by Delivery Clip ID and internal Instance ID;
+2. let the user make decisions for each Linked Item;
+3. add a new Take to each selected Linked Item where appropriate;
 4. replace only the duplicate take's PCM source with the new WAV;
 5. label the new take with its delivery revision;
 6. make it active;
@@ -306,79 +309,79 @@ Changes to duration, timeline position, source offset, channel layout, or sample
 rate require a warning and explicit handling policy. The tool must not silently
 delete items when a source clip disappears from a later publish.
 
-The update screen compares three states per Mix Instance: its last handled
-delivery baseline, the latest upstream publish, and its current local state. A
-Source-only change defaults to Use Source, a Mix-only change remains local, and
+The Delivery Update Review compares Baseline, Delivery, and Local state for each
+Linked Item. A
+Delivery-only change defaults to Use Delivery, a Local-only change remains local, and
 an equal result is accepted. When both changed a field differently, the field is
-a conflict defaulting to Keep Mix. Position, length, source offset, fades, item
-gain, and supported Take parameters each offer only Keep Mix or Use Source in the
+a conflict defaulting to Keep Local. Position, length, source offset, fades, item
+gain, and supported Take parameters each offer only Keep Local or Use Delivery in the
 MVP.
 
-Audio-content acceptance remains independent and offers Accept as New Take or
-Skip This Instance. Bulk actions accept all new audio, keep all Mix edits, or use
-Source for unmodified Items. Applying the chosen updates creates one undo point.
-Each Instance stores its accepted media revision separately from its last handled
-Source-state revision, allowing some Instances or media changes to remain
+Audio-content acceptance remains independent and offers Add New Take or Keep
+Current Media. Bulk actions use Add All as New Takes, Keep All Local Changes, or
+Use Delivery for Unmodified Items. Applying the chosen updates creates one undo
+point. Each Linked Item stores its Accepted Media Revision separately from its
+Handled Delivery Revision, allowing some Linked Items or media changes to remain
 pending without losing their comparison baseline.
 
-Copying or splitting a managed mix item creates multiple instances of the same
+Copying or splitting a managed Linked Item creates multiple Linked Items for the same
 Delivery Clip. Each remains eligible for later updates until the user explicitly
-detaches it. A detached instance becomes an ordinary REAPER item.
+detaches it. A detached Linked Item becomes an ordinary REAPER Item.
 
 The MVP copies basic take parameters when creating the new revision take: source
 offset, volume, pan, playback rate, pitch, channel mode, and polarity. Item-level
-state and track-level mix state remain in place. Take FX, take envelopes, stretch
+state and Track-level local state remain in place. Take FX, Take envelopes, stretch
 markers, take markers, and complex source wrappers are outside automatic
-migration; detecting any of them requires a warning and an explicit skip or
-replace-anyway decision.
+migration. Add New Take requires explicit confirmation when unsupported Take
+data is detected; Keep Current Media remains available.
 
-## Master Reference dependency
+## Reference dependency
 
-The mix project publishes one atomic Master Reference Set. Its stable Picture ID
-identifies the set rather than any individual video Item. The publication surface
-contains every Item on explicitly registered Picture Tracks plus explicitly
+The Master Project publishes one atomic Reference. Its stable Reference ID
+identifies the Reference rather than any individual video Item. The publication surface
+contains every Item on explicitly registered Reference Tracks plus explicitly
 registered Markers and Regions. Tracks, Items, Markers, and Regions receive stable
 cross-project identities so later revisions can update or retire the corresponding
 managed content without relying on names or REAPER-local GUIDs.
 
-Each immutable Master Reference manifest contains the complete current surface:
+Each immutable Reference manifest contains the complete current surface:
 
-- picture revision and stable lane, Item, Marker, and Region identities;
+- reference revision and stable lane, Item, Marker, and Region identities;
 - each video's external media path and content hash;
 - Item position, source offset, duration, and playback rate;
 - Marker and Region names, colors, and positions;
 - project sample rate, frame rate, and project timecode offset;
-- an optional registered Marker with semantic role `FFOP`.
+- an optional `referenceStartMarkerId` naming one registered Marker.
 
-`FFOP` is optional. When present it is the Reference Start; otherwise Reference
-Start is project zero. It is an alignment anchor and semantic label, not a
-requirement for publishing or synchronizing a Master Reference.
+The Reference Start Marker is optional and independent of the Marker's displayed
+name. Without one, project zero is the Reference Start. `FFOP` remains a valid
+user-chosen Marker name, not a ReaProjectLink role.
 
-Source subscriptions default to Mirror Master Timeline. Synchronization adopts
+Delivery subscriptions default to Mirror Master Timeline. Synchronization adopts
 the Master's timecode offset and frame rate and places managed video Items,
 Markers, and Regions at the same absolute timeline positions. It does not force
 the Source project's sample rate. Relative Reference remains an explicit
 alternative and maps published positions relative to the Source's existing
 Reference Start.
 
-If a later revision moves every stable Master Reference timeline element by the
+If a later revision moves every stable Reference timeline element by the
 same amount, the Source UI reports that delta and may explicitly shift the entire
 Source project, including all Items, Markers, and Regions, before synchronizing.
-This operation is never automatic. Moving only FFOP or only part of the Master
-Reference does not offer the full-project shift.
+This operation is never automatic. Moving only the Reference Start or only part
+of the Reference does not offer the full-project shift.
 
-Source projects may automatically detect a new picture revision, but they do not
+Source projects may automatically detect a new reference revision, but they do not
 automatically adopt it. A source project records separate synchronized and
-reviewed states. Audio Publish records the reviewed picture revision.
+reviewed states. Delivery Publish records the Reviewed Reference Revision.
 
-Picture Publish references each authoritative video file at its existing NAS path
-and records a content hash; it does not duplicate videos under `_Delivery`.
+Reference Publish references each authoritative video file at its existing NAS path
+and records a content hash; it does not duplicate videos under `_ReaProjectLink`.
 Video-file retention and historical recovery remain the responsibility of the
-external picture-asset workflow.
+external reference-asset workflow.
 
-Each successful Picture Publish adds an immutable
-`picture-history/picture-NNNN.json`; these small records are retained
-indefinitely and `picture.json` points to the latest one. Consumers revalidate
+Each successful Reference Publish adds an immutable
+`history/reference-NNNN.json`; these small records are retained
+indefinitely and `reference.json` points to the latest one. Consumers revalidate
 the referenced video's hash. Replacement at the same path is a mismatch, while
 a missing historical file makes that revision unavailable without erasing its
 record.

@@ -1,4 +1,4 @@
-local json = require("readelivery.json")
+local json = require("reaprojectlink.json")
 
 local function equal(actual, expected, label)
   if actual ~= expected then
@@ -10,26 +10,26 @@ local manifest = json.decode([[
 {
   "schemaVersion": 1,
   "sourceProjectId": "source-1",
-  "latestPublishRevision": 18,
-  "manifest": "history/publish-0018.json"
+  "latestDeliveryRevision": 18,
+  "manifest": "history/delivery-0018.json"
 }
 ]])
 
 equal(manifest.schemaVersion, 1, "schema version")
 equal(manifest.sourceProjectId, "source-1", "source id")
-equal(manifest.latestPublishRevision, 18, "publish revision")
-equal(manifest.manifest, "history/publish-0018.json", "history path")
+equal(manifest.latestDeliveryRevision, 18, "publish revision")
+equal(manifest.manifest, "history/delivery-0018.json", "history path")
 
 local encoded = json.encode({
   schemaVersion = 1,
   sourceProjectId = "source-1",
-  latestPublishRevision = 18,
-  manifest = "history/publish-0018.json",
+  latestDeliveryRevision = 18,
+  manifest = "history/delivery-0018.json",
 })
 
 equal(
   encoded,
-  '{"latestPublishRevision":18,"manifest":"history/publish-0018.json",' ..
+  '{"latestDeliveryRevision":18,"manifest":"history/delivery-0018.json",' ..
     '"schemaVersion":1,"sourceProjectId":"source-1"}',
   "canonical JSON"
 )

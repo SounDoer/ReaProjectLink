@@ -1,7 +1,7 @@
-local filesystem = require("readelivery.filesystem")
-local json = require("readelivery.json")
-local package_writer = require("readelivery.package_writer")
-local sha256 = require("readelivery.sha256")
+local filesystem = require("reaprojectlink.filesystem")
+local json = require("reaprojectlink.json")
+local delivery_writer = require("reaprojectlink.delivery_writer")
+local sha256 = require("reaprojectlink.sha256")
 
 local source = debug.getinfo(1, "S").source:sub(2)
 local tests_dir = assert(source:match("^(.*)[/\\]"))
@@ -56,21 +56,21 @@ assert(fs.read_file(stable_path) == "new", "atomic replacement")
 assert(not fs.exists(temporary_path), "temporary file is consumed")
 
 local package_root = fs.join(root, "package")
-local publish_result, publish_error = package_writer.publish({
+local publish_result, publish_error = delivery_writer.publish({
   package_root = package_root,
   expected_revision = 0,
   transaction_id = "integration",
   snapshot = {
     schemaVersion = 1,
     sourceProjectId = "source-1",
-    publishRevision = 1,
+    deliveryRevision = 1,
     lanes = json.array(),
   },
   pointer = {
     schemaVersion = 1,
     sourceProjectId = "source-1",
-    latestPublishRevision = 1,
-    manifest = "history/publish-0001.json",
+    latestDeliveryRevision = 1,
+    manifest = "history/delivery-0001.json",
   },
   media = {
     {
@@ -83,7 +83,7 @@ local publish_result, publish_error = package_writer.publish({
 }, fs)
 assert(publish_result, publish_error)
 local published_pointer = assert(fs.read_file(fs.join(package_root, "delivery.json")))
-assert(json.decode(published_pointer).latestPublishRevision == 1, "real Publish pointer")
+assert(json.decode(published_pointer).latestDeliveryRevision == 1, "real Publish pointer")
 assert(
   fs.read_file(fs.join(package_root, "media", "clip-1", "clip_r0001.wav")) == "wave bytes",
   "real Publish media"

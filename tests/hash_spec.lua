@@ -1,4 +1,4 @@
-local sha256 = require("readelivery.sha256")
+local sha256 = require("reaprojectlink.sha256")
 
 local actual = sha256.digest("abc")
 local expected = "ba7816bf8f01cfea414140de5dae2223" ..

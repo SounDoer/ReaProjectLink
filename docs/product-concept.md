@@ -90,7 +90,7 @@ The Reference relationship runs in the opposite direction:
 3. Source Projects detect that revision and ask the user to synchronize it.
 4. Synchronization mirrors the Master timeline by default; synchronization and
    review remain distinct states.
-5. A Source audio Publish records the Reference Revision against which it was
+5. A Delivery Publish records the Reference Revision against which it was
    reviewed.
 6. The Master Project warns when a Source Delivery was produced against an older
    Reference Revision.

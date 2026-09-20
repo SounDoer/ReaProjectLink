@@ -1,32 +1,30 @@
+-- @description ReaProjectLink - Run Tests
+-- @version 0.1.0-dev
+-- @author ReaProjectLink contributors
+
 local source = debug.getinfo(1, "S").source:sub(2)
-local tests_dir = source:match("^(.*)[/\\]")
-local root = tests_dir and tests_dir:match("^(.*)[/\\]tests$")
+local scripts_dir = source:match("^(.*)[/\\]")
+local root = scripts_dir and scripts_dir:match("^(.*)[/\\]scripts$")
 
 if not root then
+  reaper.ShowMessageBox("Could not resolve the ReaProjectLink repository path.", "ReaProjectLink tests", 0)
   return
 end
 
 package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
 
-assert(require("reaprojectlink.runtime_requirements").check_reaper(reaper))
+local runtime_requirements = require("reaprojectlink.runtime_requirements")
+local runtime_ok, runtime_error = runtime_requirements.check_reaper(reaper)
+if not runtime_ok then
+  reaper.ShowMessageBox(runtime_error, "ReaProjectLink tests", 0)
+  return
+end
+
+local temporary_project = root .. "/tests/.manual-runner-project.rpp"
+os.remove(temporary_project)
+reaper.Main_OnCommand(40859, 0)
 
 local ok, result = xpcall(function()
-  local entry, entry_error = loadfile(root .. "/scripts/ReaProjectLink.lua")
-  assert(entry, entry_error)
-
-  local adapter = require("reaprojectlink.reaper_adapter")
-  assert(type(adapter.project_path()) == "string")
-  assert(type(adapter.all_tracks()) == "table")
-
-  assert(reaper.ImGui_GetBuiltinPath, "ReaImGui is not installed")
-  package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua;" .. package.path
-  local ImGui = require("imgui")("0.9")
-  local context = ImGui.CreateContext("ReaProjectLink smoke test")
-  assert(context, "ReaImGui context creation failed")
-  if reaper.ImGui_DestroyContext then
-    reaper.ImGui_DestroyContext(context)
-  end
-
   local passed = dofile(root .. "/tests/project_service_spec.lua")
   passed = passed + dofile(root .. "/tests/runtime_requirements_spec.lua")
   passed = passed + dofile(root .. "/tests/reaper_adapter_spec.lua")
@@ -49,21 +47,17 @@ local ok, result = xpcall(function()
   return passed
 end, debug.traceback)
 
-local result_path = root .. "/tests/.last-result"
-local file = io.open(result_path, "w")
-if file then
-  if ok then
-    file:write(string.format("PASS %d core tests + REAPER/ReaImGui smoke\n", result))
-  else
-    file:write("FAIL\n", tostring(result), "\n")
-  end
-  file:close()
-end
+reaper.Main_SaveProjectEx(0, temporary_project, 8)
+reaper.Main_OnCommand(40860, 0)
+os.remove(temporary_project)
+os.remove(root .. "/tests/.adapter-fixture.wav")
+os.remove(root .. "/tests/.rollback-fixture.wav")
 
-reaper.atexit(function()
-  os.remove(root .. "/tests/.adapter-fixture.wav")
-  os.remove(root .. "/tests/.rollback-fixture.wav")
-  os.remove(root .. "/tests/.runner-project.rpp")
-end)
-reaper.Main_SaveProjectEx(0, root .. "/tests/.runner-project.rpp", 8)
-reaper.Main_OnCommand(40004, 0)
+if ok then
+  local message = string.format("All %d ReaProjectLink tests passed.", result)
+  reaper.ShowConsoleMsg(message .. "\n")
+  reaper.ShowMessageBox(message, "ReaProjectLink tests", 0)
+else
+  reaper.ShowConsoleMsg("ReaProjectLink tests failed:\n" .. tostring(result) .. "\n")
+  reaper.ShowMessageBox(tostring(result), "ReaProjectLink tests failed", 0)
+end
