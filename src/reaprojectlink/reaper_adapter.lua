@@ -663,13 +663,18 @@ local function get_item_string(item, key)
   return value
 end
 
-local function build_item_peaks(source, item)
+local function build_item_peaks(take, item)
   reaper.UpdateItemInProject(item)
   if not reaper.PCM_Source_BuildPeaks then
     reaper.UpdateArrange()
     return
   end
 
+  local source = reaper.GetMediaItemTake_Source(take)
+  if not source then
+    reaper.UpdateArrange()
+    return
+  end
   local remaining = reaper.PCM_Source_BuildPeaks(source, 0)
   if remaining == 0 then
     reaper.UpdateArrange()
@@ -678,10 +683,11 @@ local function build_item_peaks(source, item)
 
   reaper.UpdateArrange()
   local function continue_building()
-    if not reaper.ValidatePtr2(project(), item, "MediaItem*") then
-      reaper.PCM_Source_BuildPeaks(source, 2)
+    if not reaper.ValidatePtr2(project(), item, "MediaItem*") or
+        not reaper.ValidatePtr2(project(), take, "MediaItem_Take*") then
       return
     end
+    if reaper.GetMediaItemTake_Source(take) ~= source then return end
     remaining = reaper.PCM_Source_BuildPeaks(source, 1)
     if remaining > 0 then
       reaper.defer(continue_building)
@@ -726,7 +732,7 @@ function M.create_delivery_item(track, clip, context)
   set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, clip.mediaRevision)
   set_item_string(item, constants.ITEM_KEYS.handled_delivery_revision, context.delivery_revision)
   set_item_string(item, constants.ITEM_KEYS.reference_revision, context.reference_revision)
-  build_item_peaks(source, item)
+  build_item_peaks(take, item)
   return item
 end
 
@@ -840,7 +846,7 @@ function M.add_delivery_take(item, clip, media_path, context)
     true
   )
   reaper.SetActiveTake(take)
-  build_item_peaks(source, item)
+  build_item_peaks(take, item)
   return true
 end
 
