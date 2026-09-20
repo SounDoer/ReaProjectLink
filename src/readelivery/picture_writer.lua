@@ -6,6 +6,26 @@ local function assert_ok(ok, err)
   if not ok then error(err or "filesystem operation failed", 3) end
 end
 
+local function decode_file(fs, path, label)
+  local bytes, read_error = fs.read_file(path)
+  if not bytes then error(read_error or ("could not read " .. label), 3) end
+  local ok, value = pcall(json.decode, bytes)
+  if not ok then error(label .. " failed JSON validation: " .. tostring(value), 3) end
+  return value
+end
+
+local function retry_equivalent(left, right)
+  local function without_publication_metadata(value)
+    local copy = {}
+    for key, entry in pairs(value) do
+      if key ~= "publishedAt" and key ~= "publishedBy" then copy[key] = entry end
+    end
+    return copy
+  end
+  return json.encode(without_publication_metadata(left)) ==
+    json.encode(without_publication_metadata(right))
+end
+
 local function current_revision(input, fs)
   local path = fs.join(input.package_root, "picture.json")
   if not fs.exists(path) then return 0 end
@@ -43,7 +63,8 @@ local function perform_publish(input, fs)
   local final_parent = final_snapshot:match("^(.*)[/\\][^/\\]+$")
   assert_ok(fs.make_directory(final_parent))
   if fs.exists(final_snapshot) then
-    if fs.read_file(final_snapshot) ~= snapshot_bytes then
+    local existing_snapshot = decode_file(fs, final_snapshot, "existing Picture snapshot")
+    if not retry_equivalent(existing_snapshot, input.snapshot) then
       error("immutable Picture snapshot collision: " .. input.pointer.manifest, 2)
     end
   else
@@ -73,8 +94,15 @@ function M.publish(input, fs)
   if not token then return nil, lock_error or "Picture Publish is locked." end
   local ok, result = xpcall(function() return perform_publish(input, fs) end, debug.traceback)
   fs.remove_tree(fs.join(input.package_root, ".staging", input.transaction_id))
-  fs.release_lock(input.package_root, token)
-  if not ok then return nil, result end
+  local released, release_error = fs.release_lock(input.package_root, token)
+  if not ok then
+    if not released then
+      result = result .. "\nPicture Publish also failed to release its lock: " ..
+        tostring(release_error)
+    end
+    return nil, result
+  end
+  if not released then result.lock_release_error = release_error end
   return result
 end
 

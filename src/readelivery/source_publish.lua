@@ -104,11 +104,17 @@ function M.create(dependencies)
     local picture_start_samples = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.picture_start_samples
     ))
+    local picture_start_sample_rate = tonumber(adapter.get_project_value(
+      constants.PROJECT_KEYS.picture_start_sample_rate
+    )) or current.sample_rate
     if picture_start_samples then
+      local local_picture_start = math.floor(
+        picture_start_samples / picture_start_sample_rate * current.sample_rate + 0.5
+      )
       for _, lane in ipairs(current.lanes) do
         for _, clip in ipairs(lane.clips) do
           if clip.start_offset_samples then
-            clip.start_offset_samples = clip.start_offset_samples - picture_start_samples
+            clip.start_offset_samples = clip.start_offset_samples - local_picture_start
           end
         end
       end
@@ -203,7 +209,11 @@ function M.create(dependencies)
       tostring(result.publish_revision)
     )
     adapter.mark_project_dirty()
-    adapter.save_project()
+    local revision_saved, revision_save_error = adapter.save_project()
+    if not revision_saved then
+      result.project_save_error = revision_save_error or
+        "Delivery was published, but its revision could not be saved to the Source project."
+    end
     return result
   end
 

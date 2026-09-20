@@ -268,7 +268,12 @@ local function draw_source_review()
   if source_review.blocker_count == 0 and ImGui.Button(ctx, "Save & Publish") then
     local result, err = source_publish.publish(source_review, adapter, fs, metadata())
     if result then
-      notify("Published Delivery revision " .. result.publish_revision .. ".")
+      local message = "Published Delivery revision " .. result.publish_revision .. "."
+      if result.project_save_error then message = message .. " " .. result.project_save_error end
+      if result.lock_release_error then
+        message = message .. " Publish lock cleanup failed: " .. result.lock_release_error
+      end
+      notify(message, result.project_save_error ~= nil or result.lock_release_error ~= nil)
       source_review, source_decisions, source_save_as_decision = nil, {}, nil
     else notify(err, true); inspect_lock(source_review.package_root) end
   end
@@ -359,7 +364,12 @@ local function draw_picture_publish(state)
     if ImGui.Button(ctx, "Save & Publish Picture") then
       local result, err = picture_publish.publish(picture_review, adapter, fs, metadata())
       if result then
-        notify("Published Picture revision " .. result.picture_revision .. ".")
+        local message = "Published Picture revision " .. result.picture_revision .. "."
+        if result.project_save_error then message = message .. " " .. result.project_save_error end
+        if result.lock_release_error then
+          message = message .. " Publish lock cleanup failed: " .. result.lock_release_error
+        end
+        notify(message, result.project_save_error ~= nil or result.lock_release_error ~= nil)
         picture_review, picture_publish_anyway = nil, false
       else notify(err, true); inspect_lock(picture_review.package_root) end
     end

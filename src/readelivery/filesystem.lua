@@ -248,10 +248,27 @@ function M.create(reaper_api)
     if not ok then return nil, directory_error end
 
     local lock_path = fs.join(package_root, ".publish.lock")
+    local guard_path = lock_path .. ".guard"
+    local guarded = false
+    if separator ~= "\\" then
+      local output = reaper_api.ExecProcess("mkdir " .. posix_literal(guard_path), 30000)
+      local exit_code = output and tonumber(output:match("^(-?%d+)"))
+      if exit_code ~= 0 then
+        local existing = fs.read_file(lock_path)
+        return nil, existing or "Publish is locked."
+      end
+      guarded = true
+      if fs.exists(lock_path) then
+        remove_empty_directory(guard_path)
+        local existing = fs.read_file(lock_path)
+        return nil, existing or "Publish is locked."
+      end
+    end
     local token = reaper_api.genGuid(""):gsub("[{}]", ""):lower()
     local temporary_path = lock_path .. "." .. token .. ".tmp"
     local file, open_error = io.open(temporary_path, "wb")
     if not file then
+      if guarded then remove_empty_directory(guard_path) end
       return nil, open_error
     end
 
@@ -261,12 +278,14 @@ function M.create(reaper_api)
     local close_ok, close_error = file:close()
     if not write_ok or not close_ok then
       os.remove(temporary_path)
+      if guarded then remove_empty_directory(guard_path) end
       return nil, write_error or close_error
     end
 
     local moved, move_error = os.rename(temporary_path, lock_path)
     if not moved then
       os.remove(temporary_path)
+      if guarded then remove_empty_directory(guard_path) end
       local existing = fs.read_file(lock_path)
       return nil, existing or move_error or "Publish is locked."
     end
@@ -283,6 +302,10 @@ function M.create(reaper_api)
     end
     local removed, remove_error = os.remove(lock_path)
     if not removed then return nil, remove_error end
+    if separator ~= "\\" then
+      local guard_removed, guard_error = remove_empty_directory(lock_path .. ".guard")
+      if not guard_removed then return nil, guard_error end
+    end
     return true
   end
 
@@ -304,6 +327,10 @@ function M.create(reaper_api)
     local lock_path = fs.join(package_root, ".publish.lock")
     local removed, remove_error = os.remove(lock_path)
     if not removed then return nil, remove_error end
+    if separator ~= "\\" then
+      local guard_removed, guard_error = remove_empty_directory(lock_path .. ".guard")
+      if not guard_removed then return nil, guard_error end
+    end
     return true
   end
 

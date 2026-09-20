@@ -88,7 +88,11 @@ Publication should be atomic:
 
 Until the last step succeeds, consumers continue to see the previous successful
 revision. Interrupted staging data is never treated as published data; the tool
-may report and safely clean it up later.
+may report and safely clean it up later. If interruption happens after an
+immutable history manifest is moved but before its stable pointer is replaced, a
+retry may reuse that orphan only when every semantic field still matches; fresh
+publication time and user metadata do not turn an otherwise identical retry into
+an immutable collision.
 
 ## Publish concurrency
 
@@ -345,7 +349,10 @@ Picture Start. Source projects synchronize this reference, and delivery clip
 placement is expressed as an integer sample offset from Picture Start. On import,
 the mix project adds that offset to its own Picture Start. This avoids depending
 on identical absolute REAPER project positions while retaining sub-frame audio
-precision.
+precision. Project state stores both the Picture Start sample count and the sample
+rate that gives that count meaning. Synchronization converts the anchor into the
+receiving project's sample rate, and later reads retain the stored rate so a
+project-rate change cannot reinterpret the same count as a different time.
 
 Source projects may automatically detect a new picture revision, but they do not
 automatically adopt it. A source project records separate synchronized and

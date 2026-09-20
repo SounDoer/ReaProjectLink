@@ -5,6 +5,10 @@ local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
 
+local function cancel_undo(adapter, label)
+  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
+end
+
 local function normalize_path(path)
   path = path:gsub("\\", "/")
   local prefix = ""
@@ -350,6 +354,10 @@ function M.apply(review, adapter, options)
       return nil, "Every new Delivery Lane requires a mapping decision."
     end
   end
+  -- Work on a private copy so a failed, rolled-back Apply does not mutate the
+  -- still-visible Review and poison a retry with state that was never saved.
+  local subscriptions = json.decode(json.encode(review.subscriptions))
+  local subscription = subscriptions[review.subscription_index]
   local result = {
     new_takes = 0,
     new_items = 0,
@@ -378,7 +386,7 @@ function M.apply(review, adapter, options)
     local accepted_media_revision = row.accepted_media_revision
     if plan.media.pending and plan.media.choice == "accept_new_take" then
       if row.advanced_take_state and not decision.replace_anyway then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, "Advanced Take state requires Skip or Replace Anyway."
       end
       local added, add_error = adapter.add_delivery_take(
@@ -388,7 +396,7 @@ function M.apply(review, adapter, options)
         { source_sample_rate = review.target_snapshot.sampleRate }
       )
       if not added then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, add_error
       end
       accepted_media_revision = row.target_clip.mediaRevision
@@ -401,10 +409,12 @@ function M.apply(review, adapter, options)
         { picture_start_samples = tonumber(adapter.get_project_value(
             constants.PROJECT_KEYS.picture_start_samples
           )) or 0,
-          project_sample_rate = adapter.project_sample_rate() }
+          project_sample_rate = tonumber(adapter.get_project_value(
+            constants.PROJECT_KEYS.picture_start_sample_rate
+          )) or adapter.project_sample_rate() }
       )
       if not applied then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, apply_error
       end
     end
@@ -420,12 +430,15 @@ function M.apply(review, adapter, options)
     constants.PROJECT_KEYS.picture_start_samples
   )) or 0
   local project_sample_rate = adapter.project_sample_rate()
+  local picture_start_sample_rate = tonumber(adapter.get_project_value(
+    constants.PROJECT_KEYS.picture_start_sample_rate
+  )) or project_sample_rate
   local function import_clip(track, clip, media_path)
     local copy = {}
     for key, value in pairs(clip) do copy[key] = value end
     copy.media_path = media_path
     local item, item_error = adapter.create_delivery_item(track, copy, {
-      position_seconds = picture_start / project_sample_rate +
+      position_seconds = picture_start / picture_start_sample_rate +
         clip.startOffsetSamples / review.target_snapshot.sampleRate,
       source_project_id = review.source_project_id,
       publish_revision = review.target_revision,
@@ -442,12 +455,12 @@ function M.apply(review, adapter, options)
     if addition_decisions[addition.clip.clipId] == "import" then
       local track = adapter.track_by_guid(addition.track_guid)
       if not track then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, "A bound Mix Track is unavailable."
       end
       local item, item_error = import_clip(track, addition.clip, addition.media_path)
       if not item then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, item_error
       end
     end
@@ -456,12 +469,12 @@ function M.apply(review, adapter, options)
   for _, lane_review in ipairs(review.unmapped_lanes) do
     local mapping = lane_mappings[lane_review.lane_id]
     local binding
-    for _, candidate in ipairs(review.subscription.lanes or {}) do
+    for _, candidate in ipairs(subscription.lanes or {}) do
       if candidate.laneId == lane_review.lane_id then binding = candidate end
     end
     if not binding then
       binding = { laneId = lane_review.lane_id }
-      table.insert(review.subscription.lanes, binding)
+      table.insert(subscription.lanes, binding)
     end
     if mapping.kind == "skip" then
       binding.skipped = true
@@ -472,11 +485,11 @@ function M.apply(review, adapter, options)
         track = adapter.create_mix_track(lane_review.display_name, mapping.parent_track_ref)
         result.new_tracks = result.new_tracks + 1
       elseif mapping.kind ~= "existing" then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, "Unknown Lane mapping decision."
       end
       if not track then
-        adapter.end_undo("Apply ReaDelivery Source update")
+        cancel_undo(adapter, "Apply ReaDelivery Source update")
         return nil, "Mapped Track is unavailable."
       end
       binding.skipped = nil
@@ -484,7 +497,7 @@ function M.apply(review, adapter, options)
       for _, clip in ipairs(lane_review.clips) do
         local item, item_error = import_clip(track, clip, clip.media_path)
         if not item then
-          adapter.end_undo("Apply ReaDelivery Source update")
+          cancel_undo(adapter, "Apply ReaDelivery Source update")
           return nil, item_error
         end
       end
@@ -493,12 +506,12 @@ function M.apply(review, adapter, options)
 
   for lane_id, track in pairs(rebindings) do
     local binding
-    for _, candidate in ipairs(review.subscription.lanes or {}) do
+    for _, candidate in ipairs(subscription.lanes or {}) do
       if candidate.laneId == lane_id then binding = candidate end
     end
     local guid = track and adapter.track_guid(track)
     if not binding or not guid then
-      adapter.end_undo("Apply ReaDelivery Source update")
+      cancel_undo(adapter, "Apply ReaDelivery Source update")
       return nil, "Rebound Mix Track is unavailable."
     end
     binding.skipped = nil
@@ -509,7 +522,7 @@ function M.apply(review, adapter, options)
   -- Declining a Clip has to outlive the revision it was offered in, otherwise
   -- the Clip silently disappears once the accepted revision moves past it.
   local declined = {}
-  for _, clip_id in ipairs(review.subscription.declinedClips or {}) do
+  for _, clip_id in ipairs(subscription.declinedClips or {}) do
     declined[clip_id] = true
   end
   for _, addition in ipairs(review.additions) do
@@ -518,13 +531,13 @@ function M.apply(review, adapter, options)
   local declined_list = {}
   for clip_id in pairs(declined) do table.insert(declined_list, clip_id) end
   table.sort(declined_list)
-  review.subscription.declinedClips = #declined_list > 0 and declined_list or nil
+  subscription.declinedClips = #declined_list > 0 and declined_list or nil
 
-  review.subscription.acceptedPublishRevision = review.target_revision
-  review.subscription.sourceProjectName = review.target_snapshot.sourceProjectName
+  subscription.acceptedPublishRevision = review.target_revision
+  subscription.sourceProjectName = review.target_snapshot.sourceProjectName
   adapter.set_project_value(
     constants.PROJECT_KEYS.source_subscriptions,
-    json.encode(review.subscriptions)
+    json.encode(subscriptions)
   )
   adapter.mark_project_dirty()
   adapter.end_undo("Apply ReaDelivery Source update")
@@ -556,7 +569,7 @@ function M.detach(adapter, item)
   adapter.begin_undo("Detach ReaDelivery Instance")
   local detached, detach_error = adapter.detach_instance(item)
   if not detached then
-    adapter.end_undo("Detach ReaDelivery Instance")
+    cancel_undo(adapter, "Detach ReaDelivery Instance")
     return nil, detach_error
   end
   adapter.mark_project_dirty()

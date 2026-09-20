@@ -143,6 +143,10 @@ function M.create(dependencies)
       constants.PROJECT_KEYS.picture_start_samples,
       tostring(review.picture_start_samples)
     )
+    adapter.set_project_value(
+      constants.PROJECT_KEYS.picture_start_sample_rate,
+      tostring(review.sample_rate)
+    )
     adapter.set_item_picture_id(review.item_ref, picture_id)
     adapter.mark_project_dirty()
     adapter.end_undo("Assign ReaDelivery Picture identity")
@@ -180,7 +184,11 @@ function M.create(dependencies)
       tostring(result.picture_revision)
     )
     adapter.mark_project_dirty()
-    adapter.save_project()
+    local revision_saved, revision_save_error = adapter.save_project()
+    if not revision_saved then
+      result.project_save_error = revision_save_error or
+        "Picture was published, but its revision could not be saved to the Mix project."
+    end
     return result
   end
 

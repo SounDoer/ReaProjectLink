@@ -43,6 +43,7 @@ function adapter.set_project_value(key, value) values[key] = tostring(value) end
 function adapter.begin_undo(label) table.insert(events, "begin:" .. label) end
 function adapter.end_undo(label) table.insert(events, "end:" .. label) end
 function adapter.mark_project_dirty() table.insert(events, "dirty") end
+function adapter.project_sample_rate() return 96000 end
 function adapter.sync_picture(value)
   table.insert(events, "sync:" .. value.pictureRevision)
   return { item_ref = "picture-item", created = true }
@@ -64,7 +65,8 @@ assert(status.available, "external video hash matches")
 local synchronized, sync_error = picture_subscription.synchronize(adapter, status)
 assert(synchronized, sync_error)
 assert(values.synchronized_picture_revision == "3", "synchronized revision persisted")
-assert(values.picture_start_samples == "96000", "Picture Start persisted")
+assert(values.picture_start_samples == "192000", "Picture Start converted to the Source sample rate")
+assert(values.picture_start_sample_rate == "96000", "Picture Start sample rate persisted")
 assert(values.reviewed_picture_revision == nil, "sync does not imply review")
 
 local reviewed, review_error = picture_subscription.mark_reviewed(adapter, status)

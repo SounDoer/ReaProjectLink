@@ -120,4 +120,16 @@ local removed = assert(mix_import.remove_subscription(adapter, "source-1"))
 assert(removed.source_project_id == "source-1", "subscription removal result")
 assert(#json.decode(values.source_subscriptions) == 0, "subscription removed without project content mutation")
 
-return 4
+function adapter.cancel_undo(label) table.insert(events, "cancel:" .. label) end
+function adapter.create_delivery_item() return nil, "simulated media open failure" end
+local failed, failed_error = mix_import.apply(review, adapter, {
+  allow_picture_revision_mismatch = true,
+  mappings = {
+    ["lane-1"] = { kind = "create" },
+    ["lane-2"] = { kind = "skip" },
+  },
+})
+assert(not failed and failed_error == "simulated media open failure", "runtime import failure is reported")
+assert(events[#events] == "cancel:Import ReaDelivery Source", "failed import rolls back its undo block")
+
+return 5

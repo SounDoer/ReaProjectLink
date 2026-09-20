@@ -19,14 +19,15 @@ local project_values = {
   project_mode = "source",
   picture_id = "picture-1",
   reviewed_picture_revision = "7",
-  picture_start_samples = "96000",
+  picture_start_samples = "48000",
+  picture_start_sample_rate = "48000",
 }
 local item = {
   name = "Line A",
   clip_id = "",
   media = { path = "C:/show/bounce.wav", sample_rate = 48000, channel_count = 1 },
   presentation = {
-    start_offset_samples = 144000,
+    start_offset_samples = 288000,
     source_offset_samples = 0,
     length_samples = 48000,
     item_gain = 1,
@@ -54,7 +55,7 @@ function adapter.set_item_clip_id(value, clip_id) value.clip_id = clip_id end
 function adapter.item_display_name(value) return value.name end
 function adapter.active_take_media(value) return value.media end
 function adapter.item_presentation(value) return value.presentation end
-function adapter.project_sample_rate() return 48000 end
+function adapter.project_sample_rate() return 96000 end
 function adapter.file_exists(path) return files[path] ~= nil end
 function adapter.new_id()
   id_index = id_index + 1
@@ -98,7 +99,7 @@ assert(events[5] == "publish package", "package Publish follows project save")
 assert(captured_publish.package_root == review.package_root, "writer package root")
 assert(captured_publish.expected_revision == 0, "writer reviewed base")
 assert(captured_publish.snapshot.picture.reviewedRevision == 7, "reviewed Picture revision")
-assert(captured_publish.snapshot.lanes[1].clips[1].startOffsetSamples == 48000, "Picture-relative Clip position")
+assert(captured_publish.snapshot.lanes[1].clips[1].startOffsetSamples == 192000, "Picture-relative Clip position across sample rates")
 assert(captured_publish.pointer.manifest == "history/publish-0001.json", "history pointer")
 
 files[review.package_root .. "/delivery.json"] = json.encode(captured_publish.pointer)
@@ -124,4 +125,16 @@ assert(restarted.package_root == "C:/show/renamed/_Delivery/CIN_030_DX_New", "ne
 assert(restarted.source_project_id == nil, "new Source receives a new identity on Publish")
 assert(restarted.lanes[1].clips[1].status == "Added", "new Source resets Clip identity")
 
-return 5
+local package_events = 0
+for _, event in ipairs(events) do if event == "publish package" then package_events = package_events + 1 end end
+function adapter.save_project() return nil, "simulated save failure" end
+local unsaved, unsaved_error = service.publish(continued, adapter, fs, {
+  published_at = "2026-09-13T13:10:00+08:00",
+  published_by = "Alice",
+})
+assert(not unsaved and unsaved_error == "simulated save failure", "save failure blocks audio Publish")
+local package_events_after = 0
+for _, event in ipairs(events) do if event == "publish package" then package_events_after = package_events_after + 1 end end
+assert(package_events_after == package_events, "package writer is not called after save failure")
+
+return 6

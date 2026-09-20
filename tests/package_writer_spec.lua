@@ -21,6 +21,7 @@ local function memory_filesystem(initial, options)
 
   function fs.release_lock()
     locked = false
+    return true
   end
 
   function fs.make_directory() return true end
@@ -73,6 +74,8 @@ local snapshot = {
   schemaVersion = 1,
   sourceProjectId = "source-1",
   publishRevision = 1,
+  publishedAt = "2026-09-20T10:00:00Z",
+  publishedBy = "Alice",
   lanes = json.array(),
 }
 local pointer = {
@@ -152,7 +155,15 @@ local retry_input = {
 }
 local interrupted = package_writer.publish(retry_input, retry_fs)
 assert(interrupted == nil, "pointer failure leaves Publish uncommitted")
-local retried, retry_error = package_writer.publish(retry_input, retry_fs)
+local retry_snapshot = {}
+for key, value in pairs(snapshot) do retry_snapshot[key] = value end
+retry_snapshot.publishedAt = "2026-09-20T10:01:00Z"
+retry_snapshot.publishedBy = "Bob"
+local fresh_retry = {}
+for key, value in pairs(retry_input) do fresh_retry[key] = value end
+fresh_retry.transaction_id = "tx-retry-fresh"
+fresh_retry.snapshot = retry_snapshot
+local retried, retry_error = package_writer.publish(fresh_retry, retry_fs)
 assert(retried, retry_error)
 assert(json.decode(retry_fs.read_file("retry-package/delivery.json")).latestPublishRevision == 1, "retry commits pointer")
 

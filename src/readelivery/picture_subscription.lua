@@ -3,6 +3,10 @@ local json = require("readelivery.json")
 
 local M = {}
 
+local function cancel_undo(adapter, label)
+  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
+end
+
 local function read_json(fs, path, label)
   local bytes, read_error = fs.read_file(path)
   if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
@@ -92,16 +96,25 @@ function M.synchronize(adapter, status)
   adapter.begin_undo("Synchronize ReaDelivery Picture")
   local result, sync_error = adapter.sync_picture(status.snapshot)
   if not result then
-    adapter.end_undo("Synchronize ReaDelivery Picture")
+    cancel_undo(adapter, "Synchronize ReaDelivery Picture")
     return nil, sync_error
   end
   adapter.set_project_value(
     constants.PROJECT_KEYS.synchronized_picture_revision,
     tostring(status.latest_revision)
   )
+  local project_sample_rate = adapter.project_sample_rate()
+  local picture_sample_rate = status.snapshot.sampleRate
+  local local_picture_start = math.floor(
+    status.snapshot.pictureStartSamples / picture_sample_rate * project_sample_rate + 0.5
+  )
   adapter.set_project_value(
     constants.PROJECT_KEYS.picture_start_samples,
-    tostring(status.snapshot.pictureStartSamples)
+    tostring(local_picture_start)
+  )
+  adapter.set_project_value(
+    constants.PROJECT_KEYS.picture_start_sample_rate,
+    tostring(project_sample_rate)
   )
   adapter.mark_project_dirty()
   adapter.end_undo("Synchronize ReaDelivery Picture")

@@ -4,6 +4,10 @@ local track_suggestions = require("readelivery.track_suggestions")
 
 local M = {}
 
+local function cancel_undo(adapter, label)
+  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
+end
+
 local function normalize_path(path)
   path = path:gsub("\\", "/")
   local prefix = ""
@@ -145,12 +149,15 @@ function M.apply(review, adapter, options)
   local picture_start = tonumber(adapter.get_project_value(
     constants.PROJECT_KEYS.picture_start_samples
   )) or 0
+  local picture_start_sample_rate = tonumber(adapter.get_project_value(
+    constants.PROJECT_KEYS.picture_start_sample_rate
+  )) or mix_sample_rate
 
   adapter.begin_undo("Import ReaDelivery Source")
   for _, lane in ipairs(review.lanes) do
     local mapping = mappings[lane.lane_id]
     if not mapping then
-      adapter.end_undo("Import ReaDelivery Source")
+      cancel_undo(adapter, "Import ReaDelivery Source")
       return nil, "Every Delivery Lane requires a mapping decision."
     end
     local binding = { laneId = lane.lane_id }
@@ -162,17 +169,17 @@ function M.apply(review, adapter, options)
         track = adapter.create_mix_track(lane.display_name, mapping.parent_track_ref)
         result.created_tracks = result.created_tracks + 1
       elseif mapping.kind ~= "existing" then
-        adapter.end_undo("Import ReaDelivery Source")
+        cancel_undo(adapter, "Import ReaDelivery Source")
         return nil, "Unknown Lane mapping decision."
       end
       if not track then
-        adapter.end_undo("Import ReaDelivery Source")
+        cancel_undo(adapter, "Import ReaDelivery Source")
         return nil, "Mapped Track is unavailable."
       end
       binding.trackGuid = adapter.track_guid(track)
       for _, clip in ipairs(lane.clips) do
         local item, item_error = adapter.create_delivery_item(track, clip, {
-          position_seconds = picture_start / mix_sample_rate +
+          position_seconds = picture_start / picture_start_sample_rate +
             clip.startOffsetSamples / review.snapshot.sampleRate,
           source_project_id = review.pointer.sourceProjectId,
           publish_revision = review.pointer.latestPublishRevision,
@@ -181,7 +188,7 @@ function M.apply(review, adapter, options)
           source_sample_rate = review.snapshot.sampleRate,
         })
         if not item then
-          adapter.end_undo("Import ReaDelivery Source")
+          cancel_undo(adapter, "Import ReaDelivery Source")
           return nil, item_error
         end
         table.insert(result.items, item)

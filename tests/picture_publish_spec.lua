@@ -60,6 +60,7 @@ assert(result, err)
 assert(item.picture_id == "picture-1", "Picture identity attached to Item")
 assert(project_values.picture_id == "picture-1", "Picture identity attached to project")
 assert(project_values.picture_start_samples == "96000", "Mix Picture Start persisted")
+assert(project_values.picture_start_sample_rate == "48000", "Mix Picture Start sample rate persisted")
 assert(events[4] == "save", "identity saved before Picture Publish")
 assert(events[5] == "publish", "Picture package follows project save")
 assert(captured.snapshot.videoFile == item.path, "original video is referenced")
@@ -81,8 +82,17 @@ local overridden = assert(service.review(adapter, fs, { publish_anyway = true })
 assert(overridden.unchanged, "Publish Anyway still reports the Picture as unchanged")
 assert(not overridden.unchanged_blocker, "Publish Anyway clears the blocker")
 
+local publish_events = 0
+for _, event in ipairs(events) do if event == "publish" then publish_events = publish_events + 1 end end
+function adapter.save_project() return nil, "simulated save failure" end
+local unsaved, unsaved_error = service.publish(overridden, adapter, fs, {})
+assert(not unsaved and unsaved_error == "simulated save failure", "save failure blocks Picture Publish")
+local publish_events_after = 0
+for _, event in ipairs(events) do if event == "publish" then publish_events_after = publish_events_after + 1 end end
+assert(publish_events_after == publish_events, "Picture writer is not called after save failure")
+
 item.path = "C:/show/not-picture.wav"
 local rejected, rejected_error = service.review(adapter, fs)
 assert(not rejected and rejected_error:find("video", 1, true), "audio Item cannot become Picture")
 
-return 3
+return 4

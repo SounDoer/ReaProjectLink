@@ -56,7 +56,13 @@ assert(not locked, "lock released")
 assert(json.decode(files["package/picture.json"]).latestPictureRevision == 1, "pointer visible")
 assert(json.decode(files["package/picture-history/picture-0001.json"]).pictureRevision == 1, "history visible")
 
-local snapshot_two = { schemaVersion = 1, pictureId = "picture-1", pictureRevision = 2 }
+local snapshot_two = {
+  schemaVersion = 1,
+  pictureId = "picture-1",
+  pictureRevision = 2,
+  publishedAt = "2026-09-20T10:00:00Z",
+  publishedBy = "Alice",
+}
 local pointer_two = {
   schemaVersion = 1,
   pictureId = "picture-1",
@@ -72,7 +78,15 @@ local retry_input = {
 }
 fail_atomic = true
 assert(picture_writer.publish(retry_input, fs) == nil, "pointer failure is uncommitted")
-local retried, retry_error = picture_writer.publish(retry_input, fs)
+local fresh_snapshot = {}
+for key, value in pairs(snapshot_two) do fresh_snapshot[key] = value end
+fresh_snapshot.publishedAt = "2026-09-20T10:01:00Z"
+fresh_snapshot.publishedBy = "Bob"
+local fresh_retry = {}
+for key, value in pairs(retry_input) do fresh_retry[key] = value end
+fresh_retry.transaction_id = "tx-2-fresh"
+fresh_retry.snapshot = fresh_snapshot
+local retried, retry_error = picture_writer.publish(fresh_retry, fs)
 assert(retried, retry_error)
 assert(json.decode(files["package/picture.json"]).latestPictureRevision == 2, "Picture retry commits pointer")
 

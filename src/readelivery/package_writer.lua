@@ -40,6 +40,18 @@ local function read_json(fs, path, label)
   return value
 end
 
+local function retry_equivalent(left, right)
+  local function without_publication_metadata(value)
+    local copy = {}
+    for key, entry in pairs(value) do
+      if key ~= "publishedAt" and key ~= "publishedBy" then copy[key] = entry end
+    end
+    return copy
+  end
+  return json.encode(without_publication_metadata(left)) ==
+    json.encode(without_publication_metadata(right))
+end
+
 local function perform_publish(input, fs)
   local found_revision = current_revision(input, fs)
   if found_revision ~= input.expected_revision then
@@ -104,8 +116,8 @@ local function perform_publish(input, fs)
   local final_snapshot = fs.join(input.package_root, input.pointer.manifest)
   assert_ok(fs.make_directory(parent_path(final_snapshot)))
   if fs.exists(final_snapshot) then
-    local existing_snapshot = fs.read_file(final_snapshot)
-    if existing_snapshot ~= snapshot_bytes then
+    local existing_snapshot = read_json(fs, final_snapshot, "existing Publish snapshot")
+    if not retry_equivalent(existing_snapshot, input.snapshot) then
       error("immutable Publish snapshot collision: " .. input.pointer.manifest, 2)
     end
   else
@@ -155,11 +167,15 @@ function M.publish(input, fs)
     input.transaction_id
   )
   fs.remove_tree(staging_root)
-  fs.release_lock(input.package_root, lock_token)
+  local released, release_error = fs.release_lock(input.package_root, lock_token)
 
   if not ok then
+    if not released then
+      result = result .. "\nPublish also failed to release its lock: " .. tostring(release_error)
+    end
     return nil, result
   end
+  if not released then result.lock_release_error = release_error end
   return result
 end
 

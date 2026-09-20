@@ -96,10 +96,18 @@ assert(reaper.CountTakes(imported) == 2, "update adds a Take")
 assert(adapter.apply_delivery_fields(imported, {
   position_seconds = { choice = "use_source", source = 2 },
   length_seconds = { choice = "use_source", source = 0.02 },
-  take_pan = { choice = "use_source", source = -0.5 },
+  source_offset_seconds = { choice = "keep_mix", mix = 0.005 },
+  take_volume = { choice = "keep_mix", mix = 0.8 },
+  take_polarity_inverted = { choice = "keep_mix", mix = true },
+  take_pan = { choice = "keep_mix", mix = 0.2 },
+  take_pitch = { choice = "keep_mix", mix = 1 },
 }, { picture_start_samples = 96000, project_sample_rate = 48000 }))
 assert(math.abs(reaper.GetMediaItemInfo_Value(imported, "D_POSITION") - 4) < 0.000001, "update position")
-assert(math.abs(reaper.GetMediaItemTakeInfo_Value(reaper.GetActiveTake(imported), "D_PAN") + 0.5) < 0.000001, "update Take pan")
+local updated_take = reaper.GetActiveTake(imported)
+assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_STARTOFFS") - 0.005) < 0.000001, "new Take preserves Mix source offset")
+assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_VOL") + 0.8) < 0.000001, "new Take preserves Mix volume and polarity")
+assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_PAN") - 0.2) < 0.000001, "new Take preserves Mix pan")
+assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_PITCH") - 1) < 0.000001, "new Take preserves Mix pitch")
 adapter.set_instance_revisions(imported, 5, 9)
 instances = adapter.delivery_instances("source-1")
 assert(instances[1].accepted_media_revision == 5, "accepted media revision")

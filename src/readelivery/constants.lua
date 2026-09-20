@@ -17,6 +17,7 @@ M.PROJECT_KEYS = {
   synchronized_picture_revision = "synchronized_picture_revision",
   reviewed_picture_revision = "reviewed_picture_revision",
   picture_start_samples = "picture_start_samples",
+  picture_start_sample_rate = "picture_start_sample_rate",
   source_subscriptions = "source_subscriptions",
 }
 

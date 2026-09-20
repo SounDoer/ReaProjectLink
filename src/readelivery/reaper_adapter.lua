@@ -463,7 +463,10 @@ function M.delivery_instances(source_project_id)
   local picture_start_samples = tonumber(M.get_project_value(
     constants.PROJECT_KEYS.picture_start_samples
   )) or 0
-  local picture_start_seconds = picture_start_samples / sample_rate
+  local picture_start_sample_rate = tonumber(M.get_project_value(
+    constants.PROJECT_KEYS.picture_start_sample_rate
+  )) or sample_rate
+  local picture_start_seconds = picture_start_samples / picture_start_sample_rate
   for _, track in ipairs(M.all_tracks()) do
     for _, item in ipairs(M.track_items(track)) do
       if get_item_string(item, constants.ITEM_KEYS.source_project_id) == source_project_id then
@@ -525,11 +528,14 @@ end
 function M.apply_delivery_fields(item, fields, context)
   local take = reaper.GetActiveTake(item)
   if not take then return nil, "Linked Instance has no active Take." end
-  local function source_value(field)
+  local function chosen_value(field)
     local decision = fields[field]
-    return decision and decision.choice == "use_source" and decision.source or nil
+    if not decision then return nil end
+    if decision.choice == "use_source" then return decision.source end
+    if decision.choice == "keep_mix" then return decision.mix end
+    return nil
   end
-  local value = source_value("position_seconds")
+  local value = chosen_value("position_seconds")
   if value ~= nil then
     reaper.SetMediaItemInfo_Value(
       item,
@@ -537,20 +543,20 @@ function M.apply_delivery_fields(item, fields, context)
       context.picture_start_samples / context.project_sample_rate + value
     )
   end
-  value = source_value("length_seconds")
+  value = chosen_value("length_seconds")
   if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_LENGTH", value) end
-  value = source_value("source_offset_seconds")
+  value = chosen_value("source_offset_seconds")
   if value ~= nil then reaper.SetMediaItemTakeInfo_Value(take, "D_STARTOFFS", value) end
-  value = source_value("fade_in_seconds")
+  value = chosen_value("fade_in_seconds")
   if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_FADEINLEN", value) end
-  value = source_value("fade_out_seconds")
+  value = chosen_value("fade_out_seconds")
   if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_FADEOUTLEN", value) end
-  value = source_value("item_gain")
+  value = chosen_value("item_gain")
   if value ~= nil then reaper.SetMediaItemInfo_Value(item, "D_VOL", value) end
 
   local current_volume = reaper.GetMediaItemTakeInfo_Value(take, "D_VOL")
-  local volume = source_value("take_volume") or math.abs(current_volume)
-  local polarity = source_value("take_polarity_inverted")
+  local volume = chosen_value("take_volume") or math.abs(current_volume)
+  local polarity = chosen_value("take_polarity_inverted")
   if polarity == nil then polarity = current_volume < 0 end
   reaper.SetMediaItemTakeInfo_Value(take, "D_VOL", polarity and -math.abs(volume) or math.abs(volume))
   local take_fields = {
@@ -560,7 +566,7 @@ function M.apply_delivery_fields(item, fields, context)
     take_channel_mode = "I_CHANMODE",
   }
   for field, parameter in pairs(take_fields) do
-    value = source_value(field)
+    value = chosen_value(field)
     if value ~= nil then reaper.SetMediaItemTakeInfo_Value(take, parameter, value) end
   end
   return true
@@ -604,7 +610,19 @@ end
 
 function M.save_project()
   reaper.Main_SaveProject(project(), false)
+  if reaper.IsProjectDirty and reaper.IsProjectDirty(project()) ~= 0 then
+    return nil, "REAPER project is still dirty after Save."
+  end
+  local path = M.project_path()
+  if path == "" or not reaper.file_exists(path) then
+    return nil, "REAPER project file was not written."
+  end
   return true
+end
+
+function M.cancel_undo(label)
+  reaper.Undo_EndBlock2(project(), label, -1)
+  reaper.Undo_DoUndo2(project())
 end
 
 return M
