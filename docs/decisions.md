@@ -180,6 +180,9 @@ REAPER item and receives no later delivery revisions.
 
 ### D029 — Picture is the domain term
 
+Terminology superseded by D070. The synchronization and review behavior remains,
+but the public domain term is now Reference.
+
 The synchronization domain object is named Picture because it includes revision,
 timeline, timecode, and review state in addition to a media file. Concrete media
 fields use names such as `videoFile`; Chinese UI may display “参考视频” or
@@ -220,6 +223,9 @@ does not adopt or infer bindings for WAVs and items already present in legacy mi
 projects.
 
 ### D034 — Projects have one explicit MVP mode
+
+Terminology superseded by D069. The mutually exclusive single-level project
+classification remains part of the product model.
 
 On first use, a `.rpp` is initialized as either a Source Project or a Mix
 Project. Source mode manages delivery tracks, Picture subscription, and audio
@@ -477,6 +483,9 @@ fields; restoring the rest of a Mix project remains REAPER's own concern.
 
 ### D061 — Master Reference replaces the single-Item Picture surface
 
+Terminology superseded by D070. The multi-Track, multi-Item, and registered
+timeline structure remains part of the Reference model.
+
 The Mix project publishes one authoritative Master Reference Set. Its complete
 snapshot may contain multiple registered Picture Tracks, multiple video Items,
 registered Markers, and registered Regions. Track, Item, Marker, and Region
@@ -491,6 +500,9 @@ it. Unregistered timeline annotations remain private to the Mix project. A
 deleted registered Marker or Region is retired by the next complete snapshot.
 
 ### D063 — FFOP is an optional semantic role
+
+Terminology superseded by D071. The optional anchor behavior remains, but
+ReaProjectLink names the role Reference Start rather than FFOP.
 
 A registered Marker may be assigned the unique `FFOP` semantic role. FFOP is
 not required, but when present it is the Master Reference Start used for
@@ -528,3 +540,258 @@ loading another project, or changing the project path clears this transient UI
 state. Every mutating action also validates its captured runtime project token;
 Source and Master Reference Publish Reviews additionally become stale after the
 project changes and must be refreshed before Publish.
+
+### D068 — Product name is ReaProjectLink
+
+The product is named ReaProjectLink. It coordinates Delivery and Reference
+workflows between independent REAPER projects. Delivery remains the name of one
+directional workflow and is no longer the product-level name.
+
+The concise product description is: "Source-Master project coordination for
+REAPER." The product name is written exactly as `ReaProjectLink`, without spaces
+or hyphens.
+
+### D069 — Source and Master are mutually exclusive Project Types
+
+The MVP keeps its single-level centralized topology. Multiple Source Projects
+publish to one Master Project, and the Master Project publishes the shared
+Reference back to its Source Projects. Multi-level project dependency chains are
+outside the current design.
+
+`Source Project` and `Master Project` are the two public Project Types. They
+replace the former Source/Mix mode terminology. One `.rpp` cannot hold both
+Project Types. Source User, Source Team, Master User, and Master Team identify
+people or organizations only when that distinction is needed.
+
+### D070 — Delivery and Reference are the two directional domains
+
+A Source Project publishes a Delivery to the Master Project. The Master Project
+publishes a Reference to its Source Projects. Reference replaces Picture,
+Master Reference, and Master Reference Set as the public domain term.
+
+A Reference contains registered reference media, a Reference Timeline of
+registered Markers and Regions, and their timing context. The Master Project is
+the authority for the Reference, so `authoritative Reference` is explanatory
+wording rather than a separate object or routine UI label.
+
+The public revision states on a Source Project are Latest Revision,
+Synchronized Revision, and Reviewed Revision. Synchronization materializes a
+Reference revision in the Source Project. Review is a separate explicit user
+confirmation. A Source Delivery records the Reviewed Revision.
+
+### D071 — Reference Start is optional and generic
+
+FFOP is not a ReaProjectLink domain role. A user may optionally assign one
+registered Marker the Reference Start role, regardless of that Marker's name.
+`FFOP` remains valid as a user-chosen industry Marker name and as the expansion
+"First Frame of Picture", but the tool does not require or infer it.
+
+Without an assigned Reference Start Marker, project zero is the Reference Start.
+This has no material effect on Mirror Master Timeline alignment and supplies the
+default anchor for Relative Reference alignment.
+
+### D072 — Public Audio Delivery hierarchy
+
+A Source Project publishes one logical Delivery. Every successful audio Publish
+creates a Delivery Revision. `Delivery Revision` replaces public use of Publish
+Revision and Published Revision. `Delivery Set` is not public terminology.
+
+A registered Source REAPER Track is a Delivery Track. Its stable published route
+is a Delivery Lane. A stable logical audio unit is a Delivery Clip, and a
+specific WAV-content version of that Clip is a Media Revision.
+
+The Master Project subscribes to a Delivery. A Delivery Clip may be represented
+by one or more Linked Items in the Master Project. Instance ID remains an
+internal identity; routine UI refers to Linked Items rather than Mix Item
+Instances.
+
+### D073 — Subscription, Mapping, Binding, and Link are distinct
+
+A Delivery Subscription is the persistent relationship between a Master Project
+and one Source Delivery. Lane Mapping is the user's destination choice during a
+review. Confirming it creates or changes a persistent Lane Binding from a
+Delivery Lane to a Master Track. A Link associates a Delivery Clip with one
+concrete Linked Item.
+
+Lane Mapping offers Create New Track, Use Existing Track, and Leave Unmapped.
+`Leave Unmapped` replaces the overloaded `Skip for Now` wording. A Lane Binding
+routes future new Clips only and does not constrain existing Linked Items.
+
+Unrepresented Clips are Pending Clips. A user may Import Clip, Decline Clip, or
+Reconsider a previously Declined Clip. Detach Linked Item removes its Link while
+leaving an ordinary REAPER Item in place.
+
+### D074 — Reviews and update decisions use qualified terms
+
+Workflow reviews are named Delivery Publish Review, Reference Publish Review,
+Delivery Import Review, Delivery Update Review, and Reference Update Review.
+Reviewed Revision remains the separate semantic confirmation that a Source user
+has reviewed a synchronized Reference Revision.
+
+Delivery Publish Review uses Added, Audio Changed, Placement Changed, Metadata
+Changed, Unchanged, Retired, Needs Classification, and Blocked. Identity actions
+are Create New Clip, Continue Existing Clip, Keep Clip Identity, and Clear
+Classification.
+
+Delivery Update Review compares Baseline, Delivery, and Local state. Its
+comparison terms are Delivery-only Change, Local-only Change, Same Change,
+Conflict, and Unchanged. Field decisions are Use Delivery and Keep Local. Media
+actions are Add New Take and Keep Current Media. Bulk actions use Add All as
+New Takes, Keep All Local Changes, and Use Delivery for Unmodified Items.
+
+Unregister stops managing a registered object. Remove Subscription removes the
+relationship while retaining created REAPER objects. Retire means an upstream
+logical object is absent from the current Delivery and does not delete its
+downstream representation. Detach removes a Link while retaining the Item.
+Delete is reserved for actual object or file deletion.
+
+### D075 — Workflow verbs have one directional meaning
+
+Publish creates a new externally visible immutable revision. Source Projects use
+Save & Publish Delivery, and Master Projects use Save & Publish Reference.
+Ordinary REAPER Save never means Publish.
+
+Subscribe creates a persistent relationship. Add Delivery creates a Delivery
+Subscription in a Master Project, while Subscribe to Reference creates a
+Reference Subscription in a Source Project. Stable manifest filenames are file
+selection details rather than primary action labels.
+
+Import creates previously unrepresented Delivery Tracks or Items in the Master
+Project. Update compares a Delivery Revision with local Master state and applies
+selected changes through Apply Delivery Update. Synchronize materializes a
+Reference Revision in a Source Project. Reference synchronization remains
+distinct from Mark Reference Reviewed.
+
+Apply executes a plan prepared by a Review. It is used for Apply Delivery Update
+and Apply Lane Mapping, but not as a synonym for Publish, Import, or Synchronize.
+
+### D076 — The pre-release rename is complete and has no legacy aliases
+
+The implementation will be renamed from ReaDelivery to ReaProjectLink as one
+coherent pre-release change. The managed root becomes `_ReaProjectLink`. Source
+packages retain `delivery.json` and use `history/delivery-NNNN.json`; Master
+packages use `reference.json` and `history/reference-NNNN.json`.
+
+Public and persisted names use Project Type, Master, Reference, Delivery
+Revision, and the other confirmed terminology. The project extension namespace,
+`P_EXT` keys, Lua module directory, `require` paths, scripts, tests, UI title,
+manifest fields, and documentation are renamed together.
+
+No compatibility aliases remain for ReaDelivery, Mix Project, Picture, Master
+Reference, `project_mode`, `_Delivery`, `picture.json`, or their internal field
+names. The product has not been publicly released, so existing development
+projects and generated packages are regenerated rather than migrated.
+
+### D077 — Project identity is separate from published-domain identity
+
+Every initialized `.rpp` has one stable Project ID and one Project Type. A
+Source Project additionally has one Delivery ID, and a Master Project
+additionally has one Reference ID. `Delivery Set ID` is removed, and Master
+Projects gain the Project ID that the earlier model lacked.
+
+Local project state uses `project_id` and `project_type`. Delivery manifests
+identify `sourceProjectId` and `deliveryId`; Reference manifests identify
+`masterProjectId` and `referenceId`. Project identity and published-domain
+identity remain separate even though the MVP permits only one Delivery or
+Reference per project.
+
+After Save As, Continue Existing Project preserves the Project ID, Delivery ID
+or Reference ID, object identities, and managed package relationship. Start New
+Project assigns a new Project ID and published-domain ID and creates an
+independent managed package. The prompt identifies the concrete Source or Master
+Project Type.
+
+Lane ID, Clip ID, Reference Item ID, timeline Entry ID, Instance ID, and REAPER
+Track GUID remain stable technical identities. They are shown only when useful
+for diagnostics or identity resolution.
+
+### D078 — Exceptional actions state the user's action, not implementation jargon
+
+Detected unbaked Track FX or Take FX blocks Delivery Publish by default. The
+explicit override is Publish Unprocessed Media, accompanied by confirmation that
+the FX will not be included. Publishing a Reference with no detected changes
+uses Publish Unchanged Reference Revision and explains that Source Projects will
+still need to synchronize and review the new revision.
+
+When a Linked Item contains Take data that cannot be copied automatically, the
+actions remain Add New Take and Keep Current Media. A confirmation explains the
+unsupported Take data, that the existing Take will be retained, and that the new
+Take receives basic settings only. Internal wording such as `advanced state`
+does not appear in the action label.
+
+A blocked Publish identifies the possible current publisher and offers Check
+Again, Unlock Publishing, or Cancel. Unlock Publishing requires explicit
+confirmation that no other user or computer is publishing. Internal stale-lock
+terminology is not used as the primary action label.
+
+Identity-reset actions are Treat Selected Reference Tracks as New and Treat
+Selected Reference Items as New. Their confirmation explains that new stable
+identities will be assigned and Source Projects will see new Reference objects.
+
+### D079 — Revision types and revision-state labels are always qualified
+
+Delivery Revision is the complete Delivery version created by every successful
+Delivery Publish. Media Revision is the WAV-content version of one Delivery
+Clip and changes only when that content changes. Reference Revision is the
+complete Reference version created by Reference Publish. Their counters are
+independent and must not be compared across revision types.
+
+Reference state uses Latest Reference Revision, Synchronized Reference Revision,
+and Reviewed Reference Revision. Delivery Update uses Target Delivery Revision,
+per-Linked-Item Handled Delivery Revision, Accepted Media Revision, and Available
+Media Revision. Baseline is the historical Delivery state at the Handled
+Delivery Revision, not another revision type.
+
+UI labels use the full qualified name, or compact forms such as `Delivery r12`,
+`Reference r8`, and `Media r4` when the qualifier is visible. A bare `r12` is not
+used where more than one revision type may appear. Manifest filenames use
+zero-padded numbers; ordinary UI labels do not.
+
+### D080 — Public status language describes the condition and next action
+
+Notice is informational, Warning permits an explicitly confirmed continuation,
+and Blocked prevents the operation. Reviews invalidated by project or package
+changes show Review Out of Date and offer Refresh Review. A newly published base
+shows Newer Revision Available.
+
+Public media states are Media File Not Found, Media Unavailable, Cannot Read
+Media, Media Content Mismatch, and Unsupported Media Type. Public routing and
+identity states use Target Track Missing, Lane Mapped, Lane Unmapped, Duplicate
+Clip Identity, Needs Classification, and qualified Project, Delivery, or
+Reference Identity Mismatch.
+
+Publishing Is Locked shows the possible publisher, computer, start time, elapsed
+time, and package path before offering Check Again, Unlock Publishing, or
+Cancel. Technical terms such as stale, orphaned, offline, pointer validation,
+schema integers, and lock-age heuristics remain in diagnostics rather than
+primary user-facing status labels.
+
+Unsupported newer schemas show ReaProjectLink Update Required. Structurally
+invalid data uses Invalid Manifest, Manifest Revision Mismatch, or Invalid
+Manifest Path as appropriate, with implementation details available separately.
+
+### D081 — Public terminology and action labels follow one style
+
+The brand is always written `ReaProjectLink`; lowercase `reaprojectlink` is used
+only where a lowercase technical name is required. Formal domain objects and
+REAPER object types use their canonical capitalization. Source and Master are
+qualified as Source Project, Source User, Source Team, Master Project, Master
+User, or Master Team rather than used as ambiguous bare nouns.
+
+Register and Unregister start or stop ReaProjectLink management of an existing
+REAPER object without creating or deleting it. Add and Create are reserved for
+new relationships or objects. Actions begin with verbs, while conditions are
+phrased as states.
+
+An action label ends in an ellipsis when it opens a required selection or
+confirmation step. Immediate actions omit the ellipsis. Singular and bulk
+actions use explicit object counts such as Detach Linked Item, Detach Selected
+Linked Items, and Add All as New Takes rather than parenthesized plurals.
+
+Stable IDs are omitted from routine UI. When needed for identity resolution or
+diagnostics, labels use the complete object name, values may be shortened, and
+full values remain available in Technical Details.
+
+The Source Project UI is organized around Reference Subscription, Delivery
+Tracks, and Delivery Publishing. The Master Project UI is organized around
+Reference Publishing and Delivery Subscriptions.

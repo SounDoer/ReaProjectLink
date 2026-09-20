@@ -8,37 +8,38 @@ cinematic is ready for mixing.
 
 The current integration approaches have recurring problems:
 
-1. Copying tracks into the mix project brings incompatible or missing plug-in
+1. Copying Tracks into the Master Project brings incompatible or missing plug-in
    dependencies with it.
 2. Manually bouncing and re-importing WAV files makes frequent updates difficult
    to track and maintain.
 3. Native REAPER subprojects help with single-source-of-truth and proxy updates,
    but do not remove save conflicts and plug-in dependencies.
-4. The picture in the mix project is authoritative, but source projects also
-   need to discover, review, and adopt picture revisions.
+4. The Reference published by the Master Project is authoritative, but Source
+   Projects also need to discover, synchronize, and review its revisions.
 
 ## Product direction
 
-ReaDelivery is not initially a cloud collaboration DAW. It is a local dependency
-manager that uses an existing NAS as shared storage.
+ReaProjectLink is not initially a cloud collaboration DAW. It is a local
+cross-project coordination and dependency manager that uses an existing NAS as
+shared storage.
 
 The system separates three concepts:
 
 - **Working source:** a department's editable `.rpp` project.
 - **Published delivery:** bounced WAV revisions and a small machine-readable
   manifest.
-- **Mix integration:** the master `.rpp` that subscribes to source deliveries and
-  decides when to import or update them.
+- **Master integration:** the Master `.rpp` that subscribes to Source
+  Deliveries and decides when to import or update them.
 
 Saving a source project is not publishing. Only an explicit successful Publish
-operation creates a delivery revision visible to mix projects.
+operation creates a Delivery Revision visible to the Master Project.
 
-## Roles
+## Project Types
 
-On first use, each `.rpp` is explicitly initialized in one role for the MVP. A
-project does not combine Source and Mix modes.
+On first use, each `.rpp` is explicitly initialized with one Project Type for
+the MVP. A project does not combine Source and Master types.
 
-### Source project
+### Source Project
 
 A dialogue, music, or sound-effects project:
 
@@ -46,19 +47,19 @@ A dialogue, music, or sound-effects project:
 - keeps the department's preferred working structure and naming;
 - uses delivery tracks manually designated through the tool;
 - bounces plug-in-dependent work to ordinary audio files;
-- explicitly publishes delivery revisions;
-- does not write to or target a mix project.
+- explicitly publishes Delivery Revisions;
+- does not write to or target a Master Project.
 
-### Mix project
+### Master Project
 
-The integration project:
+The central integration project:
 
 - acts as the dependency-management hub;
-- manually adds one or more published source manifests;
-- chooses where source delivery lanes are placed in its own track hierarchy;
-- imports new delivery clips;
+- manually adds one or more published Source manifests;
+- chooses where Source Delivery Lanes are placed in its own Track hierarchy;
+- imports new Delivery Clips;
 - accepts updates as new takes on existing items;
-- owns the authoritative reference-picture track.
+- publishes the authoritative Reference for its Source Projects.
 
 ## Primary workflow
 
@@ -67,32 +68,34 @@ The integration project:
    places the current effective items on managed delivery tracks.
 3. Publish compares those tracks with the previous published snapshot, asks for
    confirmation where a new item cannot be classified safely, and writes the
-   accepted state to the local `_Delivery` package.
-4. A mix project adds the source's `delivery.json` and performs the first import.
-5. The mix project stores stable lane-to-track and clip-to-item bindings.
-6. A later source Publish creates new WAV revisions without modifying the mix
+   accepted state to the local `_ReaProjectLink` package.
+4. A Master Project adds the Source's `delivery.json` and performs the first
+   import.
+5. The Master Project stores stable Lane Bindings and Clip-to-Item Links.
+6. A later Source Publish creates new WAV revisions without modifying the Master
    project.
-7. The mix project detects the new manifest revision and presents the change.
+7. The Master Project detects the new Delivery Revision and presents the change.
 8. After user confirmation, a changed WAV becomes a new take on the already
-   bound mix item or items, including still-linked copies and split instances.
+   bound Linked Item or Items, including still-linked copies and split Linked
+   Items.
 9. Old takes remain until the user explicitly removes them.
 
-## Picture workflow
+## Reference workflow
 
-The picture relationship runs in the opposite direction:
+The Reference relationship runs in the opposite direction:
 
-1. The mix project owns one authoritative Master Reference Set containing
-   registered Picture Tracks, video Items, Markers, and Regions.
-2. A Master Reference change is explicitly published as a picture revision.
-3. Source projects detect that revision and ask the user to synchronize it.
+1. The Master Project owns one authoritative Reference containing registered
+   Reference Tracks, media Items, Markers, and Regions.
+2. A Reference change is explicitly published as a Reference Revision.
+3. Source Projects detect that revision and ask the user to synchronize it.
 4. Synchronization mirrors the Master timeline by default; synchronization and
    review remain distinct states.
-5. A source audio Publish records the picture revision against which it was
+5. A Source audio Publish records the Reference Revision against which it was
    reviewed.
-6. The mix project warns when a source delivery was produced against an older
-   picture revision.
+6. The Master Project warns when a Source Delivery was produced against an older
+   Reference Revision.
 
-Picture changes are never applied or judged compatible automatically. Equal
+Reference changes are never applied or judged compatible automatically. Equal
 duration, start time, and frame rate do not prove that the visual content is
 unchanged.
 
@@ -101,7 +104,8 @@ unchanged.
 - Cloud storage or a hosted collaboration service.
 - Simultaneous multi-user editing of one `.rpp`.
 - Sharing third-party plug-in instances between departments.
-- Automatically conforming audio to a changed picture edit.
+- Automatically conforming audio to a changed visual edit.
 - Inferring semantic identity from filenames.
 - Directly modifying another user's closed or open `.rpp` file.
-- Adopting or reconstructing delivery bindings in existing legacy mix projects.
+- Adopting or reconstructing Delivery Bindings in existing legacy Master
+  Projects.
