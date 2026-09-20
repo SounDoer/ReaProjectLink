@@ -154,6 +154,7 @@ function adapter.new_id() return "instance-repaired" end
 function adapter.set_instance_id(item, instance_id)
   table.insert(events, { "instance", item, instance_id })
 end
+function adapter.is_linked_item(item) return item == first_item end
 function adapter.detach_instance(item)
   table.insert(events, { "detach", item })
   return true
@@ -245,6 +246,9 @@ assert(repaired.reassigned_instances == 1, "copied Instance receives a new ident
 
 local detached = assert(delivery_update.detach(adapter, first_item))
 assert(detached.item_ref == first_item, "explicit detach result")
+local ordinary_detach, ordinary_detach_error = delivery_update.detach(adapter, {})
+assert(not ordinary_detach and ordinary_detach_error == "Selected Item is not a Linked Item.",
+  "ordinary Item cannot be detached")
 
 duplicate_instances = false
 local orphaned_subscriptions = json.decode(values.delivery_subscriptions)
@@ -345,4 +349,4 @@ assert(
 latest.sourceProjectId = "source-1"
 files[root .. "/history/delivery-0002.json"] = json.encode(latest)
 
-return 11
+return 12

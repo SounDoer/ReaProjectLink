@@ -614,6 +614,9 @@ function M.undecline(adapter, source_project_id, clip_id)
 end
 
 function M.detach(adapter, item)
+  if not adapter.is_linked_item(item) then
+    return nil, "Selected Item is not a Linked Item."
+  end
   adapter.begin_undo("Detach ReaProjectLink Linked Item")
   local detached, detach_error = adapter.detach_instance(item)
   if not detached then

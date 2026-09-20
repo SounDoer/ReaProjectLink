@@ -293,15 +293,17 @@ local function draw_delivery_review()
       refresh_delivery_review()
     end
   end
-  if not publish_anyway and ImGui.Button(ctx, "Publish Unprocessed Media...") then
-    publish_anyway = reaper.ShowMessageBox(
-      "Detected Track FX or Take FX will not be included in the published media. Continue?",
-      "Publish Unprocessed Media",
-      1
-    ) == 1
-    if publish_anyway then refresh_delivery_review() end
-  elseif publish_anyway then
-    ImGui.TextWrapped(ctx, "Warning: detected FX will not be included in the published media.")
+  if delivery_review.has_unprocessed_fx then
+    if not publish_anyway and ImGui.Button(ctx, "Publish Unprocessed Media...") then
+      publish_anyway = reaper.ShowMessageBox(
+        "Detected Track FX or Take FX will not be included in the published media. Continue?",
+        "Publish Unprocessed Media",
+        1
+      ) == 1
+      if publish_anyway then refresh_delivery_review() end
+    elseif publish_anyway then
+      ImGui.TextWrapped(ctx, "Warning: detected FX will not be included in the published media.")
+    end
   end
   local changed
   changed, show_unchanged = ImGui.Checkbox(ctx, "Show Unchanged Clips", show_unchanged)
@@ -871,6 +873,13 @@ local function detach_selected()
   notify(string.format("Detached %d selected Item(s).", count))
 end
 
+local function has_selected_linked_item()
+  for _, item in ipairs(adapter.selected_items()) do
+    if adapter.is_linked_item(item) then return true end
+  end
+  return false
+end
+
 local function draw_master(state)
   ImGui.Text(ctx, "Project Type: Master")
   ImGui.TextWrapped(ctx, "Project ID: " .. short_id(state.project_id))
@@ -880,9 +889,12 @@ local function draw_master(state)
   ImGui.Separator(ctx)
   ImGui.Text(ctx, "Delivery Subscriptions")
   if ImGui.Button(ctx, "Add Delivery") then begin_import() end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Detach Selected Linked Items") then detach_selected() end
-  for _, entry in ipairs(subscriptions()) do
+  local entries = subscriptions()
+  if #entries > 0 and has_selected_linked_item() then
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Detach Selected Linked Items") then detach_selected() end
+  end
+  for _, entry in ipairs(entries) do
     ImGui.TextWrapped(ctx, string.format(
       "%s (%s) | Handled Delivery Revision %d",
       subscription_name(entry),

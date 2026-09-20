@@ -105,6 +105,7 @@ assert(has_reason(review.lanes[1].clips[2].suggestions[1], "same duration"), "du
 assert(review.retired[1].clip_id == "retired-1", "retired Clip")
 assert(review.needs_decision_count == 1, "decision count")
 assert(review.blocker_count == 2, "FX and unresolved identity block")
+assert(review.has_unprocessed_fx, "Track FX is reported")
 
 local resolved = delivery_review.build({
   current = current,
@@ -121,15 +122,25 @@ assert(resolved.blocker_count == 0, "explicit FX override")
 assert(resolved.current.lanes[1].clips[1].media_hash == "same-hash", "current media hash")
 assert(resolved.current.lanes[1].clips[1].media_size == 10, "current media size")
 
+current.lanes[1].track_fx_count = 0
+local no_fx = delivery_review.build({
+  current = current,
+  previous_snapshot = previous,
+  identity_decisions = { ["item-2"] = { kind = "new" } },
+}, fs)
+assert(not no_fx.has_unprocessed_fx, "FX override is hidden when no FX exists")
+
 current.lanes[1].clips[2].blockers = {
   "Take FX will not be included; use Publish Unprocessed Media to continue",
 }
+current.lanes[1].clips[2].take_fx_count = 1
 local take_fx_blocked = delivery_review.build({
   current = current,
   previous_snapshot = previous,
   identity_decisions = { ["item-2"] = { kind = "new" } },
 }, fs)
 assert(take_fx_blocked.lanes[1].clips[2].status == "Blocked", "Take FX blocks by default")
+assert(take_fx_blocked.has_unprocessed_fx, "Take FX is reported")
 local take_fx_overridden = delivery_review.build({
   current = current,
   previous_snapshot = previous,
@@ -138,6 +149,8 @@ local take_fx_overridden = delivery_review.build({
 }, fs)
 assert(take_fx_overridden.lanes[1].clips[2].status == "Added", "Take FX override")
 current.lanes[1].clips[2].blockers = {}
+current.lanes[1].clips[2].take_fx_count = 0
+current.lanes[1].track_fx_count = 1
 
 current.lanes[1].clips[1].display_name = "Old line"
 local unchanged = delivery_review.build({
@@ -215,4 +228,4 @@ assert(
   "a resolved Item can still be decided again"
 )
 
-return 7
+return 8

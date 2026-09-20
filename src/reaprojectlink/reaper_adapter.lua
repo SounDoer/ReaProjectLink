@@ -663,6 +663,37 @@ local function get_item_string(item, key)
   return value
 end
 
+local function build_item_peaks(source, item)
+  reaper.UpdateItemInProject(item)
+  if not reaper.PCM_Source_BuildPeaks then
+    reaper.UpdateArrange()
+    return
+  end
+
+  local remaining = reaper.PCM_Source_BuildPeaks(source, 0)
+  if remaining == 0 then
+    reaper.UpdateArrange()
+    return
+  end
+
+  reaper.UpdateArrange()
+  local function continue_building()
+    if not reaper.ValidatePtr2(project(), item, "MediaItem*") then
+      reaper.PCM_Source_BuildPeaks(source, 2)
+      return
+    end
+    remaining = reaper.PCM_Source_BuildPeaks(source, 1)
+    if remaining > 0 then
+      reaper.defer(continue_building)
+      return
+    end
+    reaper.PCM_Source_BuildPeaks(source, 2)
+    reaper.UpdateItemInProject(item)
+    reaper.UpdateArrange()
+  end
+  reaper.defer(continue_building)
+end
+
 function M.create_delivery_item(track, clip, context)
   local source = reaper.PCM_Source_CreateFromFile(clip.media_path)
   if not source then return nil, "Could not open managed WAV: " .. clip.media_path end
@@ -695,6 +726,7 @@ function M.create_delivery_item(track, clip, context)
   set_item_string(item, constants.ITEM_KEYS.accepted_media_revision, clip.mediaRevision)
   set_item_string(item, constants.ITEM_KEYS.handled_delivery_revision, context.delivery_revision)
   set_item_string(item, constants.ITEM_KEYS.reference_revision, context.reference_revision)
+  build_item_peaks(source, item)
   return item
 end
 
@@ -808,6 +840,7 @@ function M.add_delivery_take(item, clip, media_path, context)
     true
   )
   reaper.SetActiveTake(take)
+  build_item_peaks(source, item)
   return true
 end
 
@@ -867,7 +900,18 @@ function M.set_instance_id(item, instance_id)
   set_item_string(item, constants.ITEM_KEYS.instance_id, instance_id)
 end
 
+function M.is_linked_item(item)
+  local source_project_id = get_item_string(
+    item,
+    constants.ITEM_KEYS.source_project_id
+  )
+  return source_project_id ~= nil and source_project_id ~= ""
+end
+
 function M.detach_instance(item)
+  if not M.is_linked_item(item) then
+    return nil, "Selected Item is not a Linked Item."
+  end
   M.set_item_clip_id(item, "")
   set_item_string(item, constants.ITEM_KEYS.source_project_id, "")
   set_item_string(item, constants.ITEM_KEYS.instance_id, "")

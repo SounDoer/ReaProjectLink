@@ -137,10 +137,14 @@ function M.build(input, fs)
     retired = {},
     blocker_count = 0,
     needs_decision_count = 0,
+    has_unprocessed_fx = false,
     current = { sample_rate = input.current.sample_rate, lanes = {} },
   }
 
   for lane_index, lane in ipairs(input.current.lanes or {}) do
+    if (lane.track_fx_count or 0) > 0 then
+      result.has_unprocessed_fx = true
+    end
     local reviewed_lane = {
       lane_id = lane.lane_id,
       display_name = lane.display_name,
@@ -159,6 +163,9 @@ function M.build(input, fs)
 
     for _, original in ipairs(lane.clips or {}) do
       local clip = copy_clip(original)
+      if (clip.take_fx_count or 0) > 0 then
+        result.has_unprocessed_fx = true
+      end
       clip.media_hash = fs.hash_file(clip.media_path)
       clip.media_size = fs.file_size(clip.media_path)
       local row = {

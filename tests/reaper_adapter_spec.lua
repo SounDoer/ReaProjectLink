@@ -29,6 +29,11 @@ assert(adapter.get_track_lane_id(track) == "lane-1", "Track identity round trip"
 assert(adapter.get_item_clip_id(item) == "clip-1", "Item identity round trip")
 assert(adapter.get_item_reference_id(item) == "reference-1", "Reference identity round trip")
 assert(adapter.selected_items()[1] == item, "selected Item enumeration")
+assert(not adapter.is_linked_item(item), "ordinary Item is not a Linked Item")
+local ordinary_detach, ordinary_detach_error = adapter.detach_instance(item)
+assert(not ordinary_detach and ordinary_detach_error == "Selected Item is not a Linked Item.",
+  "ordinary Item identity is protected from Detach")
+assert(adapter.get_item_clip_id(item) == "clip-1", "rejected Detach preserves Item identity")
 assert(state.start_offset_samples == 96000, "timeline position conversion")
 assert(state.source_offset_samples == 2400, "source offset conversion")
 assert(state.length_samples == 48000, "length conversion")
@@ -84,6 +89,7 @@ assert(imported_state.length_samples == 480, "imported length")
 assert(imported_state.source_offset_samples == 240, "imported source offset")
 assert(imported_state.take.polarity_inverted, "imported polarity")
 assert(adapter.get_item_clip_id(imported) == "imported-clip", "imported Clip binding")
+assert(adapter.is_linked_item(imported), "imported Item is linked")
 
 local instances = adapter.delivery_instances("source-1")
 assert(#instances == 1 and instances[1].instance_id == "instance-1", "linked Instance scan")
@@ -114,6 +120,7 @@ instances = adapter.delivery_instances("source-1")
 assert(instances[1].accepted_media_revision == 5, "accepted media revision")
 assert(instances[1].handled_delivery_revision == 9, "handled Publish revision")
 assert(adapter.detach_instance(imported), "detach Instance")
+assert(not adapter.is_linked_item(imported), "detached Item is no longer linked")
 assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
 
 local reference = {
