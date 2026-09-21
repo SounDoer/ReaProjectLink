@@ -52,11 +52,25 @@ os.remove(temporary_project)
 os.remove(root .. "/tests/.adapter-fixture.wav")
 os.remove(root .. "/tests/.rollback-fixture.wav")
 
+local result_path = os.getenv("REAPROJECTLINK_TEST_RESULT")
+local message
 if ok then
-  local message = string.format("All %d ReaProjectLink tests passed.", result)
+  message = string.format("All %d ReaProjectLink tests passed.", result)
   reaper.ShowConsoleMsg(message .. "\n")
+else
+  message = "ReaProjectLink tests failed:\n" .. tostring(result)
+  reaper.ShowConsoleMsg(message .. "\n")
+end
+
+if result_path and result_path ~= "" then
+  local file = io.open(result_path, "w")
+  if file then
+    file:write(ok and "PASS\n" or "FAIL\n", message, "\n")
+    file:close()
+  end
+  reaper.Main_OnCommand(40004, 0)
+elseif ok then
   reaper.ShowMessageBox(message, "ReaProjectLink tests", 0)
 else
-  reaper.ShowConsoleMsg("ReaProjectLink tests failed:\n" .. tostring(result) .. "\n")
   reaper.ShowMessageBox(tostring(result), "ReaProjectLink tests failed", 0)
 end

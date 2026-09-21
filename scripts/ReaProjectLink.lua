@@ -47,10 +47,13 @@ local reference_subscription = require("reaprojectlink.reference_subscription")
 local adapter = require("reaprojectlink.reaper_adapter")
 local delivery_publish = require("reaprojectlink.delivery_publish").create()
 local project_service = require("reaprojectlink.project_service")
+local ui_factory = require("reaprojectlink.ui")
 
 local ctx = ImGui.CreateContext("ReaProjectLink")
+local ui = ui_factory.create(ImGui, ctx)
 local fs = filesystem.create(reaper)
 local smoke_path = os.getenv("REAPROJECTLINK_UI_SMOKE_RESULT")
+local smoke_frame_count = 0
 local window_open = true
 local message, message_is_error
 local source_reference, delivery_review, reference_review, import_review, update_review
@@ -66,6 +69,7 @@ local source_shift_entire_project = false
 local lock_info, lock_package_root
 local active_project_token = adapter.project_token()
 local moved_items_change_count = -1
+local source_page = "overview"
 
 local function reset_transient_state()
   message, message_is_error = nil, nil
@@ -82,10 +86,17 @@ local function reset_transient_state()
   source_shift_entire_project = false
   lock_info, lock_package_root = nil, nil
   moved_items_change_count = -1
+  source_page = "overview"
 end
 
 local function notify(value, is_error)
-  message, message_is_error = value, is_error or false
+  if is_error then
+    message, message_is_error = value, true
+  else
+    -- Successful routine actions are reflected by the surrounding state. They
+    -- do not need a persistent global notification that displaces the UI.
+    message, message_is_error = nil, false
+  end
 end
 
 local function short_id(value)
@@ -120,12 +131,23 @@ local function metadata()
   }
 end
 
-local function draw_notice()
-  if not message then return end
-  if message_is_error then ImGui.PushStyleColor(ctx, ImGui.Col_Text, 0xff6b6bff) end
-  ImGui.TextWrapped(ctx, message)
-  if message_is_error then ImGui.PopStyleColor(ctx) end
-  ImGui.Separator(ctx)
+local function draw_error_banner()
+  if not message or not message_is_error then return end
+  local error_message = message
+  ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, 0x28171dff)
+  ImGui.PushStyleColor(ctx, ImGui.Col_Border, 0x71313dff)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 18, 11)
+  if ImGui.BeginChild(ctx, "global-error", 0, 70, 1, ImGui.WindowFlags_NoScrollbar) then
+    ui:status("Error", "blocked")
+    ImGui.SameLine(ctx)
+    if ImGui.SmallButton(ctx, "Dismiss##global-error") then
+      message, message_is_error = nil, false
+    end
+    ImGui.TextWrapped(ctx, error_message)
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+  ImGui.PopStyleColor(ctx, 2)
 end
 
 local function inspect_lock(package_root)
@@ -328,42 +350,252 @@ local function draw_delivery_review()
   end
 end
 
-local function draw_source(state)
-  ImGui.Text(ctx, "Project Type: Source")
-  ImGui.TextWrapped(ctx, "Project ID: " .. short_id(state.project_id))
-  if state.delivery_revision > 0 then
-    ImGui.TextWrapped(ctx, "Latest Delivery Revision: " .. state.delivery_revision)
-  else
-    ImGui.TextWrapped(ctx, "Published Delivery: none yet")
+local function project_name(path)
+  local name = (path or ""):match("([^/\\]+)$") or "Untitled project"
+  return name:gsub("%.[Rr][Pp][Pp]$", "")
+end
+
+local function source_reference_revisions(state)
+  if source_reference then
+    return source_reference.latest_revision or 0,
+      source_reference.synchronized_revision or 0,
+      source_reference.reviewed_revision or 0
   end
-  ImGui.TextWrapped(ctx, "Project: " .. state.path)
-  ImGui.Separator(ctx)
-  draw_source_reference(state)
-  ImGui.Separator(ctx)
-  ImGui.Text(ctx, "Delivery Tracks")
-  if ImGui.Button(ctx, "Register Selected Delivery Tracks") then
-    local result, err = project_service.register_selected_tracks(adapter)
-    notify(result and string.format("Registered %d Track(s).", result.added) or err, not result)
-  end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Unregister Selected Delivery Tracks") then
-    local result, err = project_service.unregister_selected_tracks(adapter)
-    notify(result and string.format("Removed %d Track(s).", result.removed) or err, not result)
-  end
-  local lanes = project_service.delivery_tracks(adapter)
-  if #lanes == 0 then
-    ImGui.TextWrapped(ctx, "No Delivery Track registered yet.")
-  else
-    for _, lane in ipairs(lanes) do
-      ImGui.TextWrapped(ctx, string.format(
-        "%s | %d Item(s)",
-        lane.display_name,
-        lane.item_count
-      ))
+  return nil, state.synchronized_reference_revision or 0,
+    state.reviewed_reference_revision or 0
+end
+
+local function open_delivery_review()
+  refresh_delivery_review()
+  if delivery_review then source_page = "delivery_review" end
+end
+
+local function draw_source_next_action(state, lanes)
+  if ui:begin_card("source-next-action", 124) then
+    ui:heading("Next action")
+    local subscribed = state.reference_manifest_path and state.reference_manifest_path ~= ""
+    local latest, synchronized, reviewed = source_reference_revisions(state)
+    if not subscribed then
+      ui:status("Setup required", "warning")
+      if ui:primary_button("Subscribe to Reference  →") then source_page = "reference" end
+    elseif not source_reference then
+      ui:status("Reference status not checked", "primary")
+      if ui:primary_button("Check Reference Update") then check_source_reference() end
+    elseif not source_reference.available or source_reference.video_error then
+      ui:status("Reference needs attention", "blocked")
+      if ui:primary_button("Open Reference  →") then source_page = "reference" end
+    elseif synchronized ~= latest then
+      ui:status(string.format("Reference r%d available", latest), "warning")
+      if ui:primary_button("Review Reference Update  →") then source_page = "reference" end
+    elseif reviewed ~= latest then
+      ui:status(string.format("Reference r%d review required", latest), "warning")
+      if ui:primary_button("Open Reference  →") then source_page = "reference" end
+    elseif #lanes == 0 then
+      ui:status("Delivery setup required", "warning")
+      if ui:primary_button("Set Up Delivery Tracks  →") then source_page = "delivery" end
+    else
+      ui:status("Ready to review", "ready")
+      if ui:primary_button("Review Delivery  →") then open_delivery_review() end
     end
   end
-  if ImGui.Button(ctx, "Open Delivery Publish Review") then refresh_delivery_review() end
-  draw_delivery_review()
+  ui:end_card()
+end
+
+local function draw_source_reference_card(state, width)
+  if ui:begin_card("source-reference-card", 206, width) then
+    ui:heading("Reference")
+    local subscribed = state.reference_manifest_path and state.reference_manifest_path ~= ""
+    local latest, synchronized, reviewed = source_reference_revisions(state)
+    if not subscribed then
+      ui:status("Not subscribed", "warning")
+      ui:muted("Connect this Source Project to the Reference published by its Master Project.")
+      if ImGui.Button(ctx, "Open Reference") then source_page = "reference" end
+    elseif not latest then
+      ui:status("Status not checked", "primary")
+      ui:label_value("Synchronized", "Reference r" .. synchronized)
+      ui:label_value("Reviewed", "Reference r" .. reviewed)
+      if ImGui.Button(ctx, "Check for Update") then check_source_reference() end
+    else
+      local level = latest == synchronized and latest == reviewed and "ready" or "warning"
+      local label = level == "ready" and "Synchronized and reviewed" or "Action required"
+      ui:status(label, level)
+      ui:label_value("Latest", "Reference r" .. latest)
+      ui:label_value("Synchronized", "Reference r" .. synchronized)
+      ui:label_value("Reviewed", "Reference r" .. reviewed)
+      if ImGui.Button(ctx, "Open Reference") then source_page = "reference" end
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_source_delivery_card(state, lanes, width)
+  if ui:begin_card("source-delivery-card", 206, width) then
+    ui:heading("Delivery")
+    local item_count = 0
+    for _, lane in ipairs(lanes) do item_count = item_count + lane.item_count end
+    if #lanes == 0 then
+      ui:status("Not configured", "warning")
+      ui:muted("No Delivery Tracks are registered in this Source Project.")
+      if ImGui.Button(ctx, "Set Up Delivery Tracks") then source_page = "delivery" end
+    else
+      ui:status("Ready to review", "ready")
+      ui:label_value("Latest", state.delivery_revision > 0 and
+        ("Delivery r" .. state.delivery_revision) or "Not published")
+      ui:label_value("Tracks", #lanes)
+      ui:label_value("Items", item_count)
+      if ImGui.Button(ctx, "Open Delivery") then source_page = "delivery" end
+      ImGui.SameLine(ctx)
+      if ui:primary_button("Review Delivery") then open_delivery_review() end
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_source_overview(state)
+  local lanes = project_service.delivery_tracks(adapter)
+  draw_source_next_action(state, lanes)
+  ImGui.Dummy(ctx, 0, 4)
+  local available_width = ImGui.GetContentRegionAvail(ctx)
+  if available_width >= 660 then
+    local card_width = (available_width - 10) / 2
+    draw_source_reference_card(state, card_width)
+    ImGui.SameLine(ctx)
+    draw_source_delivery_card(state, lanes, 0)
+  else
+    draw_source_reference_card(state, 0)
+    draw_source_delivery_card(state, lanes, 0)
+  end
+  ImGui.Dummy(ctx, 0, 4)
+  if ui:begin_card("source-project-health", 88) then
+    ui:heading("Project health")
+    if state.path == "" then
+      ui:status("Project must be saved", "blocked")
+    elseif lock_info then
+      ui:status("Publishing is locked", "blocked")
+    else
+      ui:status("Project is available", "ready")
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_source_reference_page(state)
+  if ui:begin_card("source-reference-page", 0) then draw_source_reference(state) end
+  ui:end_card()
+end
+
+local function draw_source_delivery_page(state)
+  if ui:begin_card("source-delivery-page", 0) then
+    ui:heading("Delivery Tracks")
+    if state.delivery_revision > 0 then
+      ui:status("Latest Delivery r" .. state.delivery_revision, "ready")
+    else
+      ui:status("No Delivery published", "warning")
+    end
+    if ui:primary_button("Register Selected Delivery Tracks") then
+      local result, err = project_service.register_selected_tracks(adapter)
+      notify(result and string.format("Registered %d Track(s).", result.added) or err, not result)
+    end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Unregister Selected Delivery Tracks...") then
+      local result, err = project_service.unregister_selected_tracks(adapter)
+      notify(result and string.format("Unregistered %d Track(s).", result.removed) or err, not result)
+    end
+    ImGui.Separator(ctx)
+    local lanes = project_service.delivery_tracks(adapter)
+    if #lanes == 0 then
+      ui:muted("No Delivery Tracks are registered. Select Tracks in REAPER, then register them here.")
+    else
+      for _, lane in ipairs(lanes) do
+        ImGui.Text(ctx, lane.display_name)
+        ImGui.SameLine(ctx, 280)
+        ui:muted(string.format("%d Item(s)", lane.item_count))
+      end
+    end
+    ImGui.Dummy(ctx, 0, 8)
+    if ui:primary_button("Review Delivery  →") then open_delivery_review() end
+  end
+  ui:end_card()
+end
+
+local function draw_source_settings(state)
+  if ui:begin_card("source-settings-project", 0) then
+    ui:heading("Project")
+    ui:label_value("Project Type", "Source Project")
+    ui:label_value("Project ID", state.project_id or "Not initialized")
+    ui:label_value("Delivery ID", state.delivery_id or "Not assigned")
+    ui:label_value("Project path", state.path ~= "" and state.path or "Not saved")
+    ui:label_value("Reference manifest", state.reference_manifest_path or "Not subscribed")
+    ui:label_value("Synchronized", "Reference r" .. (state.synchronized_reference_revision or 0))
+    ui:label_value("Reviewed", "Reference r" .. (state.reviewed_reference_revision or 0))
+  end
+  ui:end_card()
+end
+
+local function draw_source_review_page()
+  if ImGui.Button(ctx, "←  Back to Delivery") then
+    source_page = "delivery"
+    delivery_review = nil
+  end
+  ImGui.Dummy(ctx, 0, 4)
+  ui:title("Delivery Publish Review")
+  ui:muted("Validate the complete Delivery snapshot before it becomes externally visible.")
+  ImGui.Dummy(ctx, 0, 8)
+  if ui:begin_card("source-delivery-review", 0) then draw_delivery_review() end
+  ui:end_card()
+end
+
+local function draw_source_navigation()
+  local items = {
+    { "Overview", "overview" },
+    { "Reference", "reference" },
+    { "Delivery", "delivery" },
+    { "Settings", "settings" },
+  }
+  for _, item in ipairs(items) do
+    local selected = source_page == item[2] or
+      (source_page == "delivery_review" and item[2] == "delivery")
+    if ui:nav_item(item[1], selected) then source_page = item[2] end
+  end
+end
+
+local function draw_source(state)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 22, 14)
+  if ImGui.BeginChild(ctx, "source-header", 0, 78, 1) then
+    ui:title("ReaProjectLink")
+    ui:heading(project_name(state.path))
+    ImGui.SameLine(ctx)
+    ui:status("Source Project", "primary")
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+
+  draw_error_banner()
+
+  ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, ui.colors.sidebar)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 14, 18)
+  if ImGui.BeginChild(ctx, "source-sidebar", 188, 0, 1) then
+    draw_source_navigation()
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+  ImGui.PopStyleColor(ctx)
+  ImGui.SameLine(ctx, 0, 0)
+
+  ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, ui.colors.window)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 24, 20)
+  if ImGui.BeginChild(ctx, "source-content", 0, 0) then
+    draw_lock()
+    if source_page == "overview" then draw_source_overview(state)
+    elseif source_page == "reference" then draw_source_reference_page(state)
+    elseif source_page == "delivery" then draw_source_delivery_page(state)
+    elseif source_page == "settings" then draw_source_settings(state)
+    elseif source_page == "delivery_review" then draw_source_review_page()
+    else source_page = "overview" end
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+  ImGui.PopStyleColor(ctx)
 end
 
 local function refresh_reference_review()
@@ -784,30 +1016,48 @@ local function draw()
     active_project_token = project_token
     notify("Current REAPER project changed; cached reviews and decisions were cleared.")
   end
-  ImGui.SetNextWindowSize(ctx, 820, 680, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 1040, 720, ImGui.Cond_FirstUseEver)
+  ui:push_theme()
   local visible
   visible, window_open = ImGui.Begin(ctx, "ReaProjectLink", window_open)
   if visible then
-    draw_notice()
-    draw_lock()
+    ui:push_font(ui.font_body)
     local state = project_service.project_state(adapter)
-    if not state.project_type or state.project_type == "" then draw_uninitialized(state)
+    if not state.project_type or state.project_type == "" then
+      ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 24, 20)
+      draw_error_banner()
+      draw_lock()
+      draw_uninitialized(state)
+      ImGui.PopStyleVar(ctx)
     elseif state.project_type == constants.PROJECT_TYPES.source then draw_source(state)
-    elseif state.project_type == constants.PROJECT_TYPES.master then draw_master(state)
+    elseif state.project_type == constants.PROJECT_TYPES.master then
+      ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 24, 20)
+      draw_error_banner()
+      draw_lock()
+      draw_master(state)
+      ImGui.PopStyleVar(ctx)
     else ImGui.TextWrapped(ctx, "Unsupported Project Type: " .. tostring(state.project_type)) end
+    ui:pop_font()
     -- ReaImGui only accepts End() when Begin() returned true, unlike Dear ImGui.
     ImGui.End(ctx)
   end
+  ui:pop_theme()
 end
 
 local function loop()
   local ok, err = xpcall(draw, debug.traceback)
   if smoke_path then
-    local file = io.open(smoke_path, "w")
-    if file then file:write(ok and "PASS ReaProjectLink UI frame\n" or "FAIL\n" .. tostring(err) .. "\n"); file:close() end
-    window_open = false
-    reaper.Main_OnCommand(40004, 0)
-    return
+    smoke_frame_count = smoke_frame_count + 1
+    if not ok or smoke_frame_count >= 3 then
+      local file = io.open(smoke_path, "w")
+      if file then
+        file:write(ok and "PASS ReaProjectLink UI frames\n" or "FAIL\n" .. tostring(err) .. "\n")
+        file:close()
+      end
+      window_open = false
+      reaper.Main_OnCommand(40004, 0)
+      return
+    end
   end
   if not ok then
     reaper.ShowConsoleMsg("ReaProjectLink error:\n" .. tostring(err) .. "\n")

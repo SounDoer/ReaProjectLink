@@ -23,6 +23,8 @@ The working principle is:
 - [Architecture](docs/architecture.md)
 - [Manifest schema](docs/manifest-schema.md)
 - [Decision log](docs/decisions.md)
+- [UI specification](docs/ui-spec.md)
+- [UI implementation plan](docs/ui-implementation-plan.md)
 - [Development](docs/development.md)
 - [Manual validation](docs/validation.md)
 
