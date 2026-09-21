@@ -66,7 +66,7 @@ To release:
    bot's index commit) as `vX.Y.Z` and create a GitHub Release with the
    changelog.
 
-The Claude Code `release` skill (`.claude/skills/release/`) runs these steps.
+The `release` agent skill (`.agents/skills/release/`) runs these steps.
 
 The `deploy` workflow runs `reapack-index`, which indexes every commit that
 changes a package's `@version`, and commits the updated `index.xml`. Commits
