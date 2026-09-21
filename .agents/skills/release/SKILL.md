@@ -107,10 +107,13 @@ git push origin v0.2.0
 gh release create v0.2.0 --verify-tag --title "ReaProjectLink 0.2.0" --notes-file <notes.md>
 ```
 
-Notes = the changelog, then an install line: ReaPack repository
-`https://github.com/SounDoer/ReaProjectLink/raw/master/index.xml`, requires
-REAPER 7.74+ and ReaImGui 0.9+ (update if `runtime_requirements.lua` changed).
-Add `--prerelease` for pre-release versions.
+Write `<notes.md>` from `release-notes.md` in this skill's directory. Fill every
+`{{...}}` placeholder: the changelog, and the requirement versions from
+`M.minimum_reaper_version` and `M.minimum_reaimgui_api` in
+`ReaProjectLink/lib/reaprojectlink/runtime_requirements.lua`. Keep the
+pre-release paragraph only for pre-release versions and drop its markers.
+Always keep the Install and Update sections. Add `--prerelease` for pre-release
+versions.
 
 ### 8. Report
 
