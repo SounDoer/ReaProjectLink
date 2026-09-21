@@ -70,6 +70,7 @@ local lock_info, lock_package_root
 local active_project_token = adapter.project_token()
 local moved_items_change_count = -1
 local source_page = "overview"
+local master_page = "overview"
 
 local function reset_transient_state()
   message, message_is_error = nil, nil
@@ -87,6 +88,7 @@ local function reset_transient_state()
   lock_info, lock_package_root = nil, nil
   moved_items_change_count = -1
   source_page = "overview"
+  master_page = "overview"
 end
 
 local function notify(value, is_error)
@@ -979,34 +981,209 @@ local function confirm_moved_items()
   end
 end
 
-local function draw_master(state)
-  confirm_moved_items()
-  ImGui.Text(ctx, "Project Type: Master")
-  ImGui.TextWrapped(ctx, "Project ID: " .. short_id(state.project_id))
-  ImGui.TextWrapped(ctx, "Project: " .. state.path)
-  ImGui.Separator(ctx)
-  draw_reference_publish(state)
-  ImGui.Separator(ctx)
-  ImGui.Text(ctx, "Delivery Subscriptions")
-  if ImGui.Button(ctx, "Add Delivery") then begin_import() end
-  local entries = subscriptions()
-  for _, entry in ipairs(entries) do
-    ImGui.TextWrapped(ctx, string.format(
-      "%s (%s) | Handled Delivery Revision %d",
-      subscription_name(entry),
-      short_id(entry.sourceProjectId),
-      entry.acceptedDeliveryRevision or 0
-    ))
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Synchronize Delivery...##" .. entry.sourceProjectId) then begin_update(entry.sourceProjectId) end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Remove Subscription##" .. entry.sourceProjectId) then
-      local result, err = delivery_import.remove_subscription(adapter, entry.sourceProjectId)
-      notify(result and "Delivery subscription removed; Tracks and Items were kept." or err, not result)
+local function open_reference_review()
+  refresh_reference_review()
+  master_page = "reference"
+end
+
+local function master_reference_summary()
+  local tracks = reference_publish.reference_tracks(adapter)
+  local timeline = reference_publish.timeline_entries(adapter)
+  local registered = 0
+  for _, entry in ipairs(timeline or {}) do
+    if entry.registered then registered = registered + 1 end
+  end
+  return tracks, registered
+end
+
+local function draw_master_next_action(state, reference_tracks, entries)
+  if ui:begin_card("master-next-action", 124) then
+    ui:heading("Next action")
+    if #reference_tracks == 0 then
+      ui:status("Reference setup required", "warning")
+      if ui:primary_button("Set Up Reference  →") then master_page = "reference" end
+    elseif state.reference_revision == 0 then
+      ui:status("Reference not published", "warning")
+      if ui:primary_button("Review Reference  →") then open_reference_review() end
+    elseif #entries == 0 then
+      ui:status("No Delivery subscriptions", "warning")
+      if ui:primary_button("Add Delivery  →") then master_page = "deliveries" end
+    else
+      ui:status("Workspace ready", "ready")
+      if ui:primary_button("Review Reference  →") then open_reference_review() end
     end
   end
-  draw_import()
-  draw_update()
+  ui:end_card()
+end
+
+local function draw_master_reference_card(state, reference_tracks, timeline_count, width)
+  if ui:begin_card("master-reference-card", 206, width) then
+    ui:heading("Reference")
+    if #reference_tracks == 0 then
+      ui:status("Not configured", "warning")
+      ui:muted("No Reference Tracks are registered in this Master Project.")
+      if ImGui.Button(ctx, "Set Up Reference") then master_page = "reference" end
+    else
+      ui:status(state.reference_revision > 0 and "Published" or "Ready to review",
+        state.reference_revision > 0 and "ready" or "warning")
+      ui:label_value("Latest", state.reference_revision > 0 and
+        ("Reference r" .. state.reference_revision) or "Not published")
+      ui:label_value("Tracks", #reference_tracks)
+      ui:label_value("Timeline entries", timeline_count)
+      if ImGui.Button(ctx, "Open Reference") then master_page = "reference" end
+      ImGui.SameLine(ctx)
+      if ui:primary_button("Review Reference") then open_reference_review() end
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_master_deliveries_card(entries, width)
+  if ui:begin_card("master-deliveries-card", 206, width) then
+    ui:heading("Deliveries")
+    if #entries == 0 then
+      ui:status("No subscriptions", "warning")
+      ui:muted("Add a Delivery published by a Source Project.")
+      if ImGui.Button(ctx, "Open Deliveries") then master_page = "deliveries" end
+    else
+      ui:status("Subscriptions active", "ready")
+      ui:label_value("Subscriptions", #entries)
+      if ImGui.Button(ctx, "Open Deliveries") then master_page = "deliveries" end
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_master_overview(state)
+  local reference_tracks, timeline_count = master_reference_summary()
+  local entries = subscriptions()
+  draw_master_next_action(state, reference_tracks, entries)
+  ImGui.Dummy(ctx, 0, 4)
+  local available_width = ImGui.GetContentRegionAvail(ctx)
+  if available_width >= 660 then
+    local card_width = (available_width - 10) / 2
+    draw_master_reference_card(state, reference_tracks, timeline_count, card_width)
+    ImGui.SameLine(ctx)
+    draw_master_deliveries_card(entries, 0)
+  else
+    draw_master_reference_card(state, reference_tracks, timeline_count, 0)
+    draw_master_deliveries_card(entries, 0)
+  end
+  ImGui.Dummy(ctx, 0, 4)
+  if ui:begin_card("master-project-health", 88) then
+    ui:heading("Project health")
+    if state.path == "" then
+      ui:status("Project must be saved", "blocked")
+    elseif lock_info then
+      ui:status("Publishing is locked", "blocked")
+    else
+      ui:status("Project is available", "ready")
+    end
+  end
+  ui:end_card()
+end
+
+local function draw_master_reference_page(state)
+  if ui:begin_card("master-reference-page", 0) then draw_reference_publish(state) end
+  ui:end_card()
+end
+
+local function draw_master_deliveries_page()
+  if ui:begin_card("master-deliveries-page", 0) then
+    ui:heading("Delivery Subscriptions")
+    if ui:primary_button("Add Delivery...") then begin_import() end
+    local entries = subscriptions()
+    if #entries == 0 then
+      ui:muted("No Delivery subscriptions.")
+    else
+      ImGui.Separator(ctx)
+      for index, entry in ipairs(entries) do
+        ui:heading(subscription_name(entry))
+        ui:muted(string.format(
+          "Handled Delivery Revision %d",
+          entry.acceptedDeliveryRevision or 0
+        ))
+        if ImGui.Button(ctx, "Synchronize Delivery...##" .. entry.sourceProjectId) then
+          begin_update(entry.sourceProjectId)
+        end
+        ImGui.SameLine(ctx)
+        if ImGui.Button(ctx, "Remove Subscription##" .. entry.sourceProjectId) then
+          local result, err = delivery_import.remove_subscription(adapter, entry.sourceProjectId)
+          notify(result and "Delivery subscription removed; Tracks and Items were kept." or err, not result)
+        end
+        if index < #entries then ImGui.Separator(ctx) end
+      end
+    end
+    if import_review or update_review then ImGui.Separator(ctx) end
+    draw_import()
+    draw_update()
+  end
+  ui:end_card()
+end
+
+local function draw_master_settings(state)
+  if ui:begin_card("master-settings-project", 0) then
+    ui:heading("Project")
+    ui:label_value("Project Type", "Master Project")
+    ui:label_value("Project ID", state.project_id or "Not initialized")
+    ui:label_value("Reference ID", state.reference_id or "Not assigned")
+    ui:label_value("Project path", state.path ~= "" and state.path or "Not saved")
+    ui:label_value("Latest Reference", state.reference_revision > 0 and
+      ("Reference r" .. state.reference_revision) or "Not published")
+    ui:label_value("Delivery subscriptions", #subscriptions())
+  end
+  ui:end_card()
+end
+
+local function draw_master_navigation()
+  local items = {
+    { "Overview", "overview" },
+    { "Reference", "reference" },
+    { "Deliveries", "deliveries" },
+    { "Settings", "settings" },
+  }
+  for _, item in ipairs(items) do
+    if ui:nav_item(item[1], master_page == item[2]) then master_page = item[2] end
+  end
+end
+
+local function draw_master(state)
+  confirm_moved_items()
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 22, 14)
+  if ImGui.BeginChild(ctx, "master-header", 0, 78, 1) then
+    ui:title("ReaProjectLink")
+    ui:heading(project_name(state.path))
+    ImGui.SameLine(ctx)
+    ui:status("Master Project", "primary")
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+
+  draw_error_banner()
+
+  ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, ui.colors.sidebar)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 14, 18)
+  if ImGui.BeginChild(ctx, "master-sidebar", 188, 0, 1) then
+    draw_master_navigation()
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+  ImGui.PopStyleColor(ctx)
+  ImGui.SameLine(ctx, 0, 0)
+
+  ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, ui.colors.window)
+  ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 24, 20)
+  if ImGui.BeginChild(ctx, "master-content", 0, 0) then
+    draw_lock()
+    if master_page == "overview" then draw_master_overview(state)
+    elseif master_page == "reference" then draw_master_reference_page(state)
+    elseif master_page == "deliveries" then draw_master_deliveries_page()
+    elseif master_page == "settings" then draw_master_settings(state)
+    else master_page = "overview" end
+    ImGui.EndChild(ctx)
+  end
+  ImGui.PopStyleVar(ctx)
+  ImGui.PopStyleColor(ctx)
 end
 
 local function draw()
@@ -1030,12 +1207,7 @@ local function draw()
       draw_uninitialized(state)
       ImGui.PopStyleVar(ctx)
     elseif state.project_type == constants.PROJECT_TYPES.source then draw_source(state)
-    elseif state.project_type == constants.PROJECT_TYPES.master then
-      ImGui.PushStyleVar(ctx, ImGui.StyleVar_WindowPadding, 24, 20)
-      draw_error_banner()
-      draw_lock()
-      draw_master(state)
-      ImGui.PopStyleVar(ctx)
+    elseif state.project_type == constants.PROJECT_TYPES.master then draw_master(state)
     else ImGui.TextWrapped(ctx, "Unsupported Project Type: " .. tostring(state.project_type)) end
     ui:pop_font()
     -- ReaImGui only accepts End() when Begin() returned true, unlike Dear ImGui.

@@ -5,7 +5,7 @@ or persisted data model.
 
 ## Phase 1 — Shared visual foundation and Source shell
 
-Status: current milestone.
+Status: complete.
 
 - add a small ReaImGui presentation helper module;
 - establish colors, spacing, card surfaces, typography, and button hierarchy;
@@ -29,6 +29,8 @@ Status: current milestone.
 - verify small dock widths and high-DPI behavior in REAPER.
 
 ## Phase 3 — Master shell
+
+Status: implemented; awaiting visual review.
 
 - implement Master Overview;
 - migrate Reference Publishing to the shared shell;
@@ -63,4 +65,3 @@ Status: current milestone.
 - confirm no unrelated dirty-worktree changes are overwritten;
 - update this plan and `docs/ui-spec.md` when a UI decision is confirmed or
   superseded.
-

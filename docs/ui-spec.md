@@ -8,9 +8,8 @@ make project state, required action, and the consequences of mutations clear
 without exposing implementation identifiers during routine work.
 
 This specification covers the complete application information architecture and
-interaction language. The first implementation milestone applies the system to
-the Source Project experience; the same shell and components will later be used
-for the Master Project experience.
+interaction language. The shared shell and components apply to both the Source
+Project and Master Project experiences.
 
 ## 2. Design principles
 
@@ -266,17 +265,20 @@ REAPER mutation logic.
 - Keyboard activation and normal REAPER docking behavior must continue to work.
 - Body copy should remain concise and use the qualified domain terms.
 
-## 12. First implementation acceptance criteria
+## 12. Current implementation acceptance criteria
 
-The Source milestone is accepted when:
+The shared workspace milestone is accepted when:
 
 - Source Project navigation switches among Overview, Reference, Delivery, and
   Settings without reopening the script;
 - Overview selects the correct next action from available local/cached state;
 - no automatic media hashing or NAS review is introduced;
 - existing Reference and Delivery actions remain reachable;
+- Master Project navigation switches among Overview, Reference, Deliveries, and
+  Settings without reopening the script;
+- existing Reference Publish, Delivery Import, and Delivery Synchronization
+  actions remain reachable from the Master workspace;
 - Delivery Publish Review remains invalidated after project changes;
 - existing runtime requirements remain unchanged;
 - the ReaImGui smoke test opens Source and Master frames successfully;
 - the complete existing automated test suite passes.
-
