@@ -62,6 +62,11 @@ To release:
    as `0.2.0-beta1`, is a pre-release that only users who enable pre-releases
    receive.
 3. Commit and push to `master`.
+4. After the `deploy` workflow finishes, tag the version-bump commit (not the
+   bot's index commit) as `vX.Y.Z` and create a GitHub Release with the
+   changelog.
+
+The Claude Code `release` skill (`.claude/skills/release/`) runs these steps.
 
 The `deploy` workflow runs `reapack-index`, which indexes every commit that
 changes a package's `@version`, and commits the updated `index.xml`. Commits
