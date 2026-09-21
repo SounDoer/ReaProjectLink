@@ -84,5 +84,13 @@ failures, the real Windows filesystem, real REAPER Track/Item/Take APIs, and a
 ReaImGui frame. It also injects failures after partial Import, Update, and Reference
 synchronization mutations and verifies that REAPER Undo restores Tracks, Items,
 Takes, fields, timeline state, and project extension state. Run
-`ReaProjectLink - Run Tests` from the Action List after changing workflow, manifest,
-filesystem, or adapter behavior.
+`tests/ReaProjectLink_RunTests.lua` from the Action List after changing workflow,
+manifest, filesystem, or adapter behavior.
+
+`tests/specs.lua` lists the spec files that every runner executes; add new spec
+files there.
+
+`tests/run_in_reaper.lua` runs the same suite without interaction: start REAPER
+with it as the script argument, and it writes `tests/.last-result` and quits.
+CI cannot run REAPER, so the GitHub workflows validate packaging only; the
+release skill requires a local passing run before each release.

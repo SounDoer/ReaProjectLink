@@ -10,8 +10,10 @@ Confirmed product decisions remain authoritative in `decisions.md`.
 ## Confirmed terminology baseline
 
 The following terminology was confirmed after this inventory was created. It
-supersedes the conflicting current terms documented in later sections; those
-sections remain as an implementation inventory until the rename is complete.
+supersedes the conflicting terms documented in later sections. The rename is
+complete in code, manifests, and UI; the later sections record pre-rename
+terms such as ReaDelivery, Mix Project, Picture, and `_Delivery` for
+historical reference only.
 
 | Concept | Confirmed term |
 | --- | --- |

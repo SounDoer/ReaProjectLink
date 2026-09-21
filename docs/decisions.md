@@ -3,6 +3,10 @@
 This file records decisions reached during product discovery. The current MVP
 product baseline has no remaining open product questions.
 
+Entries are kept as written. Earlier entries use pre-rename terms such as
+ReaDelivery, Mix Project, Picture, and `_Delivery`; the confirmed terminology
+baseline in `terminology-inventory.md` maps them to current names.
+
 ## Confirmed decisions
 
 ### D001 — Local NAS architecture
