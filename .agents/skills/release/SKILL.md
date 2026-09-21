@@ -126,5 +126,5 @@ Version, release commit, Release URL, and test results.
 | Tagging `HEAD` after `git pull` | Tag lands on the bot's index commit, not the release |
 | Appending to `@changelog` | Old notes get repeated in the new version |
 | Skipping `git pull` after deploy | Next push is rejected (bot commit on remote) |
-| New spec file added to only one runner | `run_in_reaper.lua` and `ReaProjectLink_RunTests.lua` each list specs; check both include every `tests/*_spec.lua` |
+| New spec file missing from `tests/specs.lua` | It never runs; check every `tests/*_spec.lua` is listed |
 | Shipped file outside `lib/reaprojectlink/` | Not published unless added to `@provides` |

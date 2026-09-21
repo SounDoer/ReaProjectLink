@@ -1,0 +1,21 @@
+-- Spec files run by every test runner, in order.
+return {
+  "project_service_spec.lua",
+  "runtime_requirements_spec.lua",
+  "reaper_adapter_spec.lua",
+  "workflow_rollback_spec.lua",
+  "manifest_spec.lua",
+  "hash_spec.lua",
+  "delivery_manifest_spec.lua",
+  "delivery_writer_spec.lua",
+  "filesystem_spec.lua",
+  "delivery_publish_plan_spec.lua",
+  "delivery_review_spec.lua",
+  "delivery_publish_spec.lua",
+  "reference_manifest_spec.lua",
+  "reference_writer_spec.lua",
+  "reference_publish_spec.lua",
+  "reference_subscription_spec.lua",
+  "delivery_import_spec.lua",
+  "delivery_update_spec.lua",
+}

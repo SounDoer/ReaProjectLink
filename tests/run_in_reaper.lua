@@ -27,24 +27,10 @@ local ok, result = xpcall(function()
     reaper.ImGui_DestroyContext(context)
   end
 
-  local passed = dofile(root .. "/tests/project_service_spec.lua")
-  passed = passed + dofile(root .. "/tests/runtime_requirements_spec.lua")
-  passed = passed + dofile(root .. "/tests/reaper_adapter_spec.lua")
-  passed = passed + dofile(root .. "/tests/workflow_rollback_spec.lua")
-  passed = passed + dofile(root .. "/tests/manifest_spec.lua")
-  passed = passed + dofile(root .. "/tests/hash_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_manifest_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_writer_spec.lua")
-  passed = passed + dofile(root .. "/tests/filesystem_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_publish_plan_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_review_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_publish_spec.lua")
-  passed = passed + dofile(root .. "/tests/reference_manifest_spec.lua")
-  passed = passed + dofile(root .. "/tests/reference_writer_spec.lua")
-  passed = passed + dofile(root .. "/tests/reference_publish_spec.lua")
-  passed = passed + dofile(root .. "/tests/reference_subscription_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_import_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_update_spec.lua")
+  local passed = 0
+  for _, spec in ipairs(dofile(root .. "/tests/specs.lua")) do
+    passed = passed + dofile(root .. "/tests/" .. spec)
+  end
   return passed
 end, debug.traceback)
 
