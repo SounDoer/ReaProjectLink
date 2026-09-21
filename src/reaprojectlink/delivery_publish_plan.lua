@@ -21,66 +21,23 @@ local function clone_take(take)
   }
 end
 
-local function previous_clips_by_id(snapshot)
-  local result = {}
-  for _, lane in ipairs(snapshot and snapshot.lanes or {}) do
-    for _, clip in ipairs(lane.clips or {}) do
-      result[clip.clipId] = clip
-    end
-  end
-  return result
-end
-
-local function raw_hash(value)
-  return value and value:gsub("^sha256:", "") or nil
-end
-
-local function build_clip(clip, previous_clips, has_previous, new_id, assignments, media)
-  local clip_id = clip.clip_id
-  local created = false
-  if not clip_id or clip_id == "" then
-    if not clip.confirmed_new then
-      error("untagged Item requires an explicit identity decision", 3)
-    end
-    clip_id = new_id()
-    created = true
-    table.insert(assignments, { item_ref = clip.item_ref, clip_id = clip_id })
-  end
-
-  local previous = previous_clips[clip_id]
-  if has_previous and not previous and not created then
-    error("unknown Clip ID requires an explicit identity decision: " .. clip_id, 3)
-  end
-  local unchanged = previous and raw_hash(previous.mediaHash) == clip.media_hash
-  local media_revision = unchanged and previous.mediaRevision or
-    ((previous and previous.mediaRevision or 0) + 1)
-  local media_file
-
-  if unchanged then
-    media_file = previous.mediaFile
-  else
-    -- REAPER Item names usually carry the source extension already.
-    local base_name = ((clip.display_name or ""):gsub("%.[Ww][Aa][Vv]$", ""))
-    local filename = string.format(
-      "%s_r%04d.wav",
-      sanitize_name(base_name),
-      media_revision
-    )
-    local destination = "media/" .. clip_id .. "/" .. filename
-    media_file = "../" .. destination
-    table.insert(media, {
-      source_path = clip.media_path,
-      destination = destination,
-      size = clip.media_size,
-      hash = clip.media_hash,
-    })
-  end
-
+local function build_clip(clip, new_id, assignments, media)
+  local clip_id = new_id()
+  table.insert(assignments, { item_ref = clip.item_ref, clip_id = clip_id })
+  local base_name = ((clip.display_name or ""):gsub("%.[Ww][Aa][Vv]$", ""))
+  local filename = sanitize_name(base_name) .. ".wav"
+  local destination = "media/" .. clip_id .. "/" .. filename
+  table.insert(media, {
+    source_path = clip.media_path,
+    destination = destination,
+    size = clip.media_size,
+    hash = clip.media_hash,
+  })
   return {
     clip_id = clip_id,
     display_name = clip.display_name,
-    media_revision = media_revision,
-    media_file = media_file,
+    media_revision = 1,
+    media_file = "../" .. destination,
     media_hash = "sha256:" .. clip.media_hash,
     media_sample_rate = clip.media_sample_rate,
     channel_count = clip.channel_count,
@@ -99,10 +56,7 @@ function M.build(input, new_id)
   local delivery_id = input.delivery_id or new_id()
   local delivery_revision = input.previous_snapshot and
     input.previous_snapshot.deliveryRevision + 1 or 1
-  local lanes = {}
-  local assignments = {}
-  local media = {}
-  local previous_clips = previous_clips_by_id(input.previous_snapshot)
+  local lanes, assignments, media = {}, {}, {}
 
   for lane_index, lane in ipairs(input.current.lanes or {}) do
     local output_lane = {
@@ -112,17 +66,7 @@ function M.build(input, new_id)
       clips = {},
     }
     for _, clip in ipairs(lane.clips or {}) do
-      table.insert(
-        output_lane.clips,
-        build_clip(
-          clip,
-          previous_clips,
-          input.previous_snapshot ~= nil,
-          new_id,
-          assignments,
-          media
-        )
-      )
+      table.insert(output_lane.clips, build_clip(clip, new_id, assignments, media))
     end
     table.insert(lanes, output_lane)
   end

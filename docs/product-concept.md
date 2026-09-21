@@ -57,8 +57,8 @@ The central integration project:
 - acts as the dependency-management hub;
 - manually adds one or more published Source manifests;
 - chooses where Source Delivery Lanes are placed in its own Track hierarchy;
-- imports new Delivery Clips;
-- accepts updates as new takes on existing items;
+- maps Delivery Lanes to Master Tracks;
+- synchronizes each Delivery as a Source-owned Item snapshot;
 - publishes the authoritative Reference for its Source Projects.
 
 ## Primary workflow
@@ -66,19 +66,19 @@ The central integration project:
 1. A source project designates managed delivery tracks.
 2. A source user creates bounced items using any preferred REAPER workflow and
    places the current effective items on managed delivery tracks.
-3. Publish compares those tracks with the previous published snapshot, asks for
-   confirmation where a new item cannot be classified safely, and writes the
-   accepted state to the local `_ReaProjectLink` package.
+3. Publish writes every current Item as a new Clip in a complete immutable
+   Delivery Revision under the local `_ReaProjectLink` package.
 4. A Master Project adds the Source's `delivery.json` and performs the first
    import.
-5. The Master Project stores stable Lane Bindings and Clip-to-Item Links.
-6. A later Source Publish creates new WAV revisions without modifying the Master
+5. The Master Project stores stable Lane Bindings; imported Items remain
+   Source-managed while they stay on their mapped Master Tracks.
+6. A later Source Publish creates another complete snapshot without modifying the Master
    project.
-7. The Master Project detects the new Delivery Revision and presents the change.
-8. After user confirmation, a changed WAV becomes a new take on the already
-   bound Linked Item or Items, including still-linked copies and split Linked
-   Items.
-9. Old takes remain until the user explicitly removes them.
+7. The Master Project synchronizes by replacing the previous managed Items with
+   the complete selected Delivery Revision while preserving Master Track state.
+8. To keep or edit an Item independently, the user moves it away from its
+   mapped Track and confirms that it should become local Master content.
+9. Synchronizing the current Revision can restore the Source snapshot at any time.
 
 ## Reference workflow
 

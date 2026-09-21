@@ -1,8 +1,9 @@
 # Terminology inventory
 
-This document records the terminology currently used by ReaDelivery before its
-public naming is finalized. It is an inventory, not a naming decision. Terms
-that overlap or conflict are kept visible so they can be resolved deliberately.
+This document began as the terminology inventory used before ReaProjectLink's
+public naming was finalized. The confirmed baseline below is current. The later
+inventory sections are retained as a historical audit and are not current
+workflow documentation.
 
 Confirmed product decisions remain authoritative in `decisions.md`.
 
@@ -29,7 +30,8 @@ sections remain as an implementation inventory until the rename is complete.
 | Persistent Master relationship to a Source Delivery | Delivery Subscription |
 | In-review Lane routing choice | Lane Mapping |
 | Persisted Lane-to-Track route | Lane Binding |
-| Clip-associated downstream Item | Linked Item |
+| Source-managed downstream object | Synchronized Item |
+| Master-owned Item formerly managed by a Delivery | Local Item |
 
 The supported topology remains single-level and centralized: multiple Source
 Projects publish Deliveries to one Master Project, and that Master Project
@@ -43,43 +45,42 @@ Source Project
   -> Delivery
     -> Delivery Revision
     -> Delivery Lane
-      -> Delivery Clip
-        -> Media Revision
+      -> Delivery Clip (revision-local)
+        -> Media Revision 1
 ```
 
 A registered Source REAPER Track is a Delivery Track whose stable published
-route is a Delivery Lane. In the Master Project, a Delivery Clip is represented
-by one or more Linked Items. Delivery Set and Instance ID may remain internal,
-but are not routine public terminology.
+route is a Delivery Lane. Every Publish creates new revision-local Delivery
+Clips. In the Master Project, imported Clips become Synchronized Items owned by
+the Source snapshot. Delivery Set is not public terminology; per-Item Instance
+identity is no longer part of the Delivery workflow.
 
 The confirmed relationship vocabulary is:
 
 - A Delivery Subscription relates a Master Project to a Source Delivery.
 - A Lane Mapping is a user choice made during review.
 - A Lane Binding is the persisted Delivery Lane to Master Track route.
-- A Link associates a Delivery Clip with one Linked Item.
 - Lane Mapping uses Create New Track, Use Existing Track, and Leave Unmapped.
-- Clip handling uses Pending Clip, Import Clip, Decline Clip, Declined Clip, and
-  Reconsider Clip.
-- Detach Linked Item removes the Link and keeps an ordinary REAPER Item.
+- Moving a Synchronized Item out of its mapped Master Track offers Keep as Local.
+- Synchronize Delivery replaces all remaining Synchronized Items with the
+  complete target Delivery Revision.
 
 Confirmed Review names are Delivery Publish Review, Reference Publish Review,
 Delivery Import Review, Delivery Update Review, and Reference Update Review.
-Delivery Publish Review uses Needs Classification for unresolved identity.
-Delivery Update Review compares Baseline, Delivery, and Local state; its field
-decisions are Use Delivery and Keep Local. Media updates use Add New Take and
-Keep Current Media.
+Delivery Publish Review lists current Items as Included or Blocked and has no
+Clip-lineage decisions. Delivery Update Review shows snapshot replacement
+counts and Lane Mapping only.
 
-Unregister, Remove Subscription, Retire, Detach, and Delete have distinct
-meanings. Only Delete denotes actual deletion; Retire never automatically
-deletes a downstream Linked Item.
+Unregister stops managing a registered object. Remove Subscription removes the
+relationship while retaining project content. Keep as Local clears Delivery
+ownership from an Item that the user moved out of its mapped Master Track.
 
 Publish, Subscribe, Import, Update, Synchronize, Review, and Apply also have
 distinct workflow meanings. Publish creates an external revision; Subscribe
 creates a persistent relationship; Import creates local Delivery objects;
-Update selectively integrates Delivery changes; Synchronize materializes a
-Reference; Review prepares decisions or records explicit Reference review; and
-Apply executes a prepared local plan.
+Synchronize Delivery replaces the Source-managed snapshot; Synchronize Reference
+materializes a Reference Revision; Review validates a complete operation or
+records explicit Reference review.
 
 The pre-release implementation will receive a complete rename with no legacy
 aliases. `_ReaProjectLink` replaces `_Delivery`; Source packages use
@@ -95,21 +96,21 @@ ID is removed. Local state uses `project_id`; manifests qualify it as
 or Start New Project.
 
 Exceptional actions use user goals rather than internal jargon: Publish
-Unprocessed Media, Publish Unchanged Reference Revision, Add New Take, Keep
-Current Media, Unlock Publishing, Treat Selected Reference Tracks as New, and
+Unprocessed Media, Publish Unchanged Reference Revision, Keep as Local, Unlock
+Publishing, Treat Selected Reference Tracks as New, and
 Treat Selected Reference Items as New. Detailed risks belong in contextual
 confirmation text.
 
-The three independent revision types are Delivery Revision, Reference Revision,
-and Media Revision. Reference state uses Latest, Synchronized, and Reviewed
-Reference Revision. Delivery Update uses Target and Handled Delivery Revision,
-plus Accepted and Available Media Revision. Bare revision numbers are avoided
-when multiple revision types may be present.
+Delivery Revision and Reference Revision are the two evolving public revision
+types. Media Revision remains a technical manifest field fixed at 1 for each
+revision-local Clip. Reference state uses Latest, Synchronized, and Reviewed
+Reference Revision. Delivery synchronization uses Target and Handled Delivery
+Revision.
 
 Public severity levels are Notice, Warning, and Blocked. User-facing conditions
 include Review Out of Date, Newer Revision Available, Media File Not Found,
 Media Unavailable, Cannot Read Media, Media Content Mismatch, Target Track
-Missing, Needs Classification, and qualified Identity Mismatch. Stale,
+Missing and qualified Identity Mismatch. Stale,
 orphaned, offline, pointer, schema-integer, and lock-age terminology remains in
 technical diagnostics.
 

@@ -126,9 +126,9 @@ local update_item = assert(adapter.create_delivery_item(
     source_sample_rate = 48000,
     position_seconds = 0,
     source_project_id = "rollback-update-source",
+    lane_id = "rollback-update-lane",
     delivery_revision = 1,
     reference_revision = 7,
-    instance_id = "rollback-instance",
   }
 ))
 local retired_item = assert(adapter.create_delivery_item(
@@ -138,9 +138,9 @@ local retired_item = assert(adapter.create_delivery_item(
     source_sample_rate = 48000,
     position_seconds = 2,
     source_project_id = "rollback-update-source",
+    lane_id = "rollback-update-lane",
     delivery_revision = 1,
     reference_revision = 7,
-    instance_id = "rollback-retired-instance",
   }
 ))
 adapter.end_undo("Prepare rollback Update fixture")
@@ -175,31 +175,17 @@ local update_review = {
   instances = {
     {
       item_ref = update_item,
-      decision_key = "rollback-instance",
-      needs_new_instance_id = false,
-      baseline = current_state,
-      delivery = source_state,
-      local_state = current_state,
-      accepted_media_revision = 1,
-      target_clip = clip("rollback-update-clip", 2),
-      media_path = wav_path,
-      plan = { retired = false },
+      state = current_state,
     },
     {
       item_ref = retired_item,
-      decision_key = "rollback-retired-instance",
-      needs_new_instance_id = false,
-      baseline = retired_state,
-      delivery = nil,
-      local_state = retired_state,
-      accepted_media_revision = 1,
-      target_clip = nil,
-      plan = { retired = true },
+      state = retired_state,
     },
   },
   additions = {
     {
       track_guid = adapter.track_guid(update_track),
+      lane_id = "rollback-update-lane",
       clip = clip("rollback-addition", 1),
       media_path = wav_path,
     },
@@ -211,35 +197,16 @@ local failing_update_adapter = proxy({
     return nil, "injected addition failure"
   end,
 })
-local takes_before_update = reaper.CountTakes(update_item)
-local handled_before_update = adapter.delivery_instances(
-  "rollback-update-source"
-)[1].handled_delivery_revision
-local updated, update_error = delivery_update.apply(update_review, failing_update_adapter, {
-  instances = {
-    ["rollback-instance"] = { media_choice = "add_new_take" },
-    ["rollback-retired-instance"] = { retired_choice = "delete" },
-  },
-  additions = { ["rollback-addition"] = "import" },
-})
+local updated, update_error = delivery_update.apply(update_review, failing_update_adapter, {})
 assert(not updated and update_error == "injected addition failure", "Update failure injected")
-assert(reaper.CountTakes(update_item) == takes_before_update, "failed Update rolls back added Take")
-local restored_retired
+local restored_update, restored_retired
 for _, instance in ipairs(adapter.delivery_instances("rollback-update-source")) do
+  if instance.clip_id == "rollback-update-clip" then restored_update = instance end
   if instance.clip_id == "rollback-retired-clip" then restored_retired = instance end
 end
-assert(restored_retired, "failed Update restores deleted retired Item")
-assert(restored_retired.instance_id == "rollback-retired-instance",
-  "failed Update restores retired Item identity")
-assert(
-  math.abs(reaper.GetMediaItemInfo_Value(update_item, "D_POSITION")) < 0.000001,
-  "failed Update rolls back field changes"
-)
-assert(
-  adapter.delivery_instances("rollback-update-source")[1].handled_delivery_revision ==
-    handled_before_update,
-  "failed Update rolls back Instance revisions"
-)
+assert(restored_update and restored_retired, "failed synchronization restores deleted managed Items")
+assert(restored_retired.clip_id == "rollback-retired-clip",
+  "failed synchronization restores managed Item metadata")
 adapter.begin_undo("Clean rollback Update fixture")
 reaper.DeleteTrack(update_track)
 adapter.end_undo("Clean rollback Update fixture")

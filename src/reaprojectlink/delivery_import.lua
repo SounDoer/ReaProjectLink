@@ -191,10 +191,10 @@ function M.apply(review, adapter, options)
         local item, item_error = adapter.create_delivery_item(track, clip, {
           position_seconds = reference_start / reference_start_sample_rate +
             clip.startOffsetSamples / review.snapshot.sampleRate,
-          source_project_id = review.pointer.sourceProjectId,
+           source_project_id = review.pointer.sourceProjectId,
+           lane_id = lane.lane_id,
           delivery_revision = review.pointer.latestDeliveryRevision,
           reference_revision = review.snapshot.reference.reviewedRevision,
-          instance_id = adapter.new_id(),
           source_sample_rate = review.snapshot.sampleRate,
         })
         if not item then

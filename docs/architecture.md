@@ -43,10 +43,10 @@ The stable `delivery.json` entry point identifies the latest successful publish.
 Historical publish manifests and immutable media revisions remain available
 under `history` and `media`.
 
-Changed audio referenced by a source Active Take is copied into `media` during
-Publish. The managed copy is immutable and remains valid if the original bounce
-is moved, renamed, or deleted. Unchanged content reuses its existing managed
-revision rather than being copied again.
+Every audio file referenced by a source Active Take is copied into a new Clip
+directory during Publish. The managed copy is immutable and remains valid if
+the original bounce is moved, renamed, or deleted. Each Delivery Revision is
+self-contained and does not reuse Clip identity from an older Revision.
 
 This is a byte-for-byte copy of the Active Take's original file-backed WAV. The
 Publish operation does not render, transcode, or bake item, take, track, or FX
@@ -57,9 +57,9 @@ by default with guidance to bounce the processing, while an explicit `Publish
 Anyway` override remains available. The warning must state that the copied media
 does not include those effects.
 
-Each Clip ID owns its media-revision directory. A sanitized, length-limited Item
+Each revision-local Clip ID owns its media directory. A sanitized, length-limited Item
 or Active Take display name may make the file readable, for example
-`Commander_Radio_Close_r0001.wav`; an unnamed item uses `clip_r0001.wav`.
+`Commander_Radio_Close.wav`; an unnamed item uses `clip.wav`.
 Identity and revision come from the manifest and Clip ID directory, never from
 this filename.
 
@@ -135,8 +135,9 @@ Source Project ID
 - **Delivery:** an atomic group published together.
 - **Delivery Lane:** a designated source track and its logical counterpart in a
   Master Project.
-- **Delivery Clip:** one persistent deliverable represented by an item.
-- **Media Revision:** one bounced WAV version of that clip.
+- **Delivery Clip:** one Item in one immutable Delivery Revision.
+- **Media Revision:** retained as a manifest field and always `1` for a
+  revision-local Clip.
 
 REAPER project, track, item, and take GUIDs may be recorded as implementation
 handles, but they are not the cross-project domain identity. ReaProjectLink IDs are
@@ -144,20 +145,16 @@ stored in REAPER extension data and repeated in manifests.
 
 Durable authoring state is stored inside the `.rpp`, not in a sibling sidecar.
 Project extension state holds the Project Type, Project ID, Subscriptions,
-revision pointers, and Lane Bindings. Source Tracks carry Lane IDs; Source Items
-carry Clip IDs. A Linked Item carries its upstream Clip ID plus a distinct
-internal Instance ID. Historical Manifests provide three-way-comparison
-baselines without embedding full prior snapshots in the project.
+revision pointers, and Lane Bindings. Source Tracks carry stable Lane IDs;
+Source Items receive fresh Clip IDs on each Publish. A synchronized Master Item
+carries its Source Project ID, Delivery Lane ID, and revision-local Clip ID. The
+Delivery Lane ID lets ReaProjectLink detect when the
+Item has been moved away from its bound Master Track.
 
-Copy and split operations in a Master Project retain Clip identity but produce
-distinct internal Instance IDs. A duplicate Clip ID discovered among Source Items is not
-silently repaired: Delivery Publish Review requires the user to classify the relationship.
-
-After review resolves any new or ambiguous identities, Source and Reference
-Publish save the `.rpp` before touching the managed package. This guarantees that
-the IDs behind a published manifest survive reopening the project. A save
-failure aborts publication; IDs saved before a later package failure remain safe
-to reuse on retry. Normal REAPER Save is not a publication action. Delivery import and
+Source and Reference Publish save the `.rpp` before touching the managed
+package. This guarantees that the identities behind a published manifest
+survive reopening the project. A save failure aborts publication; IDs saved
+before a later package failure remain safe to reuse on retry. Normal REAPER Save is not a publication action. Delivery import and
 update operations follow normal REAPER editing semantics and leave the project
 dirty for the user to save.
 
@@ -190,46 +187,20 @@ Delivery tracks describe the current effective delivery state, not a timeline of
 all historical bounces. Previous versions belong in takes, outside the delivery
 tracks, or in the managed delivery package.
 
-On Publish, the tool compares the current delivery-track snapshot with the last
-published snapshot:
+On Publish, the tool scans the current Delivery Tracks as one complete snapshot.
+Every Item becomes a new revision-local Clip regardless of its prior Clip ID.
+Splits, joins, copies, additions, removals, placement changes, and renames need
+no lineage classification.
 
-- an item with an existing Delivery Clip ID is an existing logical delivery;
-- an unregistered item may be a new delivery or a new revision of an old one;
-- track and timeline overlap may be used to suggest a relationship, but not to
-  decide an ambiguous relationship silently;
-- a previously published clip that is absent becomes a removal candidate and is
-  not automatically deleted downstream.
-
-The Delivery Publish Review classifies changes as Added, Audio Changed,
-Placement Changed, Metadata Changed, Unchanged, Retired, Needs Classification,
-or Blocked. An unresolved Item blocks publication until the user classifies it or removes it from the
-delivery surface. Filename, duration, and audio similarity are never
-authoritative identity signals.
-
-The MVP presents this as a table grouped by Delivery Lane. The header shows the
+The Delivery Publish Review is grouped by Delivery Lane. The header shows the
 outgoing Delivery Revision, Reviewed Reference Revision, output path, and blocker
-count. Row labels are Added, Audio Changed, Placement Changed, Metadata Changed,
-Unchanged, Retired, Needs Classification, and Blocked; Unchanged is collapsed by
-default. Users resolve new or ambiguous identities and any FX override in this
-Review, but cannot select only part of the set. The final action is `Save &
-Publish Delivery` for the complete snapshot.
+count. Readable Items are Included; missing or unsupported media is Blocked.
+Users may resolve the explicit FX override, but cannot select only part of the
+snapshot. The final action is `Save & Publish Delivery`.
 
-Identity matching is advisory rather than score-driven. For an untagged current
-Item, the candidate set contains only prior Clips missing from the current scan.
-Same-Lane candidates sort first, followed by visible evidence such as timeline
-proximity and overlap, duration similarity, identical media hash, and name
-similarity. The user always chooses Create New Clip or Link as New Revision; no
-candidate is accepted automatically. A prior Clip that is still present cannot
-be selected, which prevents duplicate identity.
-
-One-to-many and many-to-one replacements are structural changes. The initial
-model retires the old logical clips and creates new clips; it does not collapse
-those changes into a routine revision or automatically delete downstream items.
-
-Every successful source Publish increments `deliveryRevision`. Each Clip's
-`mediaRevision` increments only when its WAV content hash changes. Metadata-only
-changes reuse the previous media revision. Reference publication maintains its own
-independent `referenceRevision`; there is no `clipRevision` in the MVP.
+Every successful Source Publish increments `deliveryRevision`. Each new Clip has
+`mediaRevision` 1 and its WAV is copied into that Clip's unique directory.
+Reference publication maintains its own independent `referenceRevision`.
 
 `delivery.json` is a small stable entry point that references the latest
 immutable, complete history manifest. Historical manifests are snapshots rather
@@ -238,9 +209,8 @@ than deltas. See `manifest-schema.md` for the implemented MVP fields.
 Each Delivery Publish scans all registered Delivery Tracks and uses every Item's
 active Take. Track and Item mute state are playback choices and do not affect
 Delivery membership. Empty Items and non-audio media are ineligible; Media File
-Not Found blocks publication. The resulting Manifest is a complete snapshot even
-though unchanged clips reuse their existing media revisions. Partial publication
-is outside the MVP.
+Not Found blocks publication. The resulting Manifest is a complete snapshot.
+Partial publication is outside the MVP.
 
 ## Master-side bindings
 
@@ -251,7 +221,6 @@ The Master Project owns all integration mappings:
 
 ```text
 Delivery Lane ID <-> Master Track GUID
-Delivery Clip ID <-> one or more Linked Item Instance IDs
 ```
 
 A Source Project never stores Master Project paths or target Track GUIDs. This makes
@@ -265,12 +234,13 @@ One lane to one track is the default suggestion, but multiple lanes may target
 the same track. Name matching may suggest an initial mapping but requires user
 confirmation; the persisted binding uses Lane ID and Track GUID.
 
-The tool then creates and tags items using the published media, timeline
+The tool then creates and tags Source-managed Items using the published media, timeline
 position, source offset, duration, display metadata, Clip ID, media revision, and
 reference revision. Initial item state also includes fades, item gain, and basic
 non-plug-in take parameters. It does not copy source-project FX, Track
 Volume/Pan, routing, automation, Take FX, track layout, or the full source folder
-hierarchy. Those properties are owned by the Master Project after import.
+hierarchy. Those Track-level properties are owned by the Master Project. Imported
+Item state remains owned by the Source while the Item is managed.
 
 The first-import screen presents this as a compact Lane mapping table. Bulk
 controls create new tracks under one selected Folder Track, offer name-based
@@ -285,62 +255,37 @@ different revisions produces a prominent warning that the Master user may
 explicitly override.
 
 A Delivery Lane added by a later Publish remains unmapped until the Master User
-chooses or creates its target track. A retired source lane does not cause its
-bound Master Track or items to be deleted.
+chooses or creates its target Track. A Lane absent from a later snapshot leaves
+its Master Track and Track-level mixing state intact, but its previous managed
+Items are removed during synchronization.
 
 ## Revision update
 
-For an existing delivery clip, an accepted update should:
+Delivery synchronization is snapshot replacement:
 
-1. locate every Linked Item by Delivery Clip ID and internal Instance ID;
-2. let the user make decisions for each Linked Item;
-3. add a new Take to each selected Linked Item where appropriate;
-4. replace only the duplicate take's PCM source with the new WAV;
-5. label the new take with its delivery revision;
-6. make it active;
-7. retain all older takes;
-8. create an undo point and update the accepted dependency revision.
+1. validate every WAV and every Lane Mapping in the target Delivery Revision;
+2. locate every still-managed Item for the Delivery;
+3. delete those Items;
+4. import every target Clip onto its bound Delivery Track;
+5. persist the handled Delivery Revision;
+6. commit the whole operation as one REAPER Undo step.
 
-This keeps the track and item stable while preserving track routing, track FX,
-automation, item placement, and previous audio revisions. Old takes are removed
-only by an explicit user action.
+This preserves Master Track objects and therefore their routing, Track FX,
+automation, folder structure, and other Track-level mixing state. Item-level
+changes on a managed Item are intentionally replaced by the Source snapshot.
+There are no per-Clip, per-field, Take, Retired, or Decline decisions.
 
-Changes to duration, timeline position, source offset, channel layout, or sample
-rate require a warning and explicit handling policy. The tool must not silently
-delete items when a source clip disappears from a later publish.
+The Delivery Update Review shows the target Revision and the counts of managed
+Items being replaced and Source Items being imported. Any published Revision can
+be targeted. The currently handled Revision can be synchronized again, allowing
+the Source snapshot to be restored after a managed Item was deleted or detached.
 
-A Linked Item whose Delivery Clip is absent from the target revision is shown as
-Retired. Keep Retired Item is the default. The Master User may instead detach it
-from Delivery updates or explicitly delete it. Match Source Structure is a bulk
-review decision that deletes Retired Linked Items and imports all Pending Clips;
-it requires confirmation and is applied in the same REAPER Undo step as the
-rest of the update.
-
-The Delivery Update Review compares Baseline, Delivery, and Local state for each
-Linked Item. A
-Delivery-only change defaults to Use Delivery, a Local-only change remains local, and
-an equal result is accepted. When both changed a field differently, the field is
-a conflict defaulting to Keep Local. Position, length, source offset, fades, item
-gain, and supported Take parameters each offer only Keep Local or Use Delivery in the
-MVP.
-
-Audio-content acceptance remains independent and offers Add New Take or Keep
-Current Media. Bulk actions use Add All as New Takes, Keep All Local Changes, or
-Use Delivery for Unmodified Items. Applying the chosen updates creates one undo
-point. Each Linked Item stores its Accepted Media Revision separately from its
-Handled Delivery Revision, allowing some Linked Items or media changes to remain
-pending without losing their comparison baseline.
-
-Copying or splitting a managed Linked Item creates multiple Linked Items for the same
-Delivery Clip. Each remains eligible for later updates until the user explicitly
-detaches it. A detached Linked Item becomes an ordinary REAPER Item.
-
-The MVP copies basic take parameters when creating the new revision take: source
-offset, volume, pan, playback rate, pitch, channel mode, and polarity. Item-level
-state and Track-level local state remain in place. Take FX, Take envelopes, stretch
-markers, take markers, and complex source wrappers are outside automatic
-migration. Add New Take requires explicit confirmation when unsupported Take
-data is detected; Keep Current Media remains available.
+When a managed Item is moved away from the Master Track bound to its Delivery Lane,
+ReaProjectLink asks whether to keep it as local Master content. Confirmation
+clears its Delivery ownership without moving it again, and later synchronization
+does not touch it. Declining leaves it managed; the next synchronization replaces
+it. There is no reattach operation—synchronizing restores a fresh Source-owned
+copy on the bound Track.
 
 ## Reference dependency
 

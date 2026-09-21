@@ -40,7 +40,7 @@ local item = {
 local track = { name = "DX", lane_id = "lane-1", items = { item } }
 local events = {}
 local project_path = "C:/show/CIN_030_DX.rpp"
-local ids = { "delivery-1", "clip-1", "tx-1" }
+local ids = { "delivery-1", "clip-1", "tx-1", "clip-2" }
 local id_index = 0
 local adapter = {}
 function adapter.project_path() return project_path end
@@ -76,10 +76,7 @@ function writer.publish(input)
 end
 
 local service = delivery_publish.create({ delivery_writer = writer })
-local review = assert(service.review(adapter, fs, {
-  identity_decisions = { [item] = { kind = "new" } },
-  publish_anyway = false,
-}))
+local review = assert(service.review(adapter, fs, { publish_anyway = false }))
 
 assert(review.package_root == "C:/show/_ReaProjectLink/CIN_030_DX", "managed package root")
 assert(review.delivery_revision == 1, "first review revision")
@@ -107,7 +104,7 @@ files[review.package_root .. "/delivery.json"] = json.encode(captured_publish.po
 files[review.package_root .. "/history/delivery-0001.json"] = json.encode(captured_publish.snapshot)
 local next_review = assert(service.review(adapter, fs, {}))
 assert(next_review.delivery_revision == 2, "published baseline is loaded")
-assert(next_review.lanes[1].clips[1].status == "Unchanged", "baseline comparison")
+assert(next_review.lanes[1].clips[1].status == "Included", "next snapshot needs no lineage decision")
 
 project_path = "C:/show/renamed/CIN_030_DX_New.rpp"
 local unresolved_save_as = assert(service.review(adapter, fs, {}))
@@ -120,11 +117,10 @@ assert(continued.source_project_id == "source-1", "continuing keeps Source ident
 
 local restarted = assert(service.review(adapter, fs, {
   save_as_decision = "new",
-  identity_decisions = { [item] = { kind = "new" } },
 }))
 assert(restarted.package_root == "C:/show/renamed/_ReaProjectLink/CIN_030_DX_New", "new Source uses new package root")
 assert(restarted.source_project_id == nil, "new Source receives a new identity on Publish")
-assert(restarted.lanes[1].clips[1].status == "Added", "new Source resets Clip identity")
+assert(restarted.lanes[1].clips[1].status == "Included", "new Source includes its current Items")
 
 local package_events = 0
 for _, event in ipairs(events) do if event == "publish package" then package_events = package_events + 1 end end

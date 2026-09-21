@@ -127,7 +127,6 @@ function M.create(dependencies)
     local review = delivery_review.build({
       current = current,
       previous_snapshot = previous,
-      identity_decisions = options.identity_decisions,
       publish_anyway = options.publish_anyway,
     }, fs)
 

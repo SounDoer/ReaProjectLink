@@ -29,13 +29,13 @@ assert(adapter.get_track_lane_id(track) == "lane-1", "Track identity round trip"
 assert(adapter.get_item_clip_id(item) == "clip-1", "Item identity round trip")
 assert(adapter.get_item_reference_id(item) == "reference-1", "Reference identity round trip")
 assert(adapter.selected_items()[1] == item, "selected Item enumeration")
-assert(not adapter.is_linked_item(item), "ordinary Item is not a Linked Item")
+assert(not adapter.is_linked_item(item), "ordinary Item is not synchronized")
 local ordinary_detach, ordinary_detach_error = adapter.detach_instance(item)
-assert(not ordinary_detach and ordinary_detach_error == "Selected Item is not a Linked Item.",
+assert(not ordinary_detach and ordinary_detach_error == "Selected Item is not a synchronized Item.",
   "ordinary Item identity is protected from Detach")
 assert(adapter.get_item_clip_id(item) == "clip-1", "rejected Detach preserves Item identity")
 local ordinary_delete, ordinary_delete_error = adapter.delete_linked_item(item)
-assert(not ordinary_delete and ordinary_delete_error == "Selected Item is not a Linked Item.",
+assert(not ordinary_delete and ordinary_delete_error == "Selected Item is not a synchronized Item.",
   "ordinary Item is protected from Delete")
 assert(state.start_offset_samples == 96000, "timeline position conversion")
 assert(state.source_offset_samples == 2400, "source offset conversion")
@@ -81,10 +81,10 @@ local imported = assert(adapter.create_delivery_item(track, {
 }, {
   source_sample_rate = 48000,
   position_seconds = 3,
-  source_project_id = "source-1",
+   source_project_id = "source-1",
+   lane_id = "lane-1",
   delivery_revision = 8,
   reference_revision = 7,
-  instance_id = "instance-1",
 }))
 local imported_state = adapter.item_presentation(imported)
 assert(imported_state.start_offset_samples == 144000, "imported position")
@@ -95,37 +95,8 @@ assert(adapter.get_item_clip_id(imported) == "imported-clip", "imported Clip bin
 assert(adapter.is_linked_item(imported), "imported Item is linked")
 
 local instances = adapter.delivery_instances("source-1")
-assert(#instances == 1 and instances[1].instance_id == "instance-1", "linked Instance scan")
-assert(not instances[1].retired, "new Linked Item is not retired")
-adapter.set_instance_retired(imported, true)
-assert(adapter.delivery_instances("source-1")[1].retired, "retirement decision persists")
-adapter.set_instance_retired(imported, false)
-assert(adapter.add_delivery_take(imported, {
-  displayName = "Imported Line",
-  mediaRevision = 5,
-  sourceOffsetSamples = 0,
-  take = { volume = 1, pan = 0, playbackRate = 1, pitch = 0, channelMode = 0, polarityInverted = false },
-}, wav_path, { source_sample_rate = 48000 }))
-assert(reaper.CountTakes(imported) == 2, "update adds a Take")
-assert(adapter.apply_delivery_fields(imported, {
-  position_seconds = { choice = "use_delivery", delivery = 2 },
-  length_seconds = { choice = "use_delivery", delivery = 0.02 },
-  source_offset_seconds = { choice = "keep_local", local_state = 0.005 },
-  take_volume = { choice = "keep_local", local_state = 0.8 },
-  take_polarity_inverted = { choice = "keep_local", local_state = true },
-  take_pan = { choice = "keep_local", local_state = 0.2 },
-  take_pitch = { choice = "keep_local", local_state = 1 },
-}, { reference_start_samples = 96000, project_sample_rate = 48000 }))
-assert(math.abs(reaper.GetMediaItemInfo_Value(imported, "D_POSITION") - 4) < 0.000001, "update position")
-local updated_take = reaper.GetActiveTake(imported)
-assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_STARTOFFS") - 0.005) < 0.000001, "new Take preserves local source offset")
-assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_VOL") + 0.8) < 0.000001, "new Take preserves local volume and polarity")
-assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_PAN") - 0.2) < 0.000001, "new Take preserves local pan")
-assert(math.abs(reaper.GetMediaItemTakeInfo_Value(updated_take, "D_PITCH") - 1) < 0.000001, "new Take preserves local pitch")
-adapter.set_instance_revisions(imported, 5, 9)
-instances = adapter.delivery_instances("source-1")
-assert(instances[1].accepted_media_revision == 5, "accepted media revision")
-assert(instances[1].handled_delivery_revision == 9, "handled Publish revision")
+assert(#instances == 1, "synchronized Item scan")
+assert(instances[1].lane_id == "lane-1", "Delivery Lane ownership is persisted")
 assert(adapter.detach_instance(imported), "detach Instance")
 assert(not adapter.is_linked_item(imported), "detached Item is no longer linked")
 assert(#adapter.delivery_instances("source-1") == 0, "detached Item is ordinary")
@@ -142,12 +113,12 @@ local deletable = assert(adapter.create_delivery_item(track, {
 }, {
   source_sample_rate = 48000,
   position_seconds = 5,
-  source_project_id = "source-1",
+   source_project_id = "source-1",
+   lane_id = "lane-1",
   delivery_revision = 1,
   reference_revision = 7,
-  instance_id = "delete-instance",
 }))
-assert(adapter.delete_linked_item(deletable), "delete retired Linked Item")
+assert(adapter.delete_linked_item(deletable), "delete synchronized Item")
 assert(not adapter.valid_item(deletable), "deleted Linked Item is removed")
 
 local reference = {

@@ -54,33 +54,34 @@ local smoke_path = os.getenv("REAPROJECTLINK_UI_SMOKE_RESULT")
 local window_open = true
 local message, message_is_error
 local source_reference, delivery_review, reference_review, import_review, update_review
-local source_decisions, import_mappings = {}, {}
+local import_mappings = {}
 local source_save_as_decision
 local master_save_as_decision
-local update_decisions, update_additions, update_lanes = {}, {}, {}
+local update_lanes = {}
 local update_rebindings = {}
 local update_target_input = 0
 local publish_anyway, import_reference_override, update_reference_override = false, false, false
 local reference_publish_anyway = false
 local source_shift_entire_project = false
-local show_unchanged = false
 local lock_info, lock_package_root
 local active_project_token = adapter.project_token()
+local moved_items_change_count = -1
 
 local function reset_transient_state()
   message, message_is_error = nil, nil
   source_reference, delivery_review, reference_review = nil, nil, nil
   import_review, update_review = nil, nil
-  source_decisions, import_mappings = {}, {}
+  import_mappings = {}
   source_save_as_decision = nil
   master_save_as_decision = nil
-  update_decisions, update_additions, update_lanes = {}, {}, {}
+  update_lanes = {}
   update_rebindings = {}
   update_target_input = 0
   publish_anyway, import_reference_override = false, false
   update_reference_override, reference_publish_anyway = false, false
-  source_shift_entire_project, show_unchanged = false, false
+  source_shift_entire_project = false
   lock_info, lock_package_root = nil, nil
+  moved_items_change_count = -1
 end
 
 local function notify(value, is_error)
@@ -255,7 +256,6 @@ end
 
 local function refresh_delivery_review()
   local review, err = delivery_publish.review(adapter, fs, {
-    identity_decisions = source_decisions,
     publish_anyway = publish_anyway,
     save_as_decision = source_save_as_decision,
   })
@@ -289,7 +289,6 @@ local function draw_delivery_review()
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Start New Project") then
       source_save_as_decision = "new"
-      source_decisions = {}
       refresh_delivery_review()
     end
   end
@@ -305,53 +304,15 @@ local function draw_delivery_review()
       ImGui.TextWrapped(ctx, "Warning: detected FX will not be included in the published media.")
     end
   end
-  local changed
-  changed, show_unchanged = ImGui.Checkbox(ctx, "Show Unchanged Clips", show_unchanged)
   for _, lane in ipairs(delivery_review.lanes) do
     if ImGui.TreeNode(ctx, lane.display_name .. "##" .. lane.lane_id) then
       if lane.fx_blocked then ImGui.TextWrapped(ctx, "Blocked: Delivery Track has FX.") end
       for _, row in ipairs(lane.clips) do
-        if row.status ~= "Unchanged" or show_unchanged then
-          ImGui.TextWrapped(ctx, string.format("[%s] %s", row.status, row.display_name or "(unnamed)"))
-        end
-        local item_key = tostring(row.clip.item_ref)
-        if row.status == "Needs Decision" or row.duplicate then
-          if ImGui.Button(ctx, "Create New Clip##" .. item_key) then
-            source_decisions[row.clip.item_ref] = { kind = "new" }
-            refresh_delivery_review()
-          end
-          if row.duplicate then
-            ImGui.SameLine(ctx)
-            if ImGui.Button(ctx, "Keep this Clip ID##" .. item_key) then
-              source_decisions[row.clip.item_ref] = { kind = "keep" }
-              refresh_delivery_review()
-            end
-          end
-          for _, candidate in ipairs(row.suggestions or {}) do
-            if ImGui.Button(ctx, "Link as revision of " .. (candidate.display_name or candidate.clip_id) .. "##" .. candidate.clip_id) then
-              source_decisions[row.clip.item_ref] = { kind = "link", clip_id = candidate.clip_id }
-              refresh_delivery_review()
-            end
-            ImGui.SameLine(ctx)
-            ImGui.TextWrapped(ctx, table.concat(candidate.reasons, ", "))
-          end
-        end
-        if source_decisions[row.clip.item_ref] then
-          ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Clear Decision##" .. item_key) then
-            source_decisions[row.clip.item_ref] = nil
-            refresh_delivery_review()
-          end
-        end
-        if row.status ~= "Unchanged" or show_unchanged then
-          for _, blocker in ipairs(row.blockers or {}) do ImGui.TextWrapped(ctx, "  " .. blocker) end
-        end
+        ImGui.TextWrapped(ctx, string.format("[%s] %s", row.status, row.display_name or "(unnamed)"))
+        for _, blocker in ipairs(row.blockers or {}) do ImGui.TextWrapped(ctx, "  " .. blocker) end
       end
       ImGui.TreePop(ctx)
     end
-  end
-  for _, row in ipairs(delivery_review.retired or {}) do
-    ImGui.TextWrapped(ctx, "[Retired] " .. (row.display_name or row.clip_id))
   end
   if delivery_review.blocker_count == 0 and ImGui.Button(ctx, "Save & Publish Delivery") then
     local result, err = delivery_publish.publish(delivery_review, adapter, fs, metadata())
@@ -362,7 +323,7 @@ local function draw_delivery_review()
         message = message .. " Publish lock cleanup failed: " .. result.lock_release_error
       end
       notify(message, result.project_save_error ~= nil or result.lock_release_error ~= nil)
-      delivery_review, source_decisions, source_save_as_decision = nil, {}, nil
+      delivery_review, source_save_as_decision = nil, nil
     else notify(err, true); inspect_lock(delivery_review.package_root) end
   end
 end
@@ -652,23 +613,15 @@ local function begin_update(source_id, target_revision)
   -- A failed reload keeps the review the user is looking at.
   if not review then notify(err, true); return end
   update_review = review
-  update_decisions, update_additions, update_lanes = {}, {}, {}
+  update_lanes = {}
   update_rebindings = {}
   update_target_input = review.target_revision
-  for _, row in ipairs(review.instances) do
-    update_decisions[row.decision_key] = {
-      media_choice = row.plan.media.choice,
-      field_choices = {},
-      retired_choice = row.plan.retired and "keep" or nil,
-    }
-  end
-  for _, row in ipairs(review.additions) do update_additions[row.clip.clipId] = "import" end
   for _, lane in ipairs(review.unmapped_lanes) do
     update_lanes[lane.lane_id] = { kind = "unmapped" }
   end
   if review.pending_count == 0 then
     notify(string.format(
-      "Already aligned with Delivery r%d.",
+      "Delivery r%d contains no synchronized Items.",
       review.target_revision
     ))
   else
@@ -680,7 +633,7 @@ local function draw_bound_lanes()
   if #update_review.bound_lanes == 0 then return end
   ImGui.Separator(ctx)
   ImGui.Text(ctx, string.format("Mapped Delivery Lanes (%d)", #update_review.bound_lanes))
-  ImGui.TextWrapped(ctx, "New Clips from a Lane land on its mapped Track. Moving an Item to another Track does not change this.")
+  ImGui.TextWrapped(ctx, "Each synchronization replaces Source-managed Items on these Tracks.")
   for _, lane in ipairs(update_review.bound_lanes) do
     local rebound = update_rebindings[lane.lane_id]
     ImGui.Text(ctx, string.format(
@@ -703,31 +656,6 @@ local function draw_bound_lanes()
   end
 end
 
-local function draw_declined_clips()
-  if #update_review.declined_clips == 0 then return end
-  ImGui.Separator(ctx)
-  ImGui.Text(ctx, string.format("Declined Clips (%d)", #update_review.declined_clips))
-  ImGui.TextWrapped(ctx, "These Clips are not offered because you skipped them. Offering one again puts it back in this review.")
-  for _, clip in ipairs(update_review.declined_clips) do
-    ImGui.Text(ctx, string.format(
-      "%s in %s",
-      clip.display_name or short_id(clip.clip_id),
-      clip.lane_display_name or "an unnamed Lane"
-    ))
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Offer Again##declined-" .. clip.clip_id) then
-      local result, err = delivery_update.undecline(
-        adapter,
-        update_review.source_project_id,
-        clip.clip_id
-      )
-      if result then
-        begin_update(update_review.source_project_id, update_review.target_revision)
-      else notify(err, true) end
-    end
-  end
-end
-
 local function draw_update_target()
   ImGui.Text(ctx, string.format(
     "Target Delivery Revision %d of %d",
@@ -746,135 +674,17 @@ end
 local function draw_update()
   if not update_review then return end
   draw_update_target()
-  local pending = update_review.pending_count > 0
-  if not pending then
-    ImGui.TextWrapped(ctx, string.format(
-      "Every Clip of Delivery r%d is already aligned in this project.",
-      update_review.target_revision
-    ))
-    draw_declined_clips()
-    draw_bound_lanes()
-    if next(update_rebindings) and ImGui.Button(ctx, "Apply Lane Mapping") then
-      local result, err = delivery_update.apply(update_review, adapter, {
-        instances = update_decisions,
-        additions = update_additions,
-        lane_mappings = update_lanes,
-        lane_rebindings = update_rebindings,
-        allow_reference_revision_mismatch = update_reference_override,
-      })
-      if result then
-        notify(string.format("Remapped %d Delivery Lane(s).", result.rebound_lanes))
-        update_review = nil
-      else notify(err, true) end
-    end
-    return
-  end
+  ImGui.TextWrapped(ctx, string.format(
+    "Synchronize Source snapshot: replace %d managed Item(s) with %d Item(s) from Delivery r%d.",
+    update_review.replacement_count,
+    update_review.source_item_count,
+    update_review.target_revision
+  ))
+  ImGui.TextWrapped(ctx,
+    "Synchronized Items on mapped Tracks are Source-managed. Move an Item to another Track and confirm Keep as Local before editing it independently.")
   if update_review.reference_warning then
     local changed
     changed, update_reference_override = ImGui.Checkbox(ctx, "Allow Reference revision difference##update", update_reference_override)
-  end
-  local retired_count = 0
-  for _, row in ipairs(update_review.instances) do
-    if row.plan.retired then retired_count = retired_count + 1 end
-  end
-  if retired_count > 0 then
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, string.format(
-      "Structural Change: %d Retired Linked Item(s), %d Pending Clip(s)",
-      retired_count,
-      #update_review.additions
-    ))
-    ImGui.TextWrapped(ctx,
-      "Keep preserves Master edits. Match Source Structure deletes retired Linked Items and imports all Pending Clips.")
-    if ImGui.Button(ctx, "Match Source Structure") then
-      for _, row in ipairs(update_review.instances) do
-        if row.plan.retired then
-          update_decisions[row.decision_key].retired_choice = "delete"
-        end
-      end
-      for _, addition in ipairs(update_review.additions) do
-        update_additions[addition.clip.clipId] = "import"
-      end
-    end
-  end
-  for _, row in ipairs(update_review.instances) do
-    local decision = update_decisions[row.decision_key]
-    local label = string.format(
-      "%s (%s)",
-      row.display_name or row.clip_id,
-      short_id(row.clip_id)
-    )
-    if row.clip_instance_total > 1 then
-      label = label .. string.format(
-        " [%d/%d]",
-        row.clip_instance_index,
-        row.clip_instance_total
-      )
-    end
-    if ImGui.TreeNode(ctx, label .. "##" .. row.decision_key) then
-      if row.plan.retired then
-        ImGui.TextWrapped(ctx, "Retired upstream. Choose what happens to this Linked Item.")
-        local retired_labels = {
-          keep = "Keep Retired Item",
-          detach = "Detach Retired Item",
-          delete = "Delete Retired Item",
-        }
-        ImGui.Text(ctx, "Action: " ..
-          (retired_labels[decision.retired_choice] or "Keep Retired Item"))
-        if ImGui.Button(ctx, "Keep Retired Item##" .. row.decision_key) then
-          decision.retired_choice = "keep"
-        end
-        ImGui.SameLine(ctx)
-        if ImGui.Button(ctx, "Detach Retired Item##" .. row.decision_key) then
-          decision.retired_choice = "detach"
-        end
-        ImGui.SameLine(ctx)
-        if ImGui.Button(ctx, "Delete Retired Item##" .. row.decision_key) then
-          decision.retired_choice = "delete"
-        end
-      else
-        if row.plan.media.pending then
-          local accept = decision.media_choice == "add_new_take"
-          local changed
-          changed, accept = ImGui.Checkbox(ctx, "Add New Take", accept)
-          if changed then
-            decision.media_choice = accept and "add_new_take" or "keep_current_media"
-          end
-          if row.advanced_take_state and accept then
-            changed, decision.replace_anyway = ImGui.Checkbox(
-              ctx,
-              "Confirm Add New Take with unsupported Take data",
-              decision.replace_anyway or false
-            )
-          end
-        end
-        for field, plan in pairs(row.plan.fields) do
-          if plan.kind ~= "unchanged" then
-            local choice = decision.field_choices[field] or plan.choice
-            if ImGui.Button(ctx, field .. ": " .. choice .. "##" .. row.decision_key .. field) then
-              decision.field_choices[field] =
-                choice == "keep_local" and "use_delivery" or "keep_local"
-            end
-          end
-        end
-      end
-      ImGui.TreePop(ctx)
-    end
-  end
-  if #update_review.additions > 0 then
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, string.format(
-      "Clips without an Item here (%d)",
-      #update_review.additions
-    ))
-    ImGui.TextWrapped(ctx, "Unchecked Clips are declined and remembered, and can be offered again later.")
-  end
-  for _, row in ipairs(update_review.additions) do
-    local id = row.clip.clipId
-    local include = update_additions[id] == "import"
-    local changed
-    changed, include = ImGui.Checkbox(ctx, "Import " .. (row.clip.displayName or short_id(id)), include)
-    if changed then update_additions[id] = include and "import" or "decline" end
   end
   if #update_review.unmapped_lanes > 0 then
     ImGui.Separator(ctx)
@@ -895,63 +705,50 @@ local function draw_update()
     end
   end
   for _, lane in ipairs(update_review.unmapped_lanes) do draw_mapping(lane, update_lanes, "update-") end
-  draw_declined_clips()
   draw_bound_lanes()
-  if update_review.blocker_count == 0 and ImGui.Button(ctx, "Apply Delivery Update") then
-    local delete_count = 0
-    for _, row in ipairs(update_review.instances) do
-      local decision = update_decisions[row.decision_key]
-      if row.plan.retired and decision.retired_choice == "delete" then
-        delete_count = delete_count + 1
-      end
-    end
-    local confirmed = delete_count == 0 or reaper.ShowMessageBox(
-      string.format(
-        "Delete %d retired Linked Item(s)? The Delivery Update will be one REAPER Undo step.",
-        delete_count
-      ),
-      "Delete Retired Linked Items",
-      1
-    ) == 1
-    if confirmed then
-      local result, err = delivery_update.apply(update_review, adapter, {
-        instances = update_decisions,
-        additions = update_additions,
-        lane_mappings = update_lanes,
-        lane_rebindings = update_rebindings,
-        allow_reference_revision_mismatch = update_reference_override,
-      })
-      if result then
-        notify(string.format(
-          "Updated %d Linked Item(s), detached %d, deleted %d, added %d Take(s) and %d Item(s).",
-          result.updated_instances,
-          result.detached_instances,
-          result.deleted_instances,
-          result.new_takes,
-          result.new_items
-        ))
-        update_review = nil
-      else notify(err, true) end
-    end
+  if update_review.blocker_count == 0 and ImGui.Button(ctx, "Synchronize Delivery") then
+    local result, err = delivery_update.apply(update_review, adapter, {
+      lane_mappings = update_lanes,
+      lane_rebindings = update_rebindings,
+      allow_reference_revision_mismatch = update_reference_override,
+    })
+    if result then
+      notify(string.format(
+        "Synchronized Delivery r%d: replaced %d Item(s) with %d Source Item(s).",
+        update_review.target_revision,
+        result.deleted_items,
+        result.new_items
+      ))
+      update_review = nil
+    else notify(err, true) end
   end
 end
 
-local function detach_selected()
-  local count = 0
-  for _, item in ipairs(adapter.selected_items()) do
-    if delivery_update.detach(adapter, item) then count = count + 1 end
+local function confirm_moved_items()
+  local change_count = adapter.project_change_count()
+  if change_count == moved_items_change_count then return end
+  moved_items_change_count = change_count
+  local moved = delivery_update.moved_instances(adapter)
+  if #moved == 0 then return end
+  local confirmed = reaper.ShowMessageBox(
+    string.format(
+      "%d synchronized Item(s) were moved out of their mapped Track.\n\n" ..
+      "Keep them as local Master content? They will no longer be updated from the Source.\n\n" ..
+      "Choose No to keep them Source-managed; the next synchronization will replace them.",
+      #moved
+    ),
+    "Keep Moved Items as Local",
+    4
+  ) == 6
+  if confirmed then
+    local result, err = delivery_update.detach_many(adapter, moved)
+    notify(result and string.format("Kept %d moved Item(s) as local content.", result.detached) or err, not result)
+    moved_items_change_count = adapter.project_change_count()
   end
-  notify(string.format("Detached %d selected Item(s).", count))
-end
-
-local function has_selected_linked_item()
-  for _, item in ipairs(adapter.selected_items()) do
-    if adapter.is_linked_item(item) then return true end
-  end
-  return false
 end
 
 local function draw_master(state)
+  confirm_moved_items()
   ImGui.Text(ctx, "Project Type: Master")
   ImGui.TextWrapped(ctx, "Project ID: " .. short_id(state.project_id))
   ImGui.TextWrapped(ctx, "Project: " .. state.path)
@@ -961,10 +758,6 @@ local function draw_master(state)
   ImGui.Text(ctx, "Delivery Subscriptions")
   if ImGui.Button(ctx, "Add Delivery") then begin_import() end
   local entries = subscriptions()
-  if #entries > 0 and has_selected_linked_item() then
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Detach Selected Linked Items") then detach_selected() end
-  end
   for _, entry in ipairs(entries) do
     ImGui.TextWrapped(ctx, string.format(
       "%s (%s) | Handled Delivery Revision %d",
@@ -973,7 +766,7 @@ local function draw_master(state)
       entry.acceptedDeliveryRevision or 0
     ))
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Check Update##" .. entry.sourceProjectId) then begin_update(entry.sourceProjectId) end
+    if ImGui.Button(ctx, "Synchronize Delivery...##" .. entry.sourceProjectId) then begin_update(entry.sourceProjectId) end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Remove Subscription##" .. entry.sourceProjectId) then
       local result, err = delivery_import.remove_subscription(adapter, entry.sourceProjectId)

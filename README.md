@@ -14,7 +14,7 @@ The working principle is:
 - Source Projects keep their own folder structures and working conventions;
 - Source Teams explicitly publish bounced audio as versioned Deliveries;
 - the Master Project subscribes to Deliveries and manages downstream imports;
-- updates become new Takes on existing Linked Items;
+- synchronization replaces Source-managed Items with a complete Delivery snapshot;
 - the Master Project publishes the shared Reference back to Source Projects.
 
 ## Documentation
@@ -36,8 +36,8 @@ The local MVP is implemented in Lua 5.4 ReaScript with ReaImGui. It includes:
   review;
 - Delivery Track registration, complete Publish Review, immutable WAV revisions,
   and atomic manifests;
-- Master-side Delivery Subscription, Lane Mapping, first import, new-Take
-  updates, per-Linked-Item three-way field resolution, and explicit detach;
+- Master-side Delivery Subscription, Lane Mapping, first import, complete
+  snapshot synchronization, and move-to-local confirmation;
 - NAS Publish locking, explicit Unlock Publishing, and interrupted-commit
   recovery.
 

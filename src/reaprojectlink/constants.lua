@@ -36,11 +36,8 @@ M.ITEM_KEYS = {
   reference_id = "P_EXT:ReaProjectLink_reference_id",
   reference_item_id = "P_EXT:ReaProjectLink_reference_item_id",
   source_project_id = "P_EXT:ReaProjectLink_source_project_id",
-  instance_id = "P_EXT:ReaProjectLink_instance_id",
-  accepted_media_revision = "P_EXT:ReaProjectLink_accepted_media_revision",
-  handled_delivery_revision = "P_EXT:ReaProjectLink_handled_delivery_revision",
+  lane_id = "P_EXT:ReaProjectLink_lane_id",
   reference_revision = "P_EXT:ReaProjectLink_reference_revision",
-  retired = "P_EXT:ReaProjectLink_retired",
 }
 
 M.PROJECT_TYPES = {

@@ -48,8 +48,8 @@ manifest are complete and validated.
         {
           "clipId": "clip-014",
           "displayName": "Commander Radio Close",
-          "mediaRevision": 4,
-          "mediaFile": "../media/clip-014/Commander_Radio_Close_r0004.wav",
+          "mediaRevision": 1,
+          "mediaFile": "../media/clip-014/Commander_Radio_Close.wav",
           "mediaHash": "sha256:...",
           "mediaSampleRate": 48000,
           "channelCount": 1,
@@ -77,7 +77,8 @@ manifest are complete and validated.
 ## Semantics
 
 - A history manifest is a full snapshot, never a delta.
-- An unchanged Clip reuses its prior `mediaRevision` and managed WAV.
+- Every Delivery Revision creates new revision-local Clips. Their
+  `mediaRevision` is `1`, and each Clip owns a new immutable managed WAV.
 - Media paths are relative to the history manifest.
 - A Delivery `mediaFile` must use the canonical `../media/...` form and resolve
   inside the current managed package. Absolute paths and directory traversal are

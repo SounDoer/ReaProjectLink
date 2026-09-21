@@ -1,175 +1,52 @@
 local delivery_publish_plan = require("reaprojectlink.delivery_publish_plan")
 
-local ids = { "source-1", "set-1", "clip-1" }
-local id_index = 0
-local function new_id()
-  id_index = id_index + 1
-  return ids[id_index]
+local ids = { "source-1", "delivery-1", "clip-1", "clip-2", "clip-3" }
+local index = 0
+local function new_id() index = index + 1; return ids[index] end
+
+local function input(previous)
+  return {
+    source_project_id = previous and "source-1" or nil,
+    delivery_id = previous and "delivery-1" or nil,
+    source_project_name = "Music",
+    source_project_file = "C:/show/Music.rpp",
+    published_at = "2026-09-20T12:00:00+08:00",
+    published_by = "Alice",
+    reference_id = "reference-1",
+    reviewed_reference_revision = 7,
+    sample_rate = 48000,
+    previous_snapshot = previous,
+    current = { lanes = {{
+      lane_id = "lane-1",
+      display_name = "Music Print",
+      clips = {{
+        item_ref = "item-1",
+        clip_id = "old-clip",
+        display_name = "Cue A.wav",
+        media_path = "C:/bounce/cue.wav",
+        media_hash = "abc123",
+        media_size = 100,
+        start_offset_samples = 0,
+        source_offset_samples = 0,
+        length_samples = 48000,
+      }},
+    }}},
+  }
 end
 
-local plan = delivery_publish_plan.build({
-  source_project_name = "CIN_030_DX",
-  source_project_file = "C:/show/CIN_030_DX.rpp",
-  published_at = "2026-09-13T12:00:00+08:00",
-  published_by = "Alice",
-  reference_id = "reference-1",
-  reviewed_reference_revision = 7,
-  sample_rate = 48000,
-  current = {
-    lanes = {
-      {
-        lane_id = "lane-1",
-        display_name = "DX Print",
-        order = 0,
-        clips = {
-          {
-            item_ref = "item-1",
-            confirmed_new = true,
-            display_name = "Commander Radio Close.wav",
-            media_path = "C:/bounce/latest.wav",
-            media_hash = "abc123",
-            media_size = 100,
-            start_offset_samples = 24000,
-            source_offset_samples = 0,
-            length_samples = 48000,
-          },
-        },
-      },
-    },
-  },
-}, new_id)
+local first = delivery_publish_plan.build(input(nil), new_id)
+assert(first.source_project_id == "source-1", "new Source identity")
+assert(first.delivery_id == "delivery-1", "new Delivery identity")
+assert(first.delivery_revision == 1, "first Delivery Revision")
+assert(first.snapshot_input.lanes[1].clips[1].clip_id == "clip-1", "fresh Clip identity")
+assert(first.snapshot_input.lanes[1].clips[1].media_revision == 1, "revision-local media identity")
+assert(first.media[1].destination == "media/clip-1/Cue_A.wav", "managed media path")
+assert(first.assignments[1].item_ref == "item-1", "Source Item receives the new identity")
 
-assert(plan.source_project_id == "source-1", "new Source identity")
-assert(plan.delivery_id == "set-1", "new Delivery identity")
-assert(plan.delivery_revision == 1, "first Publish revision")
-assert(plan.snapshot_input.lanes[1].clips[1].clip_id == "clip-1", "new Clip identity")
-assert(plan.snapshot_input.lanes[1].clips[1].media_revision == 1, "first media revision")
-assert(
-  plan.snapshot_input.lanes[1].clips[1].media_file ==
-    "../media/clip-1/Commander_Radio_Close_r0001.wav",
-  "managed manifest path"
-)
-assert(plan.media[1].destination == "media/clip-1/Commander_Radio_Close_r0001.wav", "copy target")
-assert(
-  plan.snapshot_input.lanes[1].clips[1].display_name == "Commander Radio Close.wav",
-  "displayName keeps the Item name as the user sees it"
-)
-assert(plan.assignments[1].item_ref == "item-1", "identity assignment target")
+local second = delivery_publish_plan.build(input({ deliveryRevision = 1, lanes = first.snapshot_input.lanes }), new_id)
+assert(second.delivery_revision == 2, "Delivery Revision advances")
+assert(second.snapshot_input.lanes[1].clips[1].clip_id == "clip-2", "same Item gets a new Clip next Publish")
+assert(second.snapshot_input.lanes[1].clips[1].media_revision == 1, "new Clip starts at Media Revision 1")
+assert(#second.media == 1, "every snapshot copies its media independently")
 
-local unchanged = delivery_publish_plan.build({
-  source_project_id = "source-1",
-  delivery_id = "set-1",
-  source_project_name = "CIN_030_DX",
-  source_project_file = "C:/show/CIN_030_DX.rpp",
-  published_at = "2026-09-13T12:10:00+08:00",
-  published_by = "Alice",
-  reference_id = "reference-1",
-  reviewed_reference_revision = 7,
-  sample_rate = 48000,
-  previous_snapshot = {
-    deliveryRevision = 1,
-    lanes = {
-      {
-        laneId = "lane-1",
-        clips = {
-          {
-            clipId = "clip-1",
-            displayName = "Old Name",
-            mediaRevision = 3,
-            mediaFile = "../media/clip-1/Old_Name_r0003.wav",
-            mediaHash = "sha256:abc123",
-          },
-        },
-      },
-    },
-  },
-  current = {
-    lanes = {
-      {
-        lane_id = "lane-1",
-        display_name = "DX Print",
-        clips = {
-          {
-            item_ref = "item-1",
-            clip_id = "clip-1",
-            display_name = "Renamed Clip",
-            media_path = "C:/bounce/latest.wav",
-            media_hash = "abc123",
-            media_size = 100,
-            start_offset_samples = 24000,
-            source_offset_samples = 0,
-            length_samples = 48000,
-          },
-        },
-      },
-    },
-  },
-}, new_id)
-
-local unchanged_clip = unchanged.snapshot_input.lanes[1].clips[1]
-assert(unchanged.delivery_revision == 2, "Publish revision advances")
-assert(unchanged_clip.media_revision == 3, "unchanged media keeps its revision")
-assert(unchanged_clip.media_file == "../media/clip-1/Old_Name_r0003.wav", "unchanged media keeps its file")
-assert(#unchanged.media == 0, "unchanged media is not copied again")
-
-local changed_input = {
-  source_project_id = "source-1",
-  delivery_id = "set-1",
-  source_project_name = "CIN_030_DX",
-  source_project_file = "C:/show/CIN_030_DX.rpp",
-  published_at = "2026-09-13T12:20:00+08:00",
-  published_by = "Alice",
-  reference_id = "reference-1",
-  reviewed_reference_revision = 7,
-  sample_rate = 48000,
-  previous_snapshot = {
-    deliveryRevision = 3,
-    lanes = {
-      {
-        laneId = "lane-1",
-        clips = {
-          {
-            clipId = "clip-1",
-            mediaRevision = 3,
-            mediaFile = "../media/clip-1/Old_Name_r0003.wav",
-            mediaHash = "sha256:abc123",
-          },
-        },
-      },
-    },
-  },
-  current = {
-    lanes = {
-      {
-        lane_id = "lane-1",
-        display_name = "DX Print",
-        clips = {
-          {
-            item_ref = "item-1",
-            clip_id = "clip-1",
-            display_name = "Renamed Clip",
-            media_path = "C:/bounce/latest.wav",
-            media_hash = "def456",
-            media_size = 120,
-            start_offset_samples = 24000,
-            source_offset_samples = 0,
-            length_samples = 48000,
-          },
-        },
-      },
-    },
-  },
-}
-
-local changed = delivery_publish_plan.build(changed_input, new_id)
-local changed_clip = changed.snapshot_input.lanes[1].clips[1]
-assert(changed.delivery_revision == 4, "changed Publish revision")
-assert(changed_clip.media_revision == 4, "changed media increments its revision")
-assert(changed_clip.media_file == "../media/clip-1/Renamed_Clip_r0004.wav", "changed media gets a new file")
-assert(changed.media[1].destination == "media/clip-1/Renamed_Clip_r0004.wav", "changed media is copied")
-
-changed_input.current.lanes[1].clips[1].clip_id = "missing-clip"
-local ok, err = pcall(delivery_publish_plan.build, changed_input, new_id)
-assert(not ok and err:find("unknown Clip ID", 1, true), "unknown Clip identity is blocked")
-
-return 3
+return 2

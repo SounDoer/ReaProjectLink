@@ -44,7 +44,6 @@ local ok, result = xpcall(function()
   passed = passed + dofile(root .. "/tests/reference_publish_spec.lua")
   passed = passed + dofile(root .. "/tests/reference_subscription_spec.lua")
   passed = passed + dofile(root .. "/tests/delivery_import_spec.lua")
-  passed = passed + dofile(root .. "/tests/delivery_update_plan_spec.lua")
   passed = passed + dofile(root .. "/tests/delivery_update_spec.lua")
   return passed
 end, debug.traceback)

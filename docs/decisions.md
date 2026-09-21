@@ -809,3 +809,34 @@ structural change. Match Source Structure sets every Retired Linked Item to
 Delete and every Pending Clip to Import. Applying any Delete choice requires
 confirmation; deletion, detachment, imports, and the rest of the Delivery Update
 are committed as one REAPER Undo step.
+
+### D083 — Delivery synchronization replaces a Source-owned snapshot
+
+The pre-release Delivery model is simplified from Clip lineage merging to
+Source-owned snapshot replacement. This decision supersedes the Delivery Clip
+continuity, Media Revision reuse, per-Clip classification, per-field merge,
+new-Take update, Pending/Declined Clip, and Retired Linked Item behavior in
+D007, D010, D018–D021, D023, D026–D028, D032, D036–D038, D042, D049, D052–D060,
+D072–D075, the Delivery-specific part of D077, D079, and D082. Reference
+identity and synchronization are unchanged.
+
+Every Delivery Publish treats every current Item on registered Delivery Tracks
+as a newly generated Clip, copies its media into a new Clip directory, and
+publishes a complete immutable Delivery Revision. The Source User never decides
+whether an Item continues an older Clip. Clip ID and Media Revision remain
+technical manifest fields, but a Clip is revision-local and its Media Revision
+is always 1.
+
+The Master Project owns Lane Bindings and Track-level mixing state. Items
+imported onto a bound Master Track are Source-managed. Synchronizing any
+Delivery Revision—including the currently handled Revision—deletes every still
+managed Item for that Delivery and imports the complete target snapshot in one
+REAPER Undo step. There is no per-Item merge, Take history, decline, or Retired
+decision.
+
+Moving a managed Item away from its bound Master Track prompts once for the
+user to keep it as local Master content. Confirmation clears its Delivery
+ownership while leaving the Item at the chosen location. It is never reattached;
+the Source version is restored by synchronizing the desired Delivery Revision.
+If the user does not confirm, the Item remains Source-managed and is replaced by
+the next synchronization.

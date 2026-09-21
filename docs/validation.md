@@ -49,8 +49,8 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 1. Put file-backed WAV Items on Source Project Tracks and register those Tracks
    as Delivery Tracks.
-2. Open Delivery Publish Review. Resolve Needs Classification with Create New
-   Clip or Continue Existing Clip. If FX is intentionally unbaked, confirm
+2. Open Delivery Publish Review. Confirm every current Item is listed as Included
+   without a Clip identity decision. If FX is intentionally unbaked, confirm
    Publish Unprocessed Media and its warning.
 3. Choose Save & Publish Delivery. Confirm `delivery.json`,
    `history/delivery-0001.json`, and copied Media Revisions exist under
@@ -63,21 +63,21 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Delivery update
 
-1. Publish changed audio and placement from the Source Project.
-2. In Delivery Update Review, confirm comparisons use Baseline, Delivery, and
-   Local state; conflicts default to Keep Local and can be changed to Use
-   Delivery.
-3. Use Add New Take for one Linked Item and Keep Current Media for another.
-   Confirm unsupported Take data requires explicit confirmation before a new
-   Take is added.
-4. Apply Delivery Update and confirm older Takes remain available.
-5. Decline a Pending Clip, then use Reconsider Clip and confirm it is offered
-   again.
-6. Detach a Linked Item and confirm later updates no longer include it.
-7. Replace one Source Clip with multiple new Clips and publish. Confirm Retired
-   Linked Items default to Keep, while Detach and Delete are available. Choose
-   Match Source Structure, confirm deletion, and verify the retired Items are
-   deleted and all Pending Clips are imported in one undoable update.
+1. Publish changed audio, placement, splits, additions, and removals from the
+   Source Project.
+2. In Delivery Update Review, confirm the complete target snapshot and Item
+   replacement counts are shown without per-Clip or per-field decisions.
+3. Synchronize and verify all previous managed Items are replaced by the exact
+   target snapshot in one undoable operation while Track FX, routing, and
+   automation remain unchanged.
+4. Move one Synchronized Item to a different Track. Confirm the prompt keeps it as
+   local Master content and later synchronization leaves it untouched.
+5. Move another Synchronized Item and decline the prompt. Synchronize and confirm it
+   is replaced because it remained Source-managed.
+6. Delete or detach a managed Item, then synchronize the currently handled
+   Delivery Revision and confirm the complete Source snapshot is restored.
+7. Synchronize an older Delivery Revision and confirm it replaces the managed
+   snapshot just like a forward update.
 
 ## Publish locking
 
