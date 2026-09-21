@@ -17,6 +17,18 @@ The working principle is:
 - synchronization replaces Source-managed Items with a complete Delivery snapshot;
 - the Master Project publishes the shared Reference back to Source Projects.
 
+## Installation
+
+Install [ReaPack](https://reapack.com/) and ReaImGui, then in REAPER choose
+Extensions > ReaPack > Import repositories and add:
+
+```text
+https://github.com/SounDoer/ReaProjectLink/raw/master/index.xml
+```
+
+Install ReaProjectLink from Extensions > ReaPack > Browse packages. It appears
+in the Action List as `Script: ReaProjectLink.lua`.
+
 ## Documentation
 
 - [Product concept](docs/product-concept.md)

@@ -1,15 +1,24 @@
 -- @description ReaProjectLink
--- @version 0.1.0-dev
+-- @version 0.1.0
 -- @author ReaProjectLink contributors
+-- @changelog
+--   Initial release.
+-- @about
+--   Source-Master project coordination for REAPER on shared storage.
+--
+--   Requires REAPER 7.74 or newer and ReaImGui 0.9 or newer (install ReaImGui
+--   through ReaPack).
+-- @link GitHub https://github.com/SounDoer/ReaProjectLink
+-- @provides
+--   [nomain] lib/reaprojectlink/*.lua
 
 local source = debug.getinfo(1, "S").source:sub(2)
-local scripts_dir = source:match("^(.*)[/\\]")
-local root = scripts_dir and scripts_dir:match("^(.*)[/\\]scripts$")
-if not root then
-  reaper.ShowMessageBox("Could not resolve the repository path.", "ReaProjectLink", 0)
+local script_dir = source:match("^(.*)[/\\]")
+if not script_dir then
+  reaper.ShowMessageBox("Could not resolve the script path.", "ReaProjectLink", 0)
   return
 end
-package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
+package.path = script_dir .. "/lib/?.lua;" .. package.path
 local runtime_requirements = require("reaprojectlink.runtime_requirements")
 local runtime_ok, runtime_error = runtime_requirements.check_reaper(reaper)
 if not runtime_ok then

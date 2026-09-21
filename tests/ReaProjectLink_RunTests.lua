@@ -1,17 +1,13 @@
--- @description ReaProjectLink - Run Tests
--- @version 0.1.0-dev
--- @author ReaProjectLink contributors
-
 local source = debug.getinfo(1, "S").source:sub(2)
-local scripts_dir = source:match("^(.*)[/\\]")
-local root = scripts_dir and scripts_dir:match("^(.*)[/\\]scripts$")
+local tests_dir = source:match("^(.*)[/\\]")
+local root = tests_dir and tests_dir:match("^(.*)[/\\]tests$")
 
 if not root then
   reaper.ShowMessageBox("Could not resolve the ReaProjectLink repository path.", "ReaProjectLink tests", 0)
   return
 end
 
-package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
+package.path = root .. "/ReaProjectLink/lib/?.lua;" .. package.path
 
 local runtime_requirements = require("reaprojectlink.runtime_requirements")
 local runtime_ok, runtime_error = runtime_requirements.check_reaper(reaper)

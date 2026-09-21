@@ -5,8 +5,8 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Setup
 
-1. Add `scripts/ReaProjectLink.lua` and
-   `scripts/ReaProjectLink_RunTests.lua` to REAPER's Action List.
+1. Add `ReaProjectLink/ReaProjectLink.lua` and
+   `tests/ReaProjectLink_RunTests.lua` to REAPER's Action List.
 2. Run `ReaProjectLink - Run Tests` and confirm that all tests pass.
 3. Create and save one new Master Project `.rpp` and one new Source Project
    `.rpp`.

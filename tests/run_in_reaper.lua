@@ -6,12 +6,12 @@ if not root then
   return
 end
 
-package.path = root .. "/src/?.lua;" .. root .. "/src/?/init.lua;" .. package.path
+package.path = root .. "/ReaProjectLink/lib/?.lua;" .. package.path
 
 assert(require("reaprojectlink.runtime_requirements").check_reaper(reaper))
 
 local ok, result = xpcall(function()
-  local entry, entry_error = loadfile(root .. "/scripts/ReaProjectLink.lua")
+  local entry, entry_error = loadfile(root .. "/ReaProjectLink/ReaProjectLink.lua")
   assert(entry, entry_error)
 
   local adapter = require("reaprojectlink.reaper_adapter")

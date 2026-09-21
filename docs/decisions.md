@@ -840,3 +840,12 @@ ownership while leaving the Item at the chosen location. It is never reattached;
 the Source version is restored by synchronizing the desired Delivery Revision.
 If the user does not confirm, the Item remains Source-managed and is replaced by
 the next synchronization.
+
+### D084 — ReaPack is the distribution channel
+
+ReaProjectLink is distributed as a ReaPack package from this repository's own
+`index.xml`. Everything shipped lives under `ReaProjectLink/`, which is the
+ReaPack category; the entry script resolves modules relative to its own
+directory, so the development checkout and an installed copy share one layout.
+A release is a `@version` bump on `master`; the deploy workflow runs
+`reapack-index` and commits the updated index.
