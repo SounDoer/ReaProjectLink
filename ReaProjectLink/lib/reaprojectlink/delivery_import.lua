@@ -3,30 +3,18 @@ local json = require("reaprojectlink.json")
 local manifest_validation = require("reaprojectlink.manifest_validation")
 local project_guard = require("reaprojectlink.project_guard")
 local track_suggestions = require("reaprojectlink.track_suggestions")
+local manifest_file = require("reaprojectlink.manifest_file")
 
 local M = {}
 
-local function cancel_undo(adapter, label)
-  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
-end
-
-local function read_json(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then return nil, label .. " is invalid JSON: " .. tostring(value) end
-  if value.schemaVersion ~= 1 then return nil, label .. " uses an unsupported schema version." end
-  return value
-end
-
 local function load_delivery(fs, pointer_path)
-  local pointer, pointer_error = read_json(fs, pointer_path, "delivery.json")
+  local pointer, pointer_error = manifest_file.read(fs, pointer_path, "delivery.json", 1)
   if not pointer then return nil, pointer_error end
   local valid, validation_error = manifest_validation.delivery_pointer(pointer)
   if not valid then return nil, validation_error end
   local package_root = pointer_path:match("^(.*)[/\\][^/\\]+$")
   local snapshot_path = fs.join(package_root, pointer.manifest)
-  local snapshot, snapshot_error = read_json(fs, snapshot_path, "Delivery Manifest")
+  local snapshot, snapshot_error = manifest_file.read(fs, snapshot_path, "Delivery Manifest", 1)
   if not snapshot then return nil, snapshot_error end
   valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
     source_project_id = pointer.sourceProjectId,
@@ -167,7 +155,7 @@ function M.apply(review, adapter, options)
   for _, lane in ipairs(review.lanes) do
     local mapping = mappings[lane.lane_id]
     if not mapping then
-      cancel_undo(adapter, "Import ReaProjectLink Delivery")
+      project_guard.cancel_undo(adapter, "Import ReaProjectLink Delivery")
       return nil, "Every Delivery Lane requires a mapping decision."
     end
     local binding = { laneId = lane.lane_id }
@@ -179,11 +167,11 @@ function M.apply(review, adapter, options)
         track = adapter.create_master_track(lane.display_name, mapping.parent_track_ref)
         result.created_tracks = result.created_tracks + 1
       elseif mapping.kind ~= "existing" then
-        cancel_undo(adapter, "Import ReaProjectLink Delivery")
+        project_guard.cancel_undo(adapter, "Import ReaProjectLink Delivery")
         return nil, "Unknown Lane mapping decision."
       end
       if not track or adapter.valid_track and not adapter.valid_track(track) then
-        cancel_undo(adapter, "Import ReaProjectLink Delivery")
+        project_guard.cancel_undo(adapter, "Import ReaProjectLink Delivery")
         return nil, "Mapped Track is unavailable."
       end
       binding.trackGuid = adapter.track_guid(track)
@@ -198,7 +186,7 @@ function M.apply(review, adapter, options)
           source_sample_rate = review.snapshot.sampleRate,
         })
         if not item then
-          cancel_undo(adapter, "Import ReaProjectLink Delivery")
+          project_guard.cancel_undo(adapter, "Import ReaProjectLink Delivery")
           return nil, item_error
         end
         table.insert(result.items, item)

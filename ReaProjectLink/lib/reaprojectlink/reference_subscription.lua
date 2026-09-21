@@ -1,36 +1,22 @@
 local constants = require("reaprojectlink.constants")
-local json = require("reaprojectlink.json")
 local manifest_validation = require("reaprojectlink.manifest_validation")
 local project_guard = require("reaprojectlink.project_guard")
+local manifest_file = require("reaprojectlink.manifest_file")
 
 local M = {}
 
-local function cancel_undo(adapter, label)
-  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
-end
-
-local function read_json(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then return nil, label .. " is invalid JSON: " .. tostring(value) end
-  if value.schemaVersion ~= 2 then
-    return nil, label .. " uses an unsupported schema version."
-  end
-  return value
-end
-
 local function load(fs, pointer_path)
-  local pointer, pointer_error = read_json(fs, pointer_path, "reference.json")
+  local pointer, pointer_error = manifest_file.read(fs, pointer_path, "reference.json", 2)
   if not pointer then return nil, pointer_error end
   local valid, validation_error = manifest_validation.reference_pointer(pointer)
   if not valid then return nil, validation_error end
   local directory = pointer_path:match("^(.*)[/\\][^/\\]+$")
   if not directory then return nil, "Reference pointer path has no parent directory." end
-  local snapshot, snapshot_error = read_json(
+  local snapshot, snapshot_error = manifest_file.read(
     fs,
     fs.join(directory, pointer.manifest),
-    "Reference Manifest"
+    "Reference Manifest",
+    2
   )
   if not snapshot then return nil, snapshot_error end
   valid, validation_error = manifest_validation.reference_snapshot(snapshot, {
@@ -44,10 +30,11 @@ end
 
 local function load_revision(fs, directory, master_project_id, reference_id, revision)
   if revision < 1 then return nil end
-  local raw, read_error = read_json(
+  local raw, read_error = manifest_file.read(
     fs,
     fs.join(directory, "history", string.format("reference-%04d.json", revision)),
-    "previous Reference Manifest"
+    "previous Reference Manifest",
+    2
   )
   if not raw then return nil, read_error end
   local valid, validation_error = manifest_validation.reference_snapshot(raw, {
@@ -281,7 +268,7 @@ function M.synchronize(adapter, status, options)
       status.shift_seconds ~= 0 then
     local shifted, shift_error = adapter.shift_entire_project(status.shift_seconds)
     if not shifted then
-      cancel_undo(adapter, "Synchronize ReaProjectLink Reference")
+      project_guard.cancel_undo(adapter, "Synchronize ReaProjectLink Reference")
       return nil, shift_error
     end
   end
@@ -289,7 +276,7 @@ function M.synchronize(adapter, status, options)
     alignment_mode = status.alignment_mode,
   })
   if not result then
-    cancel_undo(adapter, "Synchronize ReaProjectLink Reference")
+    project_guard.cancel_undo(adapter, "Synchronize ReaProjectLink Reference")
     return nil, restore_timeline(sync_error)
   end
   adapter.set_project_value(

@@ -4,6 +4,8 @@ local manifest_validation = require("reaprojectlink.manifest_validation")
 local reference_manifest = require("reaprojectlink.reference_manifest")
 local project_guard = require("reaprojectlink.project_guard")
 local default_reference_writer = require("reaprojectlink.reference_writer")
+local manifest_file = require("reaprojectlink.manifest_file")
+local paths = require("reaprojectlink.paths")
 
 local M = {}
 
@@ -17,33 +19,14 @@ local function is_video(path)
   return extension and VIDEO_EXTENSIONS[extension] or false
 end
 
-local function project_parts(path)
-  local directory, filename = path:match("^(.*)[/\\]([^/\\]+)$")
-  if not directory then return nil, nil end
-  return directory, filename:gsub("%.[Rr][Pp][Pp]$", "")
-end
-
-local function same_path(left, right)
-  if not left or not right then return false end
-  return left:gsub("\\", "/"):lower() == right:gsub("\\", "/"):lower()
-end
-
-local function read_json(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then return nil, label .. " is invalid JSON: " .. tostring(value) end
-  return value
-end
-
 local function load_published(fs, package_root)
   local path = fs.join(package_root, "reference.json")
   if not fs.exists(path) then return nil, nil end
-  local pointer, pointer_error = read_json(fs, path, "reference.json")
+  local pointer, pointer_error = manifest_file.read(fs, path, "reference.json")
   if not pointer then return nil, pointer_error end
   local valid, validation_error = manifest_validation.reference_pointer(pointer)
   if not valid then return nil, validation_error end
-  local raw, snapshot_error = read_json(
+  local raw, snapshot_error = manifest_file.read(
     fs, fs.join(package_root, pointer.manifest), "Reference Manifest"
   )
   if not raw then return nil, snapshot_error end
@@ -272,7 +255,7 @@ function M.create(dependencies)
         constants.PROJECT_TYPES.master then
       return nil, "Only a Master Project can publish a Reference."
     end
-    local directory, project_name = project_parts(adapter.project_path())
+    local directory, project_name = paths.project_parts(adapter.project_path())
     if not directory then return nil, "Save the Master Project before Reference Publish Review." end
     local path = adapter.project_path()
     local derived_package_root = fs.join(directory, "_ReaProjectLink", project_name)
@@ -283,7 +266,7 @@ function M.create(dependencies)
     local stored_package_root = adapter.get_project_value(constants.PROJECT_KEYS.package_root)
     local path_changed = stored_master_project_id and stored_master_project_id ~= "" and
       stored_identity_path and stored_identity_path ~= "" and
-      not same_path(stored_identity_path, path)
+      not paths.same(stored_identity_path, path)
     local starts_new = path_changed and options.save_as_decision == "new"
     local package_root = path_changed and not starts_new and
       stored_package_root and stored_package_root ~= "" and stored_package_root or

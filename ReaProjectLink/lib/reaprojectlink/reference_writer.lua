@@ -1,30 +1,11 @@
 local json = require("reaprojectlink.json")
 local manifest_validation = require("reaprojectlink.manifest_validation")
+local manifest_file = require("reaprojectlink.manifest_file")
 
 local M = {}
 
 local function assert_ok(ok, err)
   if not ok then error(err or "filesystem operation failed", 3) end
-end
-
-local function decode_file(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then error(read_error or ("could not read " .. label), 3) end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then error(label .. " failed JSON validation: " .. tostring(value), 3) end
-  return value
-end
-
-local function retry_equivalent(left, right)
-  local function without_publication_metadata(value)
-    local copy = {}
-    for key, entry in pairs(value) do
-      if key ~= "publishedAt" and key ~= "publishedBy" then copy[key] = entry end
-    end
-    return copy
-  end
-  return json.encode(without_publication_metadata(left)) ==
-    json.encode(without_publication_metadata(right))
 end
 
 local function current_revision(input, fs)
@@ -72,8 +53,8 @@ local function perform_publish(input, fs)
   local final_parent = final_snapshot:match("^(.*)[/\\][^/\\]+$")
   assert_ok(fs.make_directory(final_parent))
   if fs.exists(final_snapshot) then
-    local existing_snapshot = decode_file(fs, final_snapshot, "existing Reference snapshot")
-    if not retry_equivalent(existing_snapshot, input.snapshot) then
+    local existing_snapshot = manifest_file.decode(fs, final_snapshot, "existing Reference snapshot")
+    if not manifest_file.retry_equivalent(existing_snapshot, input.snapshot) then
       error("immutable Reference snapshot collision: " .. input.pointer.manifest, 2)
     end
   else

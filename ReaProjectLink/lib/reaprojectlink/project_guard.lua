@@ -21,4 +21,8 @@ function M.check(value, adapter, label)
   return true
 end
 
+function M.cancel_undo(adapter, label)
+  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
+end
+
 return M

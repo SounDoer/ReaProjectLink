@@ -1,49 +1,29 @@
 local constants = require("reaprojectlink.constants")
 local delivery_manifest = require("reaprojectlink.delivery_manifest")
-local json = require("reaprojectlink.json")
 local manifest_validation = require("reaprojectlink.manifest_validation")
 local default_delivery_writer = require("reaprojectlink.delivery_writer")
 local delivery_publish_plan = require("reaprojectlink.delivery_publish_plan")
 local project_guard = require("reaprojectlink.project_guard")
 local delivery_review = require("reaprojectlink.delivery_review")
 local project_service = require("reaprojectlink.project_service")
+local manifest_file = require("reaprojectlink.manifest_file")
+local paths = require("reaprojectlink.paths")
 
 local M = {}
-
-local function project_parts(path)
-  local directory, filename = path:match("^(.*)[/\\]([^/\\]+)$")
-  if not directory then return nil, nil end
-  return directory, filename:gsub("%.[Rr][Pp][Pp]$", "")
-end
-
-local function same_path(left, right)
-  if not left or not right then return false end
-  return left:gsub("\\", "/"):lower() == right:gsub("\\", "/"):lower()
-end
-
-local function read_json(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then return nil, label .. " is invalid JSON: " .. tostring(value) end
-  if value.schemaVersion ~= 1 then
-    return nil, label .. " uses an unsupported schema version."
-  end
-  return value
-end
 
 local function load_previous(fs, package_root)
   local pointer_path = fs.join(package_root, "delivery.json")
   if not fs.exists(pointer_path) then return nil, nil, nil end
 
-  local pointer, pointer_error = read_json(fs, pointer_path, "delivery.json")
+  local pointer, pointer_error = manifest_file.read(fs, pointer_path, "delivery.json", 1)
   if not pointer then return nil, nil, pointer_error end
   local valid, validation_error = manifest_validation.delivery_pointer(pointer)
   if not valid then return nil, nil, validation_error end
-  local snapshot, snapshot_error = read_json(
+  local snapshot, snapshot_error = manifest_file.read(
     fs,
     fs.join(package_root, pointer.manifest),
-    "published Delivery Manifest"
+    "published Delivery Manifest",
+    1
   )
   if not snapshot then return nil, nil, snapshot_error end
   valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
@@ -63,7 +43,7 @@ function M.create(dependencies)
   function service.review(adapter, fs, options)
     options = options or {}
     local path = adapter.project_path()
-    local directory, project_name = project_parts(path)
+    local directory, project_name = paths.project_parts(path)
     if not directory then return nil, "Save the REAPER project before Publish Review." end
 
     local derived_package_root = fs.join(directory, "_ReaProjectLink", project_name)
@@ -76,7 +56,7 @@ function M.create(dependencies)
     )
     local path_changed = stored_source_id and stored_source_id ~= "" and
       stored_identity_path and stored_identity_path ~= "" and
-      not same_path(stored_identity_path, path)
+      not paths.same(stored_identity_path, path)
     local starts_new = path_changed and options.save_as_decision == "new"
     local package_root = path_changed and not starts_new and
       stored_package_root and stored_package_root ~= "" and stored_package_root or

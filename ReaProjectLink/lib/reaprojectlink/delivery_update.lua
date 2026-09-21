@@ -3,21 +3,9 @@ local json = require("reaprojectlink.json")
 local manifest_validation = require("reaprojectlink.manifest_validation")
 local project_guard = require("reaprojectlink.project_guard")
 local track_suggestions = require("reaprojectlink.track_suggestions")
+local manifest_file = require("reaprojectlink.manifest_file")
 
 local M = {}
-
-local function cancel_undo(adapter, label)
-  if adapter.cancel_undo then adapter.cancel_undo(label) else adapter.end_undo(label) end
-end
-
-local function read_json(fs, path, label)
-  local bytes, read_error = fs.read_file(path)
-  if not bytes then return nil, read_error or ("Could not read " .. label .. ".") end
-  local ok, value = pcall(json.decode, bytes)
-  if not ok then return nil, label .. " is invalid JSON: " .. tostring(value) end
-  if value.schemaVersion ~= 1 then return nil, label .. " uses an unsupported schema version." end
-  return value
-end
 
 local function find_subscription(subscriptions, source_project_id)
   for index, subscription in ipairs(subscriptions) do
@@ -51,7 +39,7 @@ function M.review(adapter, fs, source_project_id, target_revision)
   local subscription, subscription_index = find_subscription(subscriptions, source_project_id)
   if not subscription then return nil, "Delivery subscription was not found." end
 
-  local pointer, pointer_error = read_json(fs, subscription.pointerPath, "delivery.json")
+  local pointer, pointer_error = manifest_file.read(fs, subscription.pointerPath, "delivery.json", 1)
   if not pointer then return nil, pointer_error end
   local valid, validation_error = manifest_validation.delivery_pointer(pointer)
   if not valid then return nil, validation_error end
@@ -69,7 +57,7 @@ function M.review(adapter, fs, source_project_id, target_revision)
   local target_path = target == latest_revision and
     fs.join(package_root, pointer.manifest) or
     fs.join(package_root, string.format("history/delivery-%04d.json", target))
-  local snapshot, snapshot_error = read_json(fs, target_path, "target Delivery Manifest")
+  local snapshot, snapshot_error = manifest_file.read(fs, target_path, "target Delivery Manifest", 1)
   if not snapshot then return nil, snapshot_error end
   valid, validation_error = manifest_validation.delivery_snapshot(snapshot, {
     source_project_id = subscription.sourceProjectId,
@@ -216,7 +204,7 @@ function M.apply(review, adapter, options)
 
   for _, instance in ipairs(review.instances) do
     local deleted, delete_error = adapter.delete_linked_item(instance.item_ref)
-    if not deleted then cancel_undo(adapter, label); return nil, delete_error end
+    if not deleted then project_guard.cancel_undo(adapter, label); return nil, delete_error end
     result.deleted_items = result.deleted_items + 1
   end
 
@@ -246,9 +234,9 @@ function M.apply(review, adapter, options)
 
   for _, entry in ipairs(review.additions) do
     local track = rebindings[entry.lane_id] or adapter.track_by_guid(entry.track_guid)
-    if not track then cancel_undo(adapter, label); return nil, "Target Track Missing." end
+    if not track then project_guard.cancel_undo(adapter, label); return nil, "Target Track Missing." end
     local item, item_error = import_clip(track, entry)
-    if not item then cancel_undo(adapter, label); return nil, item_error end
+    if not item then project_guard.cancel_undo(adapter, label); return nil, item_error end
   end
 
   for _, lane in ipairs(review.unmapped_lanes) do
@@ -266,13 +254,13 @@ function M.apply(review, adapter, options)
         track = adapter.create_master_track(lane.display_name, mapping.parent_track_ref)
         result.new_tracks = result.new_tracks + 1
       elseif mapping.kind ~= "existing" then
-        cancel_undo(adapter, label); return nil, "Unknown Lane mapping decision."
+        project_guard.cancel_undo(adapter, label); return nil, "Unknown Lane mapping decision."
       end
-      if not track then cancel_undo(adapter, label); return nil, "Mapped Track is unavailable." end
+      if not track then project_guard.cancel_undo(adapter, label); return nil, "Mapped Track is unavailable." end
       binding.unmapped, binding.trackGuid = nil, adapter.track_guid(track)
       for _, entry in ipairs(lane.clips) do
         local item, item_error = import_clip(track, entry)
-        if not item then cancel_undo(adapter, label); return nil, item_error end
+        if not item then project_guard.cancel_undo(adapter, label); return nil, item_error end
       end
     end
   end
@@ -282,7 +270,7 @@ function M.apply(review, adapter, options)
     for _, candidate in ipairs(subscription.lanes or {}) do
       if candidate.laneId == lane_id then binding = candidate end
     end
-    if not binding or not track then cancel_undo(adapter, label); return nil, "Target Track Missing." end
+    if not binding or not track then project_guard.cancel_undo(adapter, label); return nil, "Target Track Missing." end
     binding.unmapped, binding.trackGuid = nil, adapter.track_guid(track)
     result.rebound_lanes = result.rebound_lanes + 1
   end
@@ -321,7 +309,7 @@ function M.detach_many(adapter, instances)
   adapter.begin_undo(label)
   for _, instance in ipairs(instances) do
     local detached, detach_error = adapter.detach_instance(instance.item_ref)
-    if not detached then cancel_undo(adapter, label); return nil, detach_error end
+    if not detached then project_guard.cancel_undo(adapter, label); return nil, detach_error end
   end
   adapter.mark_project_dirty()
   adapter.end_undo(label)
