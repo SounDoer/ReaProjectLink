@@ -19,7 +19,7 @@ local project_values = {
   project_type = "source",
   project_id = "source-1",
   reference_id = "reference-1",
-  reviewed_reference_revision = "7",
+  synchronized_reference_revision = "7",
   reference_start_samples = "48000",
   reference_start_sample_rate = "48000",
 }
@@ -97,6 +97,7 @@ assert(events[5] == "publish package", "package Publish follows project save")
 assert(captured_publish.package_root == review.package_root, "writer package root")
 assert(captured_publish.expected_revision == 0, "writer reviewed base")
 assert(captured_publish.snapshot.reference.reviewedRevision == 7, "reviewed Reference revision")
+assert(project_values.reviewed_reference_revision == "7", "declared Reference revision persisted")
 assert(captured_publish.snapshot.lanes[1].clips[1].startOffsetSamples == 192000, "Reference-relative Clip position across sample rates")
 assert(captured_publish.pointer.manifest == "history/delivery-0001.json", "history pointer")
 
@@ -105,6 +106,17 @@ files[review.package_root .. "/history/delivery-0001.json"] = json.encode(captur
 local next_review = assert(service.review(adapter, fs, {}))
 assert(next_review.delivery_revision == 2, "published baseline is loaded")
 assert(next_review.lanes[1].clips[1].status == "Included", "next snapshot needs no lineage decision")
+project_values.synchronized_reference_revision = "8"
+local declared_default = assert(service.review(adapter, fs, {}))
+assert(declared_default.reviewed_reference_revision == 8,
+  "declaration defaults to the Synchronized Reference Revision")
+assert(declared_default.last_declared_reference_revision == 7, "previous declaration is offered")
+local declared_older = assert(service.review(adapter, fs, { declared_reference_revision = 7 }))
+assert(declared_older.reviewed_reference_revision == 7, "the previous revision may be declared")
+project_values.synchronized_reference_revision = nil
+local unsynchronized = assert(service.review(adapter, fs, {}))
+assert(unsynchronized.reference_blocker, "publishing requires a Synchronized Reference Revision")
+project_values.synchronized_reference_revision = "8"
 
 project_path = "C:/show/renamed/CIN_030_DX_New.rpp"
 local unresolved_save_as = assert(service.review(adapter, fs, {}))
@@ -134,4 +146,4 @@ local package_events_after = 0
 for _, event in ipairs(events) do if event == "publish package" then package_events_after = package_events_after + 1 end end
 assert(package_events_after == package_events, "package writer is not called after save failure")
 
-return 6
+return 7

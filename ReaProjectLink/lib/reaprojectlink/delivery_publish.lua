@@ -127,13 +127,20 @@ function M.create(dependencies)
       review.blocker_count = review.blocker_count + 1
     end
     review.reference_id = adapter.get_project_value(constants.PROJECT_KEYS.reference_id)
-    review.reviewed_reference_revision = tonumber(adapter.get_project_value(
+    review.synchronized_reference_revision = tonumber(adapter.get_project_value(
+      constants.PROJECT_KEYS.synchronized_reference_revision
+    )) or 0
+    -- The stored "reviewed" value now holds the revision declared at the last
+    -- Publish (D086); it seeds the second choice in the Review.
+    review.last_declared_reference_revision = tonumber(adapter.get_project_value(
       constants.PROJECT_KEYS.reviewed_reference_revision
-    ))
+    )) or 0
+    review.reviewed_reference_revision = options.declared_reference_revision or
+      review.synchronized_reference_revision
     if not review.reference_id or review.reference_id == "" or
-        not review.reviewed_reference_revision or not reference_start_samples then
+        review.synchronized_reference_revision == 0 or not reference_start_samples then
       review.blocker_count = review.blocker_count + 1
-      review.reference_blocker = "Subscribe to and review a Reference revision before audio Publish."
+      review.reference_blocker = "Synchronize a Reference revision before publishing."
     end
     return project_guard.bind(review, adapter, true)
   end
@@ -194,6 +201,10 @@ function M.create(dependencies)
     adapter.set_project_value(
       constants.PROJECT_KEYS.delivery_revision,
       tostring(result.delivery_revision)
+    )
+    adapter.set_project_value(
+      constants.PROJECT_KEYS.reviewed_reference_revision,
+      tostring(review.reviewed_reference_revision)
     )
     adapter.mark_project_dirty()
     local revision_saved, revision_save_error = adapter.save_project()

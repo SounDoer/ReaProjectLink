@@ -101,10 +101,6 @@ assert(values.reference_start_samples == "192000", "Reference Start converted to
 assert(values.reference_start_sample_rate == "96000", "Reference Start sample rate persisted")
 assert(values.reviewed_reference_revision == nil, "sync does not imply review")
 
-local reviewed, review_error = reference_subscription.mark_reviewed(adapter, status)
-assert(reviewed, review_error)
-assert(values.reviewed_reference_revision == "3", "review is explicit")
-
 local revision_four_path =
   "C:/mix/_ReaProjectLink/CIN_030_MIX/history/reference-0004.json"
 local revision_four = v2_snapshot(4, 144000, 144000)
@@ -164,4 +160,4 @@ assert(not mismatched.available, "same-path replacement detected")
 assert(mismatched.video_error:find("content does not match", 1, true),
   "content mismatch explained")
 
-return 11
+return 10

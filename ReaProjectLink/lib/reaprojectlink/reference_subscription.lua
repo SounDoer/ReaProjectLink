@@ -323,23 +323,5 @@ function M.synchronize(adapter, status, options)
   return result
 end
 
-function M.mark_reviewed(adapter, status)
-  local current, context_error = project_guard.check(
-    status, adapter, "Reference Update Review"
-  )
-  if not current then return nil, context_error end
-  local synchronized = tonumber(adapter.get_project_value(
-    constants.PROJECT_KEYS.synchronized_reference_revision
-  )) or 0
-  if synchronized ~= status.latest_revision then
-    return nil, "Synchronize the latest Reference revision before marking it reviewed."
-  end
-  adapter.set_project_value(
-    constants.PROJECT_KEYS.reviewed_reference_revision,
-    tostring(status.latest_revision)
-  )
-  adapter.mark_project_dirty()
-  return { reviewed_revision = status.latest_revision }
-end
 
 return M

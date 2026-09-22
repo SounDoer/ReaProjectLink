@@ -279,12 +279,6 @@ local function draw_source_reference(state)
     source_shift_entire_project = false
     if result then check_source_reference() else notify(err, true) end
   end
-  if source_reference.synchronized_revision == source_reference.latest_revision and
-      source_reference.reviewed_revision ~= source_reference.latest_revision and
-      ImGui.Button(ctx, "Mark Reference Reviewed") then
-    local result, err = reference_subscription.mark_reviewed(adapter, source_reference)
-    if result then check_source_reference() else notify(err, true) end
-  end
 end
 
 local function refresh_delivery_review()
