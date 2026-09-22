@@ -1,5 +1,8 @@
 # UI implementation plan
 
+> Superseded by the UI redesign (D085):
+> `docs/superpowers/plans/2026-09-22-ui-redesign.md`. Kept for history.
+
 This plan implements `docs/ui-spec.md` without changing the confirmed workflow
 or persisted data model.
 

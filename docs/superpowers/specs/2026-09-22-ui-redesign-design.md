@@ -100,7 +100,8 @@ line (colored dot + text); up to two key/value lines; at most one button.
 | Not subscribed | `Not connected` (warning) | "Choose the reference.json your mix project published." | `Choose reference.json` |
 | Checking | `Checking…` (neutral) | Last known revision | — |
 | Unreachable | `Couldn't reach shared storage` (blocked) | Last known revision | `Retry` |
-| Blocked (e.g. media missing) | Condition text per D080 (blocked) | Affected file | `Review update` |
+| Invalid (pointer unreadable or identity changed) | `Couldn't read the Reference` (blocked) | Error detail | `Retry` |
+| Blocked (e.g. media missing) | Condition text per D080 (blocked) | Last known revision | `Review update` |
 | Newer available | `Reference rN available` (warning) | `Synchronized rM` | `Review update` |
 | Up to date | `Up to date` (ready) | `Reference rN` | — |
 
@@ -142,19 +143,20 @@ Title bar has a `+` icon button: `Add delivery…` (file dialog for
 `delivery.json`, then the Delivery Import Review). With no subscriptions the card
 shows an empty state with a primary `Add delivery` button.
 
-One row per subscription: name, status text, then either an action button or a
-`···` menu.
+One row per subscription: name, status text, an action button when the row
+needs attention, and a `···` menu.
 
 | Row state | Status text | Row action |
 |---|---|---|
 | Newer revision | `rN available · have rM` (warning) | `Sync` |
 | Unmapped Lanes | `N lanes not imported` (neutral) | `Map lanes` |
 | Unreachable | `Couldn't reach` (blocked) | `Retry` |
+| Invalid | `Couldn't read delivery` (blocked) | `Retry` |
 | Older Reference | `Made against Reference rN` (warning) | `···` |
 | Up to date | `Up to date · rN` (ready) | `···` |
 
 When several states apply, the row shows the first in this order: Unreachable,
-Newer revision, Unmapped Lanes, Older Reference, Up to date.
+Invalid, Newer revision, Unmapped Lanes, Older Reference, Up to date.
 
 Row `···` menu: `Sync to another revision…`, `Remove subscription…`.
 
@@ -164,8 +166,9 @@ Row `···` menu: `Sync to another revision…`, `Remove subscription…`.
   once when the window opens and once when the active REAPER project changes,
   plus on `Check now` and `Retry`.
 - The first frame renders `Checking…`; the read happens on the next frame.
-- A read failure sets that card or row to its unreachable state; it never opens
-  an error dialog.
+- A read failure sets that card or row to Unreachable (the pointer file is
+  missing, for example the share is offline) or Invalid (the file can't be
+  parsed or its identity changed); it never opens an error dialog.
 - Known limitation: Lua file I/O has no timeout, so an unreachable SMB share can
   stall the UI for a few seconds during a check. Accepted.
 - No periodic polling.
@@ -197,7 +200,7 @@ decisions are never actionable (existing D067 behavior).
 
 | Review | Title | Decisions | Details | Primary |
 |---|---|---|---|---|
-| Reference Update (Source) | `Update Reference to rN` | Whole-project shift toggle, only when the start changed | Changed Tracks and Markers | `Synchronize` |
+| Reference Update (Source) | `Update Reference to rN` | Whole-project shift toggle, only when the start changed | Track, Marker, and Region counts and alignment mode | `Synchronize` |
 | Reference Publish (Master) | `Publish Reference rN` | Unchanged-publish confirmation when nothing changed | Registered Tracks, Markers/Regions | `Publish` |
 | Delivery Publish (Source) | `Publish Delivery rN` | Checked against Reference (9.1); Save As identity | Clips per Lane | `Publish` |
 | Delivery Import / Update (Master) | `Add <name>` / `Sync <name> to rN` | Lane Mapping table; target revision; parent for new tracks | Mapped Lanes with editable target | `Import` / `Sync` |
@@ -213,6 +216,9 @@ Replaces the per-Lane button rows.
 - Dropdown groups: suggested Tracks (name match) first; then `New track`,
   `Selected track`; then `Don't import`.
 - Default is `New track`. Suggestions are never preselected (D054 unchanged).
+- In the Delivery Update Review, Lanes that are not yet mapped default to
+  `Don't import`, preserving the existing update behavior; the user maps them
+  explicitly.
 - Header control `New tracks go under: Top level | Selected folder track`
   replaces `Create All Under Selected Folder Track`.
 - `Selected track` with zero or several selected tracks shows an inline issue
@@ -280,6 +286,9 @@ fonts.
 | Body, buttons | 13 regular |
 | Metadata (timestamps, counts) | 12 regular |
 
+UI text uses ASCII `...` instead of the `…` character, which the default
+font's glyph range does not include.
+
 ### 8.3 Spacing and shape
 
 4 px base unit. Card padding 12; gap between cards 12; gap between sections 16;
@@ -288,8 +297,9 @@ list row height 28; corner radius 6; 1 px borders.
 ### 8.4 Icons
 
 Drawn with the ImGui DrawList in the current text/token color and scaled with
-the font size: more (`···`), refresh, gear, back arrow, chevron right/down,
-plus, check, cross, warning triangle, dot. No icon font.
+the font size: more (`···`), gear, back arrow, plus, check, cross, warning
+triangle, dot, film, upload, download. Tree and dropdown arrows are ImGui's own.
+No icon font.
 
 ### 8.5 Component inventory
 

@@ -1,284 +1,292 @@
 # ReaProjectLink UI specification
 
-## 1. Purpose
-
-ReaProjectLink is a workflow tool embedded in REAPER. Its interface should feel
-like a focused delivery console rather than an audio effect plug-in. The UI must
-make project state, required action, and the consequences of mutations clear
-without exposing implementation identifiers during routine work.
+ReaProjectLink is a workflow tool embedded in REAPER. The UI shows each
+domain's state and the one next step, keeps setup and rare operations out of
+the way, and routes every mutation through a Review. Decisions: D085, D086.
 
-This specification covers the complete application information architecture and
-interaction language. The shared shell and components apply to both the Source
-Project and Master Project experiences.
+## 1. Information architecture
 
-## 2. Design principles
+The former left-hand navigation sidebar and the Overview/Reference/Delivery/Settings pages are
+removed. The UI has three layers:
 
-1. **Show the next meaningful action.** The Overview prioritizes one contextual
-   action instead of presenting every available command at once.
-2. **Review before mutation.** Synchronize and Publish operations that change a
-   REAPER project or external package are entered through a dedicated Review.
-3. **Conditions are not commands.** Status text describes the current condition;
-   buttons begin with a verb and describe the user's action.
-4. **Progressive disclosure.** Routine views use names and qualified revisions.
-   Paths, stable IDs, and implementation diagnostics live in Settings or
-   Technical Details.
-5. **REAPER remains the workspace.** ReaProjectLink supplements Track and Item
-   editing rather than recreating the arrange view.
-6. **No expensive ambient work.** Opening or drawing the Overview does not hash
-   media, scan historical packages, or repeatedly query the NAS. Exact Publish
-   readiness is calculated when a Review is opened.
-7. **One vocabulary.** Labels follow `docs/decisions.md`, especially D068-D083.
+| Layer | Content | Enter / leave |
+|---|---|---|
+| Main panel | Header + two domain cards | Always present |
+| Review | Full-panel workflow view | Entered from a card action; leaves on Back, on completion, or when the project changes |
+| Settings | Full-panel project information and preferences | Entered from the header gear; leaves on Back |
 
-## 3. Application shell
+Source cards: **Reference**, **Delivery**.
+Master cards: **Reference**, **Deliveries**.
 
-The primary interface is one resizable ReaImGui window that can float or be
-docked in REAPER.
+### 1.1 Header
 
-The shell contains:
+Left: project name, `Source` / `Master` badge.
+Right: `Checked N min ago` text, `Check now` text button, gear icon button.
 
-- a 64-72 px context header;
-- a 176-192 px left navigation rail;
-- a scrollable content surface;
-- contextual notices inside the content surface, not a permanent status bar.
+Blocking global conditions (project not saved, Publishing Is Locked) appear as a
+banner directly under the header. The banner carries its own action (for
+example `Unlock publishing…`).
 
-The header displays the `.rpp` project name and a qualified `Source Project` or
-`Master Project` badge. The product name belongs in the navigation rail. Full
-paths and IDs are excluded from the header.
+### 1.2 Next-step highlight
 
-Recommended default size is 1040 x 720. The minimum useful content width is 680
-px. Below that width, two-column card groups may stack vertically. The first
-implementation may use a fixed sidebar while preserving horizontal clipping and
-vertical scrolling safely.
+Exactly one card at most is highlighted: accent border and the view's only
+primary (filled) button. All other card buttons are secondary. This replaces
+the separate Next Action panel.
 
-## 4. Navigation
+Source priority (first match wins):
 
-### 4.1 Source Project
+1. Reference not subscribed
+2. Reference unreachable or blocked (for example media file not found)
+3. Newer Reference Revision available
+4. No Delivery Tracks registered
+5. Delivery (daily publish) — Source always has a highlighted card
 
-- Overview
-- Reference
-- Delivery
-- Settings
+Master priority:
 
-### 4.2 Master Project
+1. No Reference Tracks registered
+2. Reference never published
+3. No Delivery subscriptions
+4. Any subscription with a newer Delivery Revision, unmapped Lanes, or a read failure
+5. Otherwise nothing is highlighted and the header shows `All up to date`
 
-- Overview
-- Reference
-- Deliveries
-- Settings
+### 1.3 Responsive layout
 
-Reviews are workflow destinations rather than permanent navigation entries. A
-Review provides an explicit Back action and preserves its transient decisions
-until it is applied, refreshed, invalidated, or the REAPER project changes.
+- Content width < 560 px: cards stack vertically.
+- ≥ 560 px: cards sit side by side with equal width.
+- Review and Settings content is capped at a readable maximum width (~720 px)
+  and centered in wide windows.
+- Long paths wrap; nothing forces horizontal scrolling.
 
-## 5. Source Project experience
+### 1.4 First run
 
-### 5.1 Overview
+An uninitialized project shows only a setup view with two large choices:
 
-The Source Overview answers four questions:
+- "This is a department project" → Initialize as Source Project
+- "This is the mix project" → Initialize as Master Project
 
-1. Is the Reference current and reviewed?
-2. Is the Delivery surface configured?
-3. What is the latest published Delivery Revision?
-4. What should the user do next?
+Each has one sentence of explanation. After initialization the main panel
+appears and card empty states guide the remaining setup.
 
-The page contains:
+## 2. Cards
 
-- page title and one-line description;
-- one Next Action panel;
-- a Reference summary card;
-- a Delivery summary card;
-- a compact Project Health card.
+Every card has the same anatomy: icon + title + optional `···` menu; one status
+line (colored dot + text); up to two key/value lines; at most one button.
 
-Next Action priority is:
+### 2.1 Source · Reference
 
-1. Subscribe to Reference when no subscription exists;
-2. resolve an unavailable or blocked Reference;
-3. review and synchronize a newer Reference Revision;
-4. mark a synchronized Reference Revision reviewed;
-5. register Delivery Tracks when none exist;
-6. open Delivery Publish Review.
+| State | Status line | Info | Button |
+|---|---|---|---|
+| Not subscribed | `Not connected` (warning) | "Choose the reference.json your mix project published." | `Choose reference.json` |
+| Checking | `Checking…` (neutral) | Last known revision | — |
+| Unreachable | `Couldn't reach shared storage` (blocked) | Last known revision | `Retry` |
+| Invalid (pointer unreadable or identity changed) | `Couldn't read the Reference` (blocked) | Error detail | `Retry` |
+| Blocked (e.g. media missing) | Condition text per D080 (blocked) | Last known revision | `Review update` |
+| Newer available | `Reference rN available` (warning) | `Synchronized rM` | `Review update` |
+| Up to date | `Up to date` (ready) | `Reference rN` | — |
 
-The Overview may navigate, select a file, refresh a read-only status, or open a
-Review. It does not directly synchronize, detach, publish, unregister, unlock,
-or reset identities.
+The "synchronized but not reviewed" state no longer exists (D086).
 
-The Reference card shows qualified revisions. When all revision values match,
-it may collapse to `Reference rN · Synchronized and reviewed`. When they differ,
-it shows Latest, Synchronized, and Reviewed separately.
+`···` menu: `Detach selected items…`, `Detach selected tracks…`.
 
-The Delivery card shows the latest Delivery Revision, Delivery Track count, and
-current Item count. It uses `Ready to review`, not `Ready to publish`, until the
-Publish Review has completed its exact checks.
+### 2.2 Source · Delivery
 
-### 5.2 Reference
+| State | Status line | Info | Button |
+|---|---|---|---|
+| No tracks | `No delivery tracks` (warning) | "Select tracks in REAPER first." | `Register selected tracks` |
+| Never published | `Not published yet` (neutral) | `N tracks · M items` | `Review and publish` |
+| Published | `Last published rN` (neutral) | `N tracks · M items` | `Review and publish` |
 
-The Reference page owns:
+When the Delivery card is not highlighted because a newer Reference is pending,
+the button stays enabled and a hint reads `Will record Reference rN`.
 
-- first subscription through selection of `reference.json`;
-- explicit Check for Reference Update;
-- Latest, Synchronized, and Reviewed Reference Revision state;
-- Mirror Master Timeline versus Relative Reference alignment;
-- Reference Update Review and optional whole-project shift;
-- Synchronize Reference;
-- Mark Reference Reviewed;
-- advanced detach actions behind a clearly separated section.
+`···` menu: `Register selected tracks`, `Unregister selected tracks…`.
 
-Selecting a manifest establishes a subscription but does not silently
-synchronize the project. Synchronization remains explicit.
-
-### 5.3 Delivery
-
-The Delivery page owns:
-
-- registered Delivery Track summary;
-- Register Selected Delivery Tracks;
-- Unregister Selected Delivery Tracks;
-- latest published Delivery Revision;
-- entry to Delivery Publish Review.
-
-Register is the primary configuration action. Unregister is visually secondary
-because it stops management of an existing Track.
-
-### 5.4 Delivery Publish Review
-
-The Review is a dedicated content view. It displays:
-
-- target Delivery Revision and Reviewed Reference Revision;
-- package destination in a secondary details area;
-- blocker and warning summary;
-- one collapsible group per Delivery Lane;
-- included Delivery Clips and media blockers;
-- explicit Save As identity decisions when required;
-- Publish Unprocessed Media confirmation when required;
-- `Save & Publish Delivery` only when no blocker remains.
-
-If the project changes after review creation, the Review is replaced by a
-`Review Out of Date` state with `Refresh Review`. Stale decisions must not remain
-visually actionable.
-
-### 5.5 Settings
-
-Settings contains project-level information and infrequent actions:
-
-- Project Type;
-- Project ID and Delivery ID;
-- `.rpp` path;
-- Reference manifest path;
-- alignment mode;
-- version/runtime diagnostic information when available.
-
-IDs use complete labels. Values may be shortened in the summary but the full
-value must remain available to copy or inspect.
-
-## 6. Master Project experience
-
-The Master shell follows the same hierarchy.
-
-- Overview summarizes Reference publishing and Delivery Subscriptions.
-- Reference owns registration and Reference Publish Review.
-- Deliveries owns Add Delivery, Lane Mapping, target Delivery Revision, and
-  Synchronize Delivery.
-- Settings exposes Project and Reference identities, paths, and diagnostics.
-
-Master implementation is a later milestone, but new shared components must not
-encode Source-only assumptions.
-
-## 7. Status model
-
-Four presentation levels are used:
-
-- **Neutral:** descriptive information or an inactive state;
-- **Ready:** the user may proceed with the recommended operation;
-- **Warning:** continuation requires attention or explicit confirmation;
-- **Blocked:** the requested operation cannot proceed.
-
-The primary public conditions remain those in D080, including `Review Out of
-Date`, `Newer Revision Available`, `Media File Not Found`, `Publishing Is
-Locked`, and `ReaProjectLink Update Required`.
-
-Color is supplemental. Every state also has a text label and must remain
-understandable without color.
-
-## 8. Visual language
-
-The visual direction is a restrained professional production tool:
-
-- near-black neutral window background;
-- slightly raised navigation and card surfaces;
-- cool blue primary accent;
-- teal/green Ready state;
-- amber Warning state;
-- red Blocked and destructive state;
-- 4 px base spacing with common gaps of 8, 12, 16, and 24 px;
-- 6-8 px corner radius;
-- one-pixel low-contrast borders;
-- compact controls suitable for a docked REAPER utility.
-
-Typography has four levels:
-
-- product/project context: 20-22 px;
-- page title: 20 px;
-- section/card title: 15-16 px;
-- body and metadata: 13-14 px.
-
-The implementation uses ReaImGui's default font at multiple sizes. A packaged
-font may be evaluated later, but is not required for the first UI milestone and
-must not become an undeclared runtime dependency.
-
-## 9. Component inventory
-
-The UI layer should provide reusable helpers for:
-
-- application header;
-- navigation item;
-- page title and description;
-- card/section surface;
-- status label;
-- primary and secondary buttons;
-- notice/warning/blocker panel;
-- label/value row;
-- empty state;
-- Review header and Back action.
-
-These helpers standardize spacing and style; they must not contain domain or
-REAPER mutation logic.
-
-## 10. Responsiveness and performance
-
-- Normal frames perform only lightweight project-state and Track/Item counts.
-- Media hashing and package validation begin only through an explicit Review or
-  Check action.
-- Long paths use wrapping or a detail view and never force the window wider.
-- Lists with hundreds of rows should use clipping when the relevant screen is
-  implemented.
-- Every Begin/End and Push/Pop pair remains balanced when a child or window is
-  collapsed.
-- UI state is scoped to the active REAPER project and resets with the existing
-  project token behavior from D067.
-
-## 11. Accessibility and interaction
-
-- Do not rely on color alone.
-- Use stable visible labels and hidden ImGui IDs only for uniqueness.
-- Dangerous operations include an ellipsis and confirmation.
-- Disabled actions should explain the blocking condition nearby.
-- Keyboard activation and normal REAPER docking behavior must continue to work.
-- Body copy should remain concise and use the qualified domain terms.
-
-## 12. Current implementation acceptance criteria
-
-The shared workspace milestone is accepted when:
-
-- Source Project navigation switches among Overview, Reference, Delivery, and
-  Settings without reopening the script;
-- Overview selects the correct next action from available local/cached state;
-- no automatic media hashing or NAS review is introduced;
-- existing Reference and Delivery actions remain reachable;
-- Master Project navigation switches among Overview, Reference, Deliveries, and
-  Settings without reopening the script;
-- existing Reference Publish, Delivery Import, and Delivery Synchronization
-  actions remain reachable from the Master workspace;
-- Delivery Publish Review remains invalidated after project changes;
-- existing runtime requirements remain unchanged;
-- the ReaImGui smoke test opens Source and Master frames successfully;
-- the complete existing automated test suite passes.
+### 2.3 Master · Reference
+
+| State | Status line | Info | Button |
+|---|---|---|---|
+| No tracks | `No reference tracks` (warning) | "Select video tracks in REAPER first." | `Register selected tracks` |
+| Never published | `Not published yet` (warning) | `N tracks · M markers` | `Review and publish` |
+| Published | `Published rN` (neutral) | `N tracks · M markers` | `Review and publish` |
+
+`···` menu, grouped with separators:
+
+- Tracks: `Register selected tracks`, `Unregister selected tracks`
+- Markers: `Register selected markers/regions`, `Unregister selected markers/regions`,
+  `Set selected marker as Reference Start`
+- Advanced: `Treat selected items as new…`, `Treat selected tracks as new…`
+
+### 2.4 Master · Deliveries
+
+Title bar has a `+` icon button: `Add delivery…` (file dialog for
+`delivery.json`, then the Delivery Import Review). With no subscriptions the card
+shows an empty state with a primary `Add delivery` button.
+
+One row per subscription: name, status text, an action button when the row
+needs attention, and a `···` menu.
+
+| Row state | Status text | Row action |
+|---|---|---|
+| Newer revision | `rN available · have rM` (warning) | `Sync` |
+| Unmapped Lanes | `N lanes not imported` (neutral) | `Map lanes` |
+| Unreachable | `Couldn't reach` (blocked) | `Retry` |
+| Invalid | `Couldn't read delivery` (blocked) | `Retry` |
+| Older Reference | `Made against Reference rN` (warning) | `···` |
+| Up to date | `Up to date · rN` (ready) | `···` |
+
+When several states apply, the row shows the first in this order: Unreachable,
+Invalid, Newer revision, Unmapped Lanes, Older Reference, Up to date.
+
+Row `···` menu: `Sync to another revision…`, `Remove subscription…`.
+
+## 3. Update checks
+
+- Reference and Delivery pointers (small JSON files only, never media) are read
+  once when the window opens and once when the active REAPER project changes,
+  plus on `Check now` and `Retry`.
+- The first frame renders `Checking…`; the read happens on the next frame.
+- A read failure sets that card or row to Unreachable (the pointer file is
+  missing, for example the share is offline) or Invalid (the file can't be
+  parsed or its identity changed); it never opens an error dialog.
+- Known limitation: Lua file I/O has no timeout, so an unreachable SMB share can
+  stall the UI for a few seconds during a check. Accepted.
+- No periodic polling.
+
+## 4. Review pattern
+
+All Reviews share one skeleton. Empty sections are omitted.
+
+1. **Header** — Back arrow, verb-first title with the target revision
+   (for example `Publish Delivery r13`), one summary line.
+2. **Issues** — blockers (red) and warnings (amber). Each item carries an inline
+   fix or acknowledgment action (for example `Select item` selects the offending
+   Item in REAPER; `Publish unprocessed media`; `Allow Reference revision
+   difference`; Save As identity as two buttons `Continue existing` /
+   `Start new`).
+3. **Decisions** — choices the operation needs (Reference declaration, Lane
+   Mapping table, target revision, parent for new tracks).
+4. **Details** — collapsible groups per Lane or Track, collapsed by default,
+   auto-expanded when the group contains an issue. Long lists use clipping.
+5. **Footer** — fixed at the bottom: one-sentence effect summary and the only
+   primary button. With blockers the button is disabled and the text reads
+   `Fix N issues to publish` (or the matching verb).
+
+**Stale state:** when the project changes after the Review was built, the whole
+body is replaced by `Project changed` + explanation + `Refresh review`. Stale
+decisions are never actionable (existing D067 behavior).
+
+### 4.1 Review inventory
+
+| Review | Title | Decisions | Details | Primary |
+|---|---|---|---|---|
+| Reference Update (Source) | `Update Reference to rN` | Whole-project shift toggle, only when the start changed | Track, Marker, and Region counts and alignment mode | `Synchronize` |
+| Reference Publish (Master) | `Publish Reference rN` | Unchanged-publish confirmation when nothing changed | Registered Tracks, Markers/Regions | `Publish` |
+| Delivery Publish (Source) | `Publish Delivery rN` | Checked against Reference (D086); Save As identity | Clips per Lane | `Publish` |
+| Delivery Import / Update (Master) | `Add <name>` / `Sync <name> to rN` | Lane Mapping table; target revision; parent for new tracks | Mapped Lanes with editable target | `Import` / `Sync` |
+
+Reference Update is a new Review view; today its controls sit inline on the
+Reference page. The separate Reference-review confirmation step is removed
+(D086).
+
+### 4.2 Lane Mapping table
+
+Replaces the per-Lane button rows.
+
+- One row per Lane: Lane name, Clip count, one dropdown.
+- Dropdown groups: suggested Tracks (name match) first; then `New track`,
+  `Selected track`; then `Don't import`.
+- Default is `New track`. Suggestions are never preselected (D054 unchanged).
+- In the Delivery Update Review, Lanes that are not yet mapped default to
+  `Don't import`, preserving the existing update behavior; the user maps them
+  explicitly.
+- Header control `New tracks go under: Top level | Selected folder track`
+  replaces `Create All Under Selected Folder Track`.
+- `Selected track` with zero or several selected tracks shows an inline issue
+  on that row instead of a toast.
+- Already-mapped Lanes (Update Review) list their current target in the same
+  dropdown so a Lane can be re-bound.
+
+## 5. Settings
+
+| Group | Source | Master |
+|---|---|---|
+| Project | Name, `.rpp` path, Project ID, Delivery ID (copyable) | Name, `.rpp` path, Project ID, Reference ID (copyable) |
+| Reference | `reference.json` path + `Change…`; Mirror Master Timeline toggle | — |
+| Appearance | Theme: Auto / Light / Dark | Same |
+| About | ReaProjectLink, REAPER, ReaImGui versions | Same |
+
+`Unlock publishing…` lives in the lock banner, not in Settings.
+
+## 6. Notifications
+
+- Transient toast at the top of the content area.
+- Success toasts disappear after ~4 s; error toasts stay until dismissed.
+- Errors that belong to a Review are shown as Review issues, not toasts.
+
+## 7. Visual system
+
+### 7.1 Color tokens
+
+Both themes define the same semantic names. Components reference only names.
+
+| Token | Light | Dark |
+|---|---|---|
+| bg | `#f3f4f6` | `#16181c` |
+| surface | `#ffffff` | `#1f2227` |
+| surface_hover | `#eef0f3` | `#272b31` |
+| border | `#dadde2` | `#30343c` |
+| text | `#1d2025` | `#e6e8eb` |
+| muted | `#5f6670` | `#9aa0a8` |
+| accent | `#2f6fe0` | `#4c8dff` |
+| on_accent | `#ffffff` | `#0b1220` |
+| accent_bg | `#e4edfc` | `#1c2a44` |
+| ready | `#1f8a63` | `#3fbf8f` |
+| warning | `#a86a0c` | `#e0a84a` |
+| warning_bg | `#fdf1dc` | `#3a2f1c` |
+| blocked | `#c93c46` | `#eb5f68` |
+| blocked_bg | `#fbe5e6` | `#3b2224` |
+
+Hover/active shades are derived in `theme.lua`. Status colors are used only for
+text, dots, borders, and the tinted issue backgrounds, never large fills. Every
+status also has a text label.
+
+Theme preference `Auto | Light | Dark` is stored globally in ExtState (not per
+project), default `Auto`. `Auto` reads REAPER's main background theme color and
+picks Light or Dark by luminance.
+
+### 7.2 Typography
+
+System sans-serif through ReaImGui; bold through the font flags. No bundled
+fonts.
+
+| Use | Size / weight |
+|---|---|
+| Project name, Review title | 16 bold |
+| Card title, group name | 14 bold |
+| Body, buttons | 13 regular |
+| Metadata (timestamps, counts) | 12 regular |
+
+UI text uses ASCII `...` instead of the `…` character, which the default
+font's glyph range does not include.
+
+### 7.3 Spacing and shape
+
+4 px base unit. Card padding 12; gap between cards 12; gap between sections 16;
+list row height 28; corner radius 6; 1 px borders.
+
+### 7.4 Icons
+
+Drawn with the ImGui DrawList in the current text/token color and scaled with
+the font size: more (`···`), gear, back arrow, plus, check, cross, warning
+triangle, dot, film, upload, download. Tree and dropdown arrows are ImGui's own.
+No icon font.
+
+### 7.5 Component inventory
+
+All in the UI layer; none contains domain or REAPER mutation logic.
+
+- Shell: Header, Banner, Toast
+- Cards: Card (normal / highlighted), StatusLine, KeyValue, EmptyState
+- Buttons: Button (primary / secondary / danger), IconButton
+- Selection: Menu (with separators), Dropdown, Segmented
+- Review: IssueItem, GroupRow (collapsible), ListRow, FooterBar, StaleState

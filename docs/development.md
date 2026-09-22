@@ -74,8 +74,10 @@ that do not change `@version` are not published. The `check` workflow validates
 the package on every push and pull request; run `reapack-index --check` locally
 for the same check (requires Ruby, the `reapack-index` gem, and Pandoc).
 
-A new module under `lib/reaprojectlink/` is published automatically by the
-`@provides` glob. Any other new shipped file must be added to `@provides`.
+Modules in `lib/reaprojectlink/`, `lib/reaprojectlink/ui/`, and
+`lib/reaprojectlink/ui/views/` are covered by the `@provides` globs; a new
+subdirectory needs its own `@provides` line. Any other new shipped file must
+be added to `@provides`.
 
 ## Verification
 
@@ -94,3 +96,8 @@ files there.
 with it as the script argument, and it writes `tests/.last-result` and quits.
 CI cannot run REAPER, so the GitHub workflows validate packaging only; the
 release skill requires a local passing run before each release.
+
+`tests/run_ui_smoke.lua` renders one frame for every scenario in
+`tests/ui_smoke_scenarios.lua` (each view and Review, both themes, 320 px and
+1040 px wide) and writes the result to the file named by
+`REAPROJECTLINK_UI_SMOKE_RESULT`.

@@ -578,10 +578,10 @@ registered Markers and Regions, and their timing context. The Master Project is
 the authority for the Reference, so `authoritative Reference` is explanatory
 wording rather than a separate object or routine UI label.
 
-The public revision states on a Source Project are Latest Revision,
-Synchronized Revision, and Reviewed Revision. Synchronization materializes a
-Reference revision in the Source Project. Review is a separate explicit user
-confirmation. A Source Delivery records the Reviewed Revision.
+The public revision states on a Source Project are Latest Revision and
+Synchronized Revision. Synchronization materializes a Reference revision in the
+Source Project. A Source Delivery records the Reference revision its user
+declared at Publish (D086).
 
 ### D071 — Reference Start is optional and generic
 
@@ -663,8 +663,8 @@ selection details rather than primary action labels.
 Import creates previously unrepresented Delivery Tracks or Items in the Master
 Project. Update compares a Delivery Revision with local Master state and applies
 selected changes through Apply Delivery Update. Synchronize materializes a
-Reference Revision in a Source Project. Reference synchronization remains
-distinct from Mark Reference Reviewed.
+Reference Revision in a Source Project. The checked Reference revision is
+declared at Delivery Publish (D086).
 
 Apply executes a plan prepared by a Review. It is used for Apply Delivery Update
 and Apply Lane Mapping, but not as a synonym for Publish, Import, or Synchronize.
@@ -853,3 +853,27 @@ ReaPack category; the entry script resolves modules relative to its own
 directory, so the development checkout and an installed copy share one layout.
 A release is a `@version` bump on `master`; the deploy workflow runs
 `reapack-index` and commits the updated index.
+
+### D085 — Single-panel UI with next-step highlighting
+
+The UI has three layers: a main panel with one card per domain (Source:
+Reference and Delivery; Master: Reference and Deliveries), full-panel Reviews
+entered from card actions, and Settings entered from the header. There is no
+navigation rail. At most one card is highlighted as the next step; it carries the
+view's only primary button. Setup and low-frequency operations live in each
+card's `···` menu or in Settings, and first-time setup is reached through card
+empty states. Pointer files (never media) are read when the window opens, when
+the active project changes, and on `Check now`; there is no periodic polling.
+The UI offers Light and Dark themes plus Auto, which follows the brightness of
+the REAPER theme. Details: `docs/ui-spec.md`.
+
+### D086 — The checked Reference revision is declared at Delivery Publish
+
+Amends D070 and D074. Source projects no longer have a separate Mark Reference
+Reviewed step. Delivery Publish Review asks which Reference revision the audio
+was checked against, defaulting to the Synchronized Reference Revision and
+offering the revision declared by the previous Publish when it differs. The
+declared revision is written to the Delivery Manifest's existing
+`reference.reviewedRevision` field and stored in the project as the next
+default. Publishing requires a Synchronized Reference Revision rather than a
+Reviewed one. The manifest schema and Master behavior are unchanged.

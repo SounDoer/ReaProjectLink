@@ -323,8 +323,8 @@ This operation is never automatic. Moving only the Reference Start or only part
 of the Reference does not offer the full-project shift.
 
 Source projects may automatically detect a new reference revision, but they do not
-automatically adopt it. A source project records separate synchronized and
-reviewed states. Delivery Publish records the Reviewed Reference Revision.
+automatically adopt it. Delivery Publish records the Reference revision the user
+declares in the Review, defaulting to the synchronized revision (D086).
 
 Reference Publish references each authoritative video file at its existing NAS path
 and records a content hash; it does not duplicate videos under `_ReaProjectLink`.
