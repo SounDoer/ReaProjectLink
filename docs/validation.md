@@ -112,3 +112,20 @@ the projects and test media on the team's normal shared-storage arrangement.
 1. In Delivery Publish Review, use `Select Item` on a blocked Item. Confirm it
    selects the Item in REAPER and confirm the Review does not immediately flip
    to `Review Out of Date`.
+
+## Project state reset
+
+1. In an initialized Source or Master Project, open Settings and choose
+   `Reset ReaProjectLink State...`. Confirm the project returns to the setup
+   view (as if never initialized), while Tracks, Items, and any published
+   packages are untouched.
+2. Use Edit > Undo in REAPER. Confirm the reset project and object state is
+   restored and the panel shows the project's prior type and data again.
+
+## Master package check
+
+1. On a Master Project with a published Reference, delete the published
+   package folder (or just `reference.json` inside it) from shared storage.
+2. Choose `Check Now`. Confirm the Reference card shows `Package Missing`
+   with a note explaining the published files weren't found, and offers
+   `Review and Publish` to restore them.

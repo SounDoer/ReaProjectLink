@@ -880,3 +880,18 @@ offered as the alternative choice the next time (the default is always the
 Synchronized Reference Revision). Publishing requires a Synchronized Reference
 Revision rather than a Reviewed one. The manifest schema and Master behavior
 are unchanged.
+
+### D087 — Project state can be reset explicitly
+
+Settings offers Reset ReaProjectLink State..., which clears the project's
+ReaProjectLink extension state and the ReaProjectLink Track and Item keys in
+one undoable step. Published packages and media Items are kept; only the
+project's own type, IDs, subscriptions, and revision pointers are removed.
+D049's storage model is unchanged, and Reset simply empties it.
+
+### D088 — Master checks its own published Reference package
+
+The pointer check that runs on window open, project change, and Check Now
+also confirms that the Master's own published `reference.json` still exists
+alongside its manifest. If it is missing, the Reference card shows Package
+Missing and offers Review and Publish so the user can restore the package.

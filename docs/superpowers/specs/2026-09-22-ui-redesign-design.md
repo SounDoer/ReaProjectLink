@@ -129,6 +129,7 @@ the button stays enabled and a hint reads `Will record Reference rN`.
 | No tracks | `No Reference Tracks` (warning) | "Select video tracks in REAPER first." | `Register Selected Tracks` |
 | Never published | `Not Published Yet` (warning) | `N tracks · M markers` | `Review and Publish` |
 | Published | `Published rN` (neutral) | `N tracks · M markers` | `Review and Publish` |
+| Package Missing | `Package Missing` (blocked) | `N tracks · M markers`; note explains published files weren't found | `Review and Publish` |
 
 `···` menu, grouped with separators:
 
@@ -172,6 +173,9 @@ Row `···` menu: `Sync to Another Revision…`, `Remove Subscription…`.
 - Known limitation: Lua file I/O has no timeout, so an unreachable SMB share can
   stall the UI for a few seconds during a check. Accepted.
 - No periodic polling.
+- On a Master with a published Reference, the same check also confirms its own
+  `reference.json` still exists next to the manifest; if not, the Reference
+  card shows Package Missing instead of Published (D088).
 
 ## 5. Review pattern
 
@@ -233,6 +237,7 @@ Replaces the per-Lane button rows.
 | Reference | `reference.json` path + `Change…`; Mirror Master Timeline toggle | — |
 | Appearance | Theme: Auto / Light / Dark | Same |
 | About | ReaProjectLink, REAPER, ReaImGui versions | Same |
+| Reset | `Reset ReaProjectLink State…` button, with a note that Published packages and media Items are kept | Same |
 
 `Unlock Publishing…` lives in the lock banner, not in Settings.
 
