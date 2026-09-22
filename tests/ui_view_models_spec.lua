@@ -64,12 +64,15 @@ function tests.source_highlights_reference_until_it_is_current()
     { { check = { state = "done", latest = 5 } }, "newer", "reference" },
     { { check = { state = "checking" } }, "checking", "delivery" },
     { {}, "current", "delivery" },
+    { { track_count = 0 }, "current", "delivery" },
   }
   for _, case in ipairs(cases) do
     local cards = view_models.source_cards(source_input(case[1]))
     equal(cards.reference.state, case[2], "reference state")
     equal(cards.highlight, case[3], case[2] .. " highlight")
   end
+  local no_tracks = view_models.source_cards(source_input({ track_count = 0 }))
+  equal(no_tracks.delivery.state, "unconfigured", "delivery unconfigured when current reference")
 end
 
 function tests.source_reference_card_text_and_actions()
@@ -81,21 +84,27 @@ function tests.source_reference_card_text_and_actions()
   equal(newer.action.id, "review_update", "newer action")
   local unsubscribed = view_models.source_cards(source_input({ subscribed = false })).reference
   equal(unsubscribed.action.id, "choose_reference", "subscribe action")
+  equal(unsubscribed.status, "Not connected", "unsubscribed status")
+  equal(unsubscribed.level, "warning", "unsubscribed level")
   local unreachable = view_models.source_cards(source_input({ check = { state = "unreachable" } })).reference
   equal(unreachable.status, "Couldn't reach shared storage", "unreachable status")
   equal(unreachable.action.id, "retry", "retry action")
+  equal(unreachable.level, "blocked", "unreachable level")
   local invalid = view_models.source_cards(source_input({ check = { state = "invalid", error = "bad" } })).reference
   equal(invalid.note, "bad", "invalid detail")
+  equal(invalid.status, "Couldn't read the Reference", "invalid status")
   local blocked = view_models.source_cards(source_input({ media_error = "Media File Not Found" })).reference
   equal(blocked.status, "Media File Not Found", "media status")
   equal(blocked.action.id, "review_update", "media action")
   local checking = view_models.source_cards(source_input({ check = { state = "checking" } })).reference
   equal(checking.status, "Checking...", "checking status")
   equal(checking.action, nil, "no action while checking")
+  equal(checking.level, "neutral", "checking level")
   local current = view_models.source_cards(source_input()).reference
   equal(current.status, "Up to date", "current status")
   equal(current.rows[1][2], "r4", "current revision")
   equal(current.action, nil, "no action when current")
+  equal(current.level, "ready", "current level")
 end
 
 function tests.source_delivery_card_states()
@@ -104,6 +113,7 @@ function tests.source_delivery_card_states()
   equal(empty.action.id, "register_tracks", "register action")
   local never = view_models.source_cards(source_input({ delivery_revision = 0 })).delivery
   equal(never.status, "Not published yet", "never published")
+  equal(never.level, "neutral", "source not-published level")
   local published = view_models.source_cards(source_input()).delivery
   equal(published.status, "Last published r12", "published")
   equal(published.rows[1][2], "3", "track count")
@@ -136,6 +146,23 @@ function tests.master_highlight_priority()
     { id = "a", name = "A", accepted = 3, unmapped_count = 0 },
   } }))
   equal(checking.all_current, false, "checking is not up to date")
+  local unmapped = view_models.master_cards(master_input({ rows = {
+    { id = "a", name = "A", accepted = 3, unmapped_count = 2,
+      check = { state = "done", latest = 3, reviewed_reference = 8 } },
+  } }))
+  equal(unmapped.highlight, "deliveries", "unmapped delivery")
+  local unreachable = view_models.master_cards(master_input({ rows = {
+    { id = "a", name = "A", accepted = 3, unmapped_count = 0, check = { state = "unreachable" } },
+  } }))
+  equal(unreachable.highlight, "deliveries", "unreachable delivery")
+  local older_reference = view_models.master_cards(master_input({ rows = {
+    { id = "a", name = "A", accepted = 3, unmapped_count = 0,
+      check = { state = "done", latest = 3, reviewed_reference = 7 } },
+  } }))
+  equal(older_reference.highlight, nil, "older reference does not need attention")
+  equal(older_reference.all_current, true, "older reference counts as current")
+  local no_tracks_no_rows = view_models.master_cards(master_input({ track_count = 0, rows = {} }))
+  equal(no_tracks_no_rows.highlight, "reference", "reference wins over no subscriptions")
 end
 
 function tests.master_reference_card_states()
@@ -145,6 +172,7 @@ function tests.master_reference_card_states()
   local unpublished = view_models.master_cards(master_input({ reference_revision = 0 })).reference
   equal(unpublished.status, "Not published yet", "unpublished")
   equal(unpublished.action.id, "review_publish", "publish action")
+  equal(unpublished.level, "warning", "master not-published level")
   local published = view_models.master_cards(master_input()).reference
   equal(published.status, "Published r8", "published")
   equal(published.level, "neutral", "published level")
@@ -152,6 +180,7 @@ function tests.master_reference_card_states()
   equal(published.rows[2][2], "2", "marker count")
   local empty = view_models.master_cards(master_input({ rows = {} })).deliveries_empty
   equal(empty.action.id, "add_delivery", "add action")
+  equal(empty.status, "No deliveries yet", "deliveries empty status")
 end
 
 function tests.delivery_row_priority()
@@ -161,7 +190,10 @@ function tests.delivery_row_priority()
   local unreachable = row({ state = "unreachable" }, 2)
   equal(unreachable.state, "unreachable", "unreachable first")
   equal(unreachable.action.id, "retry", "retry action")
-  equal(row({ state = "invalid", error = "bad" }).note, "bad", "invalid detail")
+  equal(unreachable.status, "Couldn't reach", "unreachable row status")
+  local invalid = row({ state = "invalid", error = "bad" })
+  equal(invalid.note, "bad", "invalid detail")
+  equal(invalid.status, "Couldn't read delivery", "invalid row status")
   local newer = row({ state = "done", latest = 4, reviewed_reference = 7 }, 2)
   equal(newer.state, "newer", "newer before unmapped")
   equal(newer.status, "r4 available · have r3", "newer status")
@@ -170,11 +202,15 @@ function tests.delivery_row_priority()
   equal(unmapped.state, "unmapped", "unmapped before older reference")
   equal(unmapped.status, "2 lanes not imported", "unmapped status")
   equal(unmapped.action.id, "map_lanes", "map action")
+  equal(unmapped.level, "neutral", "unmapped level")
   local older = row({ state = "done", latest = 3, reviewed_reference = 7 })
   equal(older.state, "older_reference", "older reference")
   equal(older.status, "Made against Reference r7", "older status")
   equal(older.action, nil, "older has no action")
-  equal(row({ state = "done", latest = 3, reviewed_reference = 8 }).status, "Up to date · r3", "current")
+  equal(older.level, "warning", "older reference level")
+  local current = row({ state = "done", latest = 3, reviewed_reference = 8 })
+  equal(current.status, "Up to date · r3", "current")
+  equal(current.level, "ready", "current row level")
   equal(row(nil).status, "Checking...", "not checked yet")
 end
 
@@ -221,6 +257,12 @@ function tests.mapping_summary_and_parent()
   }, "folder")
   equal(parented.a.parent_track_ref, "folder", "new track parent")
   equal(parented.b.parent_track_ref, nil, "existing track untouched")
+  local suggested_lane = { { lane_id = "a", clips = { {} },
+    suggestions = { { display_name = "A", track_ref = "t" } } } }
+  equal(view_models.mapping_summary(suggested_lane, {}, "create"), "1 new track · 1 item",
+    "suggestions do not preselect the summary")
+  equal(view_models.lane_mapping_label(nil, "create", tostring), "New track",
+    "suggestions do not preselect the label")
 end
 
 function tests.reference_declaration_options()
