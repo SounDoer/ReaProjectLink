@@ -39,6 +39,19 @@ function M.run_master(env)
     end
   end
   env.app.checks.deliveries = results
+
+  local revision = tonumber(env.adapter.get_project_value(
+    constants.PROJECT_KEYS.reference_revision
+  )) or 0
+  if revision <= 0 then
+    env.app.checks.reference = { state = "idle" }
+  else
+    local root = env.adapter.get_project_value(constants.PROJECT_KEYS.package_root)
+    if root and root ~= "" then
+      local present = env.fs.exists(env.fs.join(root, "reference.json"))
+      env.app.checks.reference = { state = present and "done" or "missing" }
+    end
+  end
 end
 
 return M

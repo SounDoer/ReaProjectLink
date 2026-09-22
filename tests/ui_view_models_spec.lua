@@ -183,6 +183,37 @@ function tests.master_reference_card_states()
   equal(empty.status, "No Deliveries Yet", "deliveries empty status")
 end
 
+function tests.master_reference_package_missing()
+  local missing = view_models.master_cards(master_input({
+    package_check = { state = "missing" },
+  })).reference
+  equal(missing.state, "package_missing", "package missing state")
+  equal(missing.status, "Package Missing", "package missing status")
+  equal(missing.level, "blocked", "package missing level")
+  equal(missing.attention, true, "package missing needs attention")
+  equal(missing.action.id, "review_publish", "package missing action")
+  equal(missing.note, "Published files for Reference r8 weren't found. Publish again to restore them.",
+    "package missing note")
+  equal(missing.rows[2][2], "2", "marker count kept")
+  local highlight = view_models.master_cards(master_input({
+    package_check = { state = "missing" },
+  })).highlight
+  equal(highlight, "reference", "package missing wins highlight")
+
+  local done = view_models.master_cards(master_input({
+    package_check = { state = "done" },
+  })).reference
+  equal(done.state, "published", "package check done keeps Published card")
+
+  local idle = view_models.master_cards(master_input({
+    package_check = { state = "idle" },
+  })).reference
+  equal(idle.state, "published", "package check idle keeps Published card")
+
+  local none = view_models.master_cards(master_input()).reference
+  equal(none.state, "published", "no package check keeps Published card")
+end
+
 function tests.delivery_row_priority()
   local function row(check, unmapped)
     return view_models.delivery_row({ accepted = 3, unmapped_count = unmapped or 0, check = check }, 8)

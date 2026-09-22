@@ -121,6 +121,52 @@ function tests.checks_clear_media_error_on_successful_peek()
   equal(app.media_error, nil, "stale media error is cleared")
 end
 
+local function master_package_env(project_values)
+  local app = require("reaprojectlink.ui.app_state").new(function() return 0 end)
+  return {
+    app = app,
+    fs = {
+      join = function(...) return table.concat({...}, "/") end,
+      exists = function(path) return path == "C:/package/reference.json" end,
+    },
+    adapter = {
+      get_project_value = function(key) return project_values[key] end,
+    },
+    services = {
+      delivery_update = { peek = function() return nil, "no subscriptions", "unsubscribed" end },
+    },
+  }
+end
+
+function tests.checks_master_package_present()
+  local constants = require("reaprojectlink.constants")
+  local env = master_package_env({
+    [constants.PROJECT_KEYS.reference_revision] = "4",
+    [constants.PROJECT_KEYS.package_root] = "C:/package",
+  })
+  local checks = require("reaprojectlink.ui.checks")
+  checks.run_master(env)
+  equal(env.app.checks.reference.state, "done", "present package")
+end
+
+function tests.checks_master_package_missing()
+  local constants = require("reaprojectlink.constants")
+  local env = master_package_env({
+    [constants.PROJECT_KEYS.reference_revision] = "4",
+    [constants.PROJECT_KEYS.package_root] = "C:/other",
+  })
+  local checks = require("reaprojectlink.ui.checks")
+  checks.run_master(env)
+  equal(env.app.checks.reference.state, "missing", "missing package")
+end
+
+function tests.checks_master_package_unpublished()
+  local env = master_package_env({})
+  local checks = require("reaprojectlink.ui.checks")
+  checks.run_master(env)
+  equal(env.app.checks.reference.state, "idle", "unpublished Reference")
+end
+
 local passed = 0
 for name, test in pairs(tests) do
   local ok, err = pcall(test)

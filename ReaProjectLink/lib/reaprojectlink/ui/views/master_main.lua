@@ -52,6 +52,7 @@ local function input(env, state)
     marker_count = markers,
     marker_error = marker_error,
     reference_revision = state.reference_revision,
+    package_check = app.checks.reference,
     rows = rows,
   }
 end

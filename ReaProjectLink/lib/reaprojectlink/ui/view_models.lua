@@ -130,6 +130,16 @@ function M.master_reference(input)
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
+  local package_check = input.package_check
+  if package_check and package_check.state == "missing" then
+    return {
+      state = "package_missing", status = "Package Missing", level = "blocked", rows = rows,
+      note = string.format(
+        "Published files for Reference r%d weren't found. Publish again to restore them.", revision
+      ),
+      action = { id = "review_publish", label = "Review and Publish" }, attention = true,
+    }
+  end
   return {
     state = "published", status = "Published r" .. revision, level = "neutral", rows = rows,
     action = { id = "review_publish", label = "Review and Publish" }, attention = false,
