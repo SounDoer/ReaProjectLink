@@ -20,4 +20,5 @@ return {
   "delivery_update_spec.lua",
   "ui_theme_spec.lua",
   "ui_view_models_spec.lua",
+  "ui_app_state_spec.lua",
 }
