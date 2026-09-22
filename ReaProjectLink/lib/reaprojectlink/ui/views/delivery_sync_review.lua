@@ -128,11 +128,11 @@ local function draw_import(env, review)
   local c, app = env.c, env.app
   local data = review.data
   local back = false
+  workflow.draw_notices(env)
   if c.begin_page("delivery-import", true) then
     back = c.review_header("Add " .. data.snapshot.sourceProjectName,
       string.format("Delivery r%d · made against Reference r%d",
         data.pointer.latestDeliveryRevision, data.snapshot.reference.reviewedRevision))
-    workflow.draw_notices(env)
     draw_reference_issue(env, data, review, "Import")
     for lane_index, lane in ipairs(data.lanes) do
       for clip_index, clip in ipairs(lane.clips) do
@@ -216,13 +216,13 @@ local function draw_update(env, review)
   local c, app = env.c, env.app
   local data = review.data
   local back, load = false, false
+  workflow.draw_notices(env)
   if c.begin_page("delivery-update", true) then
     back = c.review_header(string.format("Sync %s to r%d",
       data.target_snapshot.sourceProjectName, data.target_revision),
       string.format("Replaces %s with %s",
         view_models.count(data.replacement_count, "item"),
         view_models.count(data.source_item_count, "item")))
-    workflow.draw_notices(env)
     draw_reference_issue(env, data, review, "Sync")
     for index, clip in ipairs(data.additions) do
       draw_clip_issue(env, "addition-" .. index, clip.lane_display_name, clip)
@@ -238,7 +238,8 @@ local function draw_update(env, review)
   end
   local page = c.end_page()
 
-  local ready = data.blocker_count == 0 and (not data.reference_warning or review.allow_reference)
+  local ready = data.blocker_count == 0 and (not data.reference_warning or review.allow_reference) and
+    (data.pending_count > 0 or next(review.rebindings) ~= nil)
   local summary, level = string.format("Syncs Delivery r%d", data.target_revision), "neutral"
   if data.blocker_count > 0 then
     summary, level = view_models.blocked_summary(data.blocker_count, "sync"), "blocked"

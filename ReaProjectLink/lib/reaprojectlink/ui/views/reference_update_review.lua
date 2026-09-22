@@ -22,10 +22,10 @@ function M.draw(env)
   local status = review.status
   local snapshot = status.snapshot or {}
   local back = false
+  workflow.draw_notices(env)
   if c.begin_page("reference-update", true) then
     back = c.review_header(string.format("Update Reference to r%d", status.latest_revision),
       string.format("Synchronized r%d", status.synchronized_revision))
-    workflow.draw_notices(env)
     if not status.available then c.notice("reference-media", "blocked", status.video_error) end
     if status.can_shift_entire_project then
       c.section("Decision")

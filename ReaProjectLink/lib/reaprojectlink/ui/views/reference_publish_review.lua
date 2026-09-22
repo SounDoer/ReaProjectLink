@@ -83,11 +83,11 @@ function M.draw(env)
   for key, value in pairs(review.options) do options[key] = value end
   local stale = workflow.is_stale(env, data)
   local back, changed, refresh_clicked = false, false, false
+  workflow.draw_notices(env)
   if c.begin_page("reference-publish", true) then
     back = c.review_header(string.format("Publish Reference r%d", data.reference_revision),
       view_models.count(#data.lanes, "track") .. " · " ..
         view_models.count(#data.markers + #data.regions, "marker"))
-    workflow.draw_notices(env)
     if stale then
       refresh_clicked = c.stale("Project changed",
         "The project was edited after this review was made.", "Refresh review")

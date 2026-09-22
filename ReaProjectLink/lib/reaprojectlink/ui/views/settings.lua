@@ -31,9 +31,9 @@ function M.draw(env, state)
   local ImGui, ctx, c, theme, adapter = env.ImGui, env.ctx, env.c, env.theme, env.adapter
   local source = state.project_type == constants.PROJECT_TYPES.source
   local back = false
+  workflow.draw_notices(env)
   if c.begin_page("settings", false) then
     back = c.review_header("Settings")
-    workflow.draw_notices(env)
     c.section("Project")
     c.copy_value("project-name", "Name", view_models.project_name(state.path))
     c.copy_value("project-path", "Project file", state.path ~= "" and state.path or "Not saved")
