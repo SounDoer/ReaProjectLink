@@ -53,6 +53,20 @@ function M.initialize_master(adapter)
   return initialize(adapter, constants.PROJECT_TYPES.master)
 end
 
+function M.reset(adapter)
+  local path, path_error = require_saved_project(adapter)
+  if not path then
+    return nil, path_error
+  end
+
+  adapter.begin_undo("Reset ReaProjectLink state")
+  local counts = adapter.clear_extension_state()
+  adapter.mark_project_dirty()
+  adapter.end_undo("Reset ReaProjectLink state")
+
+  return counts
+end
+
 function M.project_state(adapter)
   local function revision(key)
     return tonumber(adapter.get_project_value(key)) or 0

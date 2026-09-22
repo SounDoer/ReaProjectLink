@@ -46,6 +46,24 @@ assert(math.abs(state.take.playback_rate - 1.1) < 0.000001, "take rate")
 assert(math.abs(state.take.volume - 0.8) < 0.000001, "absolute take volume")
 assert(state.take.polarity_inverted, "take polarity")
 
+adapter.set_project_value("project_id", "clear-test-project")
+assert(adapter.get_project_value("project_id") == "clear-test-project", "project value set before clear")
+local cleared_counts = assert(adapter.clear_extension_state())
+assert(cleared_counts.tracks >= 1, "clear reports affected Track count")
+assert(cleared_counts.items >= 1, "clear reports affected Item count")
+assert(adapter.get_project_value("project_id") == nil, "project ext state cleared")
+assert(adapter.get_track_lane_id(track) == "", "Track lane id cleared")
+assert(adapter.get_item_clip_id(item) == "", "Item clip id cleared")
+assert(adapter.get_item_reference_id(item) == "", "Item reference id cleared")
+
+-- Whether REAPER Undo restores clear_extension_state was investigated here
+-- but is not asserted: calling reaper.Undo_DoUndo2 mid-script in this linear,
+-- shared-fixture spec invalidated the `track`/`item` pointers used by every
+-- later assertion (it unwound further than the single "Test reset undo"
+-- block), which would break the rest of this file. See the implementation
+-- report for details; this is left as an open concern rather than a
+-- (possibly false) green assertion.
+
 local source = debug.getinfo(1, "S").source:sub(2)
 local tests_dir = assert(source:match("^(.*)[/\\]"))
 local wav_path = tests_dir .. "/.adapter-fixture.wav"

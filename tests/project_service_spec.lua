@@ -37,6 +37,11 @@ local function fake_adapter(options)
   function adapter.mark_project_dirty() dirty = dirty + 1 end
   function adapter.dirty_count() return dirty end
   function adapter.undo_depth() return undo_depth end
+  function adapter.clear_extension_state()
+    options.clear_extension_state_calls = (options.clear_extension_state_calls or 0) + 1
+    options.clear_extension_state_undo_depth = undo_depth
+    return options.clear_extension_state_result or { tracks = 0, items = 0 }
+  end
   return adapter
 end
 
@@ -218,6 +223,26 @@ function tests.rejects_non_wav_delivery_media()
   local result = assert(project_service.scan(adapter))
   equal(result.blocker_count, 1, "non-WAV blocker")
   equal(result.lanes[1].clips[1].blockers[1], "Only file-backed WAV media can be published", "non-WAV message")
+end
+
+function tests.resets_state_inside_a_balanced_undo_block_and_marks_dirty()
+  local options = { clear_extension_state_result = { tracks = 2, items = 5 } }
+  local adapter = fake_adapter(options)
+  local counts = assert(project_service.reset(adapter))
+  equal(counts.tracks, 2, "Track count")
+  equal(counts.items, 5, "Item count")
+  equal(options.clear_extension_state_calls, 1, "clear_extension_state called once")
+  equal(options.clear_extension_state_undo_depth, 1, "clear_extension_state runs inside undo block")
+  equal(adapter.dirty_count(), 1, "dirty count")
+  equal(adapter.undo_depth(), 0, "balanced undo")
+end
+
+function tests.rejects_resetting_an_unsaved_project()
+  local adapter = fake_adapter({ path = "" })
+  local result, err = project_service.reset(adapter)
+  equal(result, nil, "result")
+  equal(type(err), "string", "error")
+  equal(adapter.dirty_count(), 0, "dirty count")
 end
 
 local passed = 0

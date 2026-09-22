@@ -870,4 +870,31 @@ function M.cancel_undo(label)
   reaper.Undo_DoUndo2(project())
 end
 
+function M.clear_extension_state()
+  local counts = { tracks = 0, items = 0 }
+  for _, track in ipairs(M.all_tracks()) do
+    local had_value = false
+    for _, key in pairs(constants.TRACK_KEYS) do
+      local _, value = reaper.GetSetMediaTrackInfo_String(track, key, "", false)
+      if value and value ~= "" then had_value = true end
+      reaper.GetSetMediaTrackInfo_String(track, key, "", true)
+    end
+    if had_value then counts.tracks = counts.tracks + 1 end
+
+    for _, item in ipairs(M.track_items(track)) do
+      local item_had_value = false
+      for _, key in pairs(constants.ITEM_KEYS) do
+        local _, value = reaper.GetSetMediaItemInfo_String(item, key, "", false)
+        if value and value ~= "" then item_had_value = true end
+        reaper.GetSetMediaItemInfo_String(item, key, "", true)
+      end
+      if item_had_value then counts.items = counts.items + 1 end
+    end
+  end
+
+  reaper.SetProjExtState(project(), constants.EXTENSION_NAME, "", "")
+
+  return counts
+end
+
 return M

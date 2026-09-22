@@ -30,7 +30,7 @@ end
 function M.draw(env, state)
   local ImGui, ctx, c, theme, adapter = env.ImGui, env.ctx, env.c, env.theme, env.adapter
   local source = state.project_type == constants.PROJECT_TYPES.source
-  local back = false
+  local back, reset = false, false
   workflow.draw_notices(env)
   if c.begin_page("settings", false) then
     back = c.review_header("Settings")
@@ -56,9 +56,27 @@ function M.draw(env, state)
     c.key_value("ReaProjectLink", env.version)
     c.key_value("REAPER", env.reaper.GetAppVersion())
     c.key_value("ReaImGui", tostring(reaimgui_version))
+    c.section("Reset")
+    c.small("Removes ReaProjectLink data from this project: its type, subscriptions, revisions, " ..
+      "and the IDs on Tracks and Items. Published packages and your audio and video Items are kept.")
+    if c.button("Reset ReaProjectLink State...") then reset = true end
   end
   c.end_page()
   if back then env.app:back() end
+  if reset then
+    if workflow.confirm(env.reaper, "Reset ReaProjectLink State",
+        "Remove all ReaProjectLink data from this project? Published packages and media Items are kept. " ..
+        "You can undo this with Edit > Undo.") then
+      local result, err = env.services.project_service.reset(env.adapter)
+      if result then
+        env.app:reset()
+        env.app:notify("ReaProjectLink state was reset.")
+        env.app:request_check()
+      else
+        env.app:notify(err, true)
+      end
+    end
+  end
 end
 
 return M
