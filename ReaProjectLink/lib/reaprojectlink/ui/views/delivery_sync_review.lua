@@ -233,7 +233,7 @@ local function draw_update(env, review)
       end
     end
     load = draw_target(env, review)
-    if #data.unmapped_lanes > 0 then draw_mapping_table(env, data.unmapped_lanes, review, "unmapped") end
+    if #data.unmapped_lanes > 0 then draw_mapping_table(env, data.unmapped_lanes, review, "create") end
     draw_bound_lanes(env, review)
   end
   local page = c.end_page()
@@ -254,7 +254,7 @@ local function draw_update(env, review)
     M.open_update(env, data.source_project_id, review.target_input)
   elseif sync then
     local result, err = env.services.delivery_update.apply(data, env.adapter, {
-      lane_mappings = collect_mappings(data.unmapped_lanes, review, "unmapped"),
+      lane_mappings = collect_mappings(data.unmapped_lanes, review, "create"),
       lane_rebindings = review.rebindings,
       allow_reference_revision_mismatch = review.allow_reference,
     })

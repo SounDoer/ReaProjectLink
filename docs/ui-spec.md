@@ -197,10 +197,9 @@ Replaces the per-Lane button rows.
 - One row per Lane: Lane name, Clip count, one dropdown.
 - Dropdown groups: suggested Tracks (name match) first; then `New track`,
   `Selected track`; then `Don't import`.
-- Default is `New track`. Suggestions are never preselected (D054 unchanged).
-- In the Delivery Update Review, Lanes that are not yet mapped default to
-  `Don't import`, preserving the existing update behavior; the user maps them
-  explicitly.
+- Default is `New track` in both the Delivery Import and Delivery Update
+  Reviews, including Lanes previously left as `Don't import`. Suggestions are
+  never preselected (D054 unchanged).
 - Header control `New tracks go under: Top level | Selected folder track`
   replaces `Create All Under Selected Folder Track`.
 - `Selected track` with zero or several selected tracks shows an inline issue
