@@ -22,6 +22,7 @@ local MODULES = {
   "reaprojectlink.ui.views.settings",
   "reaprojectlink.ui.views.source_main",
   "reaprojectlink.ui.views.master_main",
+  "reaprojectlink.ui.app",
 }
 
 local tests = {}
