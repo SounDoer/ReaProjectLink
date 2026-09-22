@@ -71,6 +71,16 @@ function M.selected_items()
   return items
 end
 
+function M.select_items(items)
+  reaper.SelectAllMediaItems(project(), false)
+  for _, item in ipairs(items) do
+    if reaper.ValidatePtr2(project(), item, "MediaItem*") then
+      reaper.SetMediaItemSelected(item, true)
+    end
+  end
+  reaper.UpdateArrange()
+end
+
 function M.all_tracks()
   local tracks = {}
   for index = 0, reaper.CountTracks(project()) - 1 do

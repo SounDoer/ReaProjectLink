@@ -10,6 +10,10 @@ local MODULES = {
   "reaprojectlink.ui.theme",
   "reaprojectlink.ui.icons",
   "reaprojectlink.ui.components",
+  "reaprojectlink.ui.workflow",
+  "reaprojectlink.ui.checks",
+  "reaprojectlink.ui.views.card",
+  "reaprojectlink.ui.views.header",
 }
 
 local tests = {}
@@ -32,6 +36,61 @@ function tests.every_icon_draws_primitives()
     assert(calls > 0, name .. " draws at least one primitive")
   end
   equal(icons.draw(ImGui, "draw-list", "missing", 0, 0, 16, 0xffffffff), false, "unknown icon")
+end
+
+function tests.workflow_formats_publish_results()
+  local workflow = require("reaprojectlink.ui.workflow")
+  local message, is_error = workflow.publish_message("Delivery", 13, {})
+  equal(message, "Published Delivery r13.", "plain message")
+  equal(is_error, false, "plain result")
+  message, is_error = workflow.publish_message("Reference", 2, {
+    project_save_error = "Save failed.", lock_release_error = "Lock stuck.",
+  })
+  equal(message, "Published Reference r2. Save failed. Publish lock cleanup failed: Lock stuck.",
+    "follow-up errors")
+  equal(is_error, true, "follow-up errors are errors")
+end
+
+function tests.workflow_detects_stale_reviews()
+  local workflow = require("reaprojectlink.ui.workflow")
+  local env = { adapter = { project_change_count = function() return 5 end } }
+  equal(workflow.is_stale(env, { project_change_count = 4 }), true, "changed project")
+  equal(workflow.is_stale(env, { project_change_count = 5 }), false, "unchanged project")
+  equal(workflow.is_stale(env, {}), false, "untracked review")
+end
+
+function tests.checks_store_pointer_results()
+  local checks = require("reaprojectlink.ui.checks")
+  local app = require("reaprojectlink.ui.app_state").new(function() return 0 end)
+  local env = {
+    app = app,
+    fs = {},
+    adapter = {
+      get_project_value = function()
+        return '[{"sourceProjectId":"a","pointerPath":"A"},{"sourceProjectId":"b","pointerPath":"B"}]'
+      end,
+    },
+    services = {
+      reference_subscription = {
+        peek = function() return nil, "Couldn't reach shared storage.", "unreachable" end,
+      },
+      delivery_update = {
+        peek = function(_, entry)
+          if entry.sourceProjectId == "a" then
+            return { latest_revision = 4, reviewed_reference_revision = 8 }
+          end
+          return nil, "bad", "invalid"
+        end,
+      },
+    },
+  }
+  checks.run_source(env)
+  equal(app.checks.reference.state, "unreachable", "reference failure kind")
+  checks.run_master(env)
+  equal(app.checks.deliveries.a.latest, 4, "delivery latest")
+  equal(app.checks.deliveries.a.reviewed_reference, 8, "delivery reviewed Reference")
+  equal(app.checks.deliveries.b.state, "invalid", "delivery failure kind")
+  equal(app.checks.deliveries.b.error, "bad", "delivery failure message")
 end
 
 local passed = 0
