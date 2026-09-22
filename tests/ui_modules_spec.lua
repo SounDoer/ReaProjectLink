@@ -18,6 +18,10 @@ local MODULES = {
   "reaprojectlink.ui.views.delivery_publish_review",
   "reaprojectlink.ui.views.reference_publish_review",
   "reaprojectlink.ui.views.delivery_sync_review",
+  "reaprojectlink.ui.views.setup",
+  "reaprojectlink.ui.views.settings",
+  "reaprojectlink.ui.views.source_main",
+  "reaprojectlink.ui.views.master_main",
 }
 
 local tests = {}
