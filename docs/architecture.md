@@ -193,10 +193,10 @@ Splits, joins, copies, additions, removals, placement changes, and renames need
 no lineage classification.
 
 The Delivery Publish Review is grouped by Delivery Lane. The header shows the
-outgoing Delivery Revision, Reviewed Reference Revision, output path, and blocker
+outgoing Delivery Revision, declared Reference Revision, output path, and blocker
 count. Readable Items are Included; missing or unsupported media is Blocked.
 Users may resolve the explicit FX override, but cannot select only part of the
-snapshot. The final action is `Save & Publish Delivery`.
+snapshot. The final action is `Publish`.
 
 Every successful Source Publish increments `deliveryRevision`. Each new Clip has
 `mediaRevision` 1 and its WAV is copied into that Clip's unique directory.

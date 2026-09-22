@@ -17,8 +17,8 @@ the projects and test media on the team's normal shared-storage arrangement.
    Review, Delivery Update Review, or Reference Publish Review.
 2. Switch Project Tabs and confirm the panel clears transient Reviews,
    decisions, mappings, overrides, messages, and observed lock data.
-3. Edit a project after opening a Publish Review. Confirm the UI shows Review
-   Out of Date and requires Refresh Review before publishing.
+3. Edit a project after opening a Publish Review. Confirm the UI shows
+   `Project changed` and requires `Refresh review` before publishing.
 4. Use Save As on each Project Type. Confirm Continue Existing Project keeps
    its IDs and package relationship, while Start New Project creates new
    Project and Delivery or Reference identities at the new package location.
@@ -29,14 +29,14 @@ the projects and test media on the team's normal shared-storage arrangement.
 2. Register any required Markers and Regions. Optionally assign one registered
    Marker as the Reference Start; its displayed name may be anything, including
    an industry label such as FFOP.
-3. Open Reference Publish Review and choose Save & Publish Reference.
+3. Open Reference Publish Review and choose `Publish`.
 4. Confirm that `_ReaProjectLink/<master-project-name>/reference.json` and
    `history/reference-0001.json` exist beside the Master Project.
 5. Initialize the Source Project and subscribe to the Master Project's
    `reference.json`.
-6. Keep Mirror Master Timeline enabled, synchronize, and explicitly mark the
-   revision reviewed. Verify all registered Reference Tracks, Items, Markers,
-   and Regions use the Master Project's absolute positions.
+6. Keep Mirror Master Timeline enabled and synchronize. Verify all registered
+   Reference Tracks, Items, Markers, and Regions use the Master Project's
+   absolute positions.
 7. Move every stable Reference timeline element by the same amount, publish,
    and confirm the Source Project offers—but never automatically applies—the
    full-project shift. Move only the Reference Start and confirm it is not
@@ -52,12 +52,17 @@ the projects and test media on the team's normal shared-storage arrangement.
 2. Open Delivery Publish Review. Confirm every current Item is listed as Included
    without a Clip identity decision. If FX is intentionally unbaked, confirm
    Publish Unprocessed Media and its warning.
-3. Choose Save & Publish Delivery. Confirm `delivery.json`,
-   `history/delivery-0001.json`, and copied Media Revisions exist under
-   `_ReaProjectLink/<source-project-name>`.
+3. Confirm the `Checked against Reference` choice: it defaults to the
+   Synchronized Reference Revision, and offers the previously declared revision
+   as an alternative when it differs. Choose `Publish`. Confirm
+   `delivery.json`, `history/delivery-0001.json`, and copied Media Revisions
+   exist under `_ReaProjectLink/<source-project-name>`, and that the manifest's
+   `reference.reviewedRevision` records the revision chosen in the Review.
 4. In the Master Project, choose Add Delivery, select that `delivery.json`, and
-   map every Delivery Lane with Create New Track, Use Existing Track, or Leave
-   Unmapped.
+   map every Delivery Lane using its dropdown: suggested Tracks, `New track`,
+   `Selected track`, or `Don't import`. Confirm `New tracks go under: Top
+   level | Selected folder track` chooses the parent for lanes mapped to
+   `New track`.
 5. Import the Delivery and verify position relative to Reference Start, source
    offset, length, fades, Item gain, and supported Take settings.
 
@@ -81,8 +86,29 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Publish locking
 
-- While Publishing Is Locked, confirm the possible publisher, computer, start
-  time, and package path are visible.
-- Confirm Check Again does not mutate the lock.
-- Choose Unlock Publishing only after confirming that no other user or computer
-  is publishing; then refresh the Review before retrying.
+- While Publishing Is Locked, confirm the possible publisher, computer, and
+  start time are visible.
+- Confirm `Check now` (header) and `Retry` (card action) do not mutate the
+  lock.
+- Choose `Unlock publishing...` only after confirming that no other user or
+  computer is publishing; then refresh the Review before retrying.
+
+## Pointer checks
+
+1. Open the window and confirm each card briefly shows `Checking...` before
+   settling on its result.
+2. Switch Project Tabs and confirm the same `Checking...` then result sequence
+   runs again for the newly active project.
+
+## Appearance and layout
+
+1. In Settings, choose each of Light, Dark, and Auto. Confirm Auto follows the
+   brightness of the REAPER theme.
+2. Dock the window and narrow it to about 320 px. Confirm cards, Reviews, and
+   Settings stay usable without horizontal clipping.
+
+## Review interactions
+
+1. In Delivery Publish Review, use `Select item` on a blocked Item. Confirm it
+   selects the Item in REAPER and confirm the Review does not immediately flip
+   to `Project changed`.

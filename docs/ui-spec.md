@@ -173,7 +173,9 @@ All Reviews share one skeleton. Empty sections are omitted.
 
 **Stale state:** when the project changes after the Review was built, the whole
 body is replaced by `Project changed` + explanation + `Refresh review`. Stale
-decisions are never actionable (existing D067 behavior).
+decisions are never actionable (existing D067 behavior). This applies to the
+Delivery Publish and Reference Publish Reviews; the Delivery Import, Delivery
+Update, and Reference Update Reviews are not tracked for project changes.
 
 ### 4.1 Review inventory
 
@@ -184,9 +186,9 @@ decisions are never actionable (existing D067 behavior).
 | Delivery Publish (Source) | `Publish Delivery rN` | Checked against Reference (D086); Save As identity | Clips per Lane | `Publish` |
 | Delivery Import / Update (Master) | `Add <name>` / `Sync <name> to rN` | Lane Mapping table; target revision; parent for new tracks | Mapped Lanes with editable target | `Import` / `Sync` |
 
-Reference Update is a new Review view; today its controls sit inline on the
-Reference page. The separate Reference-review confirmation step is removed
-(D086).
+Reference Update is a new Review view; its controls previously sat inline on
+the Reference page and now live in the Reference Update Review. The separate
+Reference-review confirmation step is removed (D086).
 
 ### 4.2 Lane Mapping table
 

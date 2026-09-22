@@ -629,8 +629,7 @@ leaving an ordinary REAPER Item in place.
 
 Workflow reviews are named Delivery Publish Review, Reference Publish Review,
 Delivery Import Review, Delivery Update Review, and Reference Update Review.
-Reviewed Revision remains the separate semantic confirmation that a Source user
-has reviewed a synchronized Reference Revision.
+The checked Reference revision is declared at Delivery Publish; see D086.
 
 Delivery Publish Review uses Added, Audio Changed, Placement Changed, Metadata
 Changed, Unchanged, Retired, Needs Classification, and Blocked. Identity actions
@@ -874,6 +873,8 @@ Reviewed step. Delivery Publish Review asks which Reference revision the audio
 was checked against, defaulting to the Synchronized Reference Revision and
 offering the revision declared by the previous Publish when it differs. The
 declared revision is written to the Delivery Manifest's existing
-`reference.reviewedRevision` field and stored in the project as the next
-default. Publishing requires a Synchronized Reference Revision rather than a
-Reviewed one. The manifest schema and Master behavior are unchanged.
+`reference.reviewedRevision` field and stored in the project, where it is
+offered as the alternative choice the next time (the default is always the
+Synchronized Reference Revision). Publishing requires a Synchronized Reference
+Revision rather than a Reviewed one. The manifest schema and Master behavior
+are unchanged.

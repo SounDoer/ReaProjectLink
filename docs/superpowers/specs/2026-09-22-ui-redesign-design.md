@@ -338,7 +338,7 @@ This amends D070 and D074 and is recorded as a new decision D086.
 
 ### 9.2 Automatic pointer check on open
 
-Section 4. Refines ui-spec principle 6: reading pointer JSON on open and on
+Section 4. Refines the former ui-spec performance principle: reading pointer JSON on open and on
 project change is allowed; hashing and package validation remain Review-only.
 
 ## 10. Code structure
