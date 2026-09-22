@@ -135,8 +135,6 @@ function M.create(ImGui, ctx, theme)
     local k = colors()
     if kind == "primary" then
       return styled_button(label, k.accent, k.accent_hover, k.accent_active, k.on_accent, k.accent)
-    elseif kind == "danger" then
-      return styled_button(label, k.surface, k.blocked_bg, k.blocked_bg, k.blocked, k.blocked)
     end
     return ImGui.Button(ctx, label)
   end

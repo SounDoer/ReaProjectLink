@@ -85,42 +85,38 @@ function M.confirm_moved_items(env)
   end
 end
 
-local function run(env, result, err, success)
-  workflow.report(env, result, err, success)
-end
-
 local function handle_reference(env, action)
   local publish, adapter = env.services.reference_publish, env.adapter
   if action == "review_publish" then
     reference_publish_review.open(env)
   elseif action == "register_tracks" then
     local result, err = publish.register_selected_tracks(adapter)
-    run(env, result, err, function(value)
+    workflow.report(env, result, err, function(value)
       return "Registered " .. view_models.count(value.added, "Reference track") .. "."
     end)
   elseif action == "unregister_tracks" then
     local result, err = publish.unregister_selected_tracks(adapter)
-    run(env, result, err, function(value)
+    workflow.report(env, result, err, function(value)
       return "Unregistered " .. view_models.count(value.removed, "Reference track") .. "."
     end)
   elseif action == "register_markers" then
     local result, err = publish.register_selected_timeline_entries(adapter)
-    run(env, result, err, function(value)
+    workflow.report(env, result, err, function(value)
       return string.format("Registered %d marker(s) or region(s).", value.added)
     end)
   elseif action == "unregister_markers" then
     local result, err = publish.unregister_selected_timeline_entries(adapter)
-    run(env, result, err, function(value)
+    workflow.report(env, result, err, function(value)
       return string.format("Unregistered %d marker(s) or region(s).", value.removed)
     end)
   elseif action == "set_start" then
     local result, err = publish.set_selected_reference_start(adapter)
-    run(env, result, err, "Reference Start set.")
+    workflow.report(env, result, err, "Reference Start set.")
   elseif action == "reset_items" then
     if workflow.confirm(env.reaper, "Treat Reference items as new",
         "Assign new identities? Source projects will see these as new Reference items.") then
       local result, err = publish.reset_selected_reference_items(adapter)
-      run(env, result, err, function(value)
+      workflow.report(env, result, err, function(value)
         return "Assigned new identities to " .. view_models.count(value.reset, "item") .. "."
       end)
     end
@@ -128,7 +124,7 @@ local function handle_reference(env, action)
     if workflow.confirm(env.reaper, "Treat Reference tracks as new",
         "Assign new identities? Source projects will see these as new Reference tracks.") then
       local result, err = publish.reset_selected_reference_tracks(adapter)
-      run(env, result, err, function(value)
+      workflow.report(env, result, err, function(value)
         return "Assigned new identities to " .. view_models.count(value.reset, "track") .. "."
       end)
     end
@@ -147,7 +143,7 @@ local function handle_delivery(env, action)
     if workflow.confirm(env.reaper, "Remove subscription",
         string.format("Stop following %s? Its tracks and items stay in this project.", action.row.name)) then
       local result, err = env.services.delivery_import.remove_subscription(env.adapter, action.row.id)
-      run(env, result, err, "Subscription removed. Tracks and items were kept.")
+      workflow.report(env, result, err, "Subscription removed. Tracks and items were kept.")
       app:request_check()
     end
   end
