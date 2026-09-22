@@ -14,6 +14,8 @@ local MODULES = {
   "reaprojectlink.ui.checks",
   "reaprojectlink.ui.views.card",
   "reaprojectlink.ui.views.header",
+  "reaprojectlink.ui.views.reference_update_review",
+  "reaprojectlink.ui.views.delivery_publish_review",
 }
 
 local tests = {}
