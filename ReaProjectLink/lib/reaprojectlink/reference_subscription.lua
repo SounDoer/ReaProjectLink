@@ -240,6 +240,27 @@ function M.check(adapter, fs)
   }, adapter, false)
 end
 
+-- Reads only reference.json. The third return value classifies a failure as
+-- "unsubscribed", "unreachable", or "invalid" for the main panel.
+function M.peek(adapter, fs)
+  local pointer_path = adapter.get_project_value(constants.PROJECT_KEYS.reference_manifest_path)
+  if not pointer_path or pointer_path == "" then
+    return nil, "No Reference subscription.", "unsubscribed"
+  end
+  if not fs.exists(pointer_path) then
+    return nil, "Couldn't reach shared storage.", "unreachable"
+  end
+  local pointer, pointer_error = manifest_file.read(fs, pointer_path, "reference.json", 2)
+  if not pointer then return nil, pointer_error, "invalid" end
+  local valid, validation_error = manifest_validation.reference_pointer(pointer)
+  if not valid then return nil, validation_error, "invalid" end
+  local expected_id = adapter.get_project_value(constants.PROJECT_KEYS.reference_id)
+  if expected_id and expected_id ~= "" and pointer.referenceId ~= expected_id then
+    return nil, "Subscribed Reference ID changed unexpectedly.", "invalid"
+  end
+  return { latest_revision = pointer.latestReferenceRevision }
+end
+
 function M.synchronize(adapter, status, options)
   local current, context_error = project_guard.check(
     status, adapter, "Reference Update Review"

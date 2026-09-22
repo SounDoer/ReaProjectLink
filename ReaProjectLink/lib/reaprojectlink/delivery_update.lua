@@ -31,6 +31,30 @@ local function checked_clip(fs, package_root, lane, clip)
   }
 end
 
+-- Reads only delivery.json and its latest snapshot (small JSON, no media).
+function M.peek(fs, subscription)
+  if not fs.exists(subscription.pointerPath) then
+    return nil, "Couldn't reach shared storage.", "unreachable"
+  end
+  local pointer, pointer_error = manifest_file.read(fs, subscription.pointerPath, "delivery.json", 1)
+  if not pointer then return nil, pointer_error, "invalid" end
+  local valid, validation_error = manifest_validation.delivery_pointer(pointer)
+  if not valid then return nil, validation_error, "invalid" end
+  if pointer.sourceProjectId ~= subscription.sourceProjectId or
+      pointer.deliveryId ~= subscription.deliveryId then
+    return nil, "Subscribed Source or Delivery identity changed.", "invalid"
+  end
+  local package_root = subscription.pointerPath:match("^(.*)[/\\][^/\\]+$")
+  local snapshot, snapshot_error = manifest_file.read(
+    fs, fs.join(package_root, pointer.manifest), "Delivery Manifest", 1
+  )
+  if not snapshot then return nil, snapshot_error, "invalid" end
+  return {
+    latest_revision = pointer.latestDeliveryRevision,
+    reviewed_reference_revision = snapshot.reference and snapshot.reference.reviewedRevision,
+  }
+end
+
 function M.review(adapter, fs, source_project_id, target_revision)
   local stored = adapter.get_project_value(constants.PROJECT_KEYS.delivery_subscriptions)
   if not stored or stored == "" then return nil, "Master Project has no Delivery Subscriptions." end
