@@ -21,11 +21,11 @@ Master cards: **Reference**, **Deliveries**.
 ### 1.1 Header
 
 Left: project name, `Source` / `Master` badge.
-Right: `Checked N min ago` text, `Check now` text button, gear icon button.
+Right: `Checked N min ago` text, `Check Now` text button, gear icon button.
 
 Blocking global conditions (project not saved, Publishing Is Locked) appear as a
 banner directly under the header. The banner carries its own action (for
-example `Unlock publishing…`).
+example `Unlock Publishing…`).
 
 ### 1.2 Next-step highlight
 
@@ -47,7 +47,7 @@ Master priority:
 2. Reference never published
 3. No Delivery subscriptions
 4. Any subscription with a newer Delivery Revision, unmapped Lanes, or a read failure
-5. Otherwise nothing is highlighted and the header shows `All up to date`
+5. Otherwise nothing is highlighted and the header shows `All Up to Date`
 
 ### 1.3 Responsive layout
 
@@ -61,8 +61,8 @@ Master priority:
 
 An uninitialized project shows only a setup view with two large choices:
 
-- "This is a department project" → Initialize as Source Project
-- "This is the mix project" → Initialize as Master Project
+- "This Is a Department Project" → Initialize as Source Project
+- "This Is the Mix Project" → Initialize as Master Project
 
 Each has one sentence of explanation. After initialization the main panel
 appears and card empty states guide the remaining setup.
@@ -76,68 +76,68 @@ line (colored dot + text); up to two key/value lines; at most one button.
 
 | State | Status line | Info | Button |
 |---|---|---|---|
-| Not subscribed | `Not connected` (warning) | "Choose the reference.json your mix project published." | `Choose reference.json` |
+| Not subscribed | `Not Connected` (warning) | "Choose the reference.json your mix project published." | `Choose reference.json` |
 | Checking | `Checking…` (neutral) | Last known revision | — |
-| Unreachable | `Couldn't reach shared storage` (blocked) | Last known revision | `Retry` |
-| Invalid (pointer unreadable or identity changed) | `Couldn't read the Reference` (blocked) | Error detail | `Retry` |
-| Blocked (e.g. media missing) | Condition text per D080 (blocked) | Last known revision | `Review update` |
-| Newer available | `Reference rN available` (warning) | `Synchronized rM` | `Review update` |
-| Up to date | `Up to date` (ready) | `Reference rN` | — |
+| Unreachable | `Couldn't Reach Shared Storage` (blocked) | Last known revision | `Retry` |
+| Invalid (pointer unreadable or identity changed) | `Couldn't Read the Reference` (blocked) | Error detail | `Retry` |
+| Blocked (e.g. media missing) | Condition text per D080 (blocked) | Last known revision | `Review Update` |
+| Newer available | `Reference rN Available` (warning) | `Synchronized rM` | `Review Update` |
+| Up to date | `Up to Date` (ready) | `Reference rN` | — |
 
 The "synchronized but not reviewed" state no longer exists (D086).
 
-`···` menu: `Detach selected items…`, `Detach selected tracks…`.
+`···` menu: `Detach Selected Items…`, `Detach Selected Tracks…`.
 
 ### 2.2 Source · Delivery
 
 | State | Status line | Info | Button |
 |---|---|---|---|
-| No tracks | `No delivery tracks` (warning) | "Select tracks in REAPER first." | `Register selected tracks` |
-| Never published | `Not published yet` (neutral) | `N tracks · M items` | `Review and publish` |
-| Published | `Last published rN` (neutral) | `N tracks · M items` | `Review and publish` |
+| No tracks | `No Delivery Tracks` (warning) | "Select tracks in REAPER first." | `Register Selected Tracks` |
+| Never published | `Not Published Yet` (neutral) | `N tracks · M items` | `Review and Publish` |
+| Published | `Last Published rN` (neutral) | `N tracks · M items` | `Review and Publish` |
 
 When the Delivery card is not highlighted because a newer Reference is pending,
 the button stays enabled and a hint reads `Will record Reference rN`.
 
-`···` menu: `Register selected tracks`, `Unregister selected tracks…`.
+`···` menu: `Register Selected Tracks`, `Unregister Selected Tracks…`.
 
 ### 2.3 Master · Reference
 
 | State | Status line | Info | Button |
 |---|---|---|---|
-| No tracks | `No reference tracks` (warning) | "Select video tracks in REAPER first." | `Register selected tracks` |
-| Never published | `Not published yet` (warning) | `N tracks · M markers` | `Review and publish` |
-| Published | `Published rN` (neutral) | `N tracks · M markers` | `Review and publish` |
+| No tracks | `No Reference Tracks` (warning) | "Select video tracks in REAPER first." | `Register Selected Tracks` |
+| Never published | `Not Published Yet` (warning) | `N tracks · M markers` | `Review and Publish` |
+| Published | `Published rN` (neutral) | `N tracks · M markers` | `Review and Publish` |
 
 `···` menu, grouped with separators:
 
-- Tracks: `Register selected tracks`, `Unregister selected tracks`
-- Markers: `Register selected markers/regions`, `Unregister selected markers/regions`,
-  `Set selected marker as Reference Start`
-- Advanced: `Treat selected items as new…`, `Treat selected tracks as new…`
+- Tracks: `Register Selected Tracks`, `Unregister Selected Tracks`
+- Markers: `Register Selected Markers/Regions`, `Unregister Selected Markers/Regions`,
+  `Set Selected Marker as Reference Start`
+- Advanced: `Treat Selected Items as New…`, `Treat Selected Tracks as New…`
 
 ### 2.4 Master · Deliveries
 
-Title bar has a `+` icon button: `Add delivery…` (file dialog for
+Title bar has a `+` icon button: `Add Delivery` (file dialog for
 `delivery.json`, then the Delivery Import Review). With no subscriptions the card
-shows an empty state with a primary `Add delivery` button.
+shows an empty state with a primary `Add Delivery` button.
 
 One row per subscription: name, status text, an action button when the row
 needs attention, and a `···` menu.
 
 | Row state | Status text | Row action |
 |---|---|---|
-| Newer revision | `rN available · have rM` (warning) | `Sync` |
-| Unmapped Lanes | `N lanes not imported` (neutral) | `Map lanes` |
-| Unreachable | `Couldn't reach` (blocked) | `Retry` |
-| Invalid | `Couldn't read delivery` (blocked) | `Retry` |
-| Older Reference | `Made against Reference rN` (warning) | `···` |
-| Up to date | `Up to date · rN` (ready) | `···` |
+| Newer revision | `rN Available · Have rM` (warning) | `Sync` |
+| Unmapped Lanes | `N Lanes Not Imported` (neutral) | `Map Lanes` |
+| Unreachable | `Couldn't Reach` (blocked) | `Retry` |
+| Invalid | `Couldn't Read Delivery` (blocked) | `Retry` |
+| Older Reference | `Made Against Reference rN` (warning) | `···` |
+| Up to date | `Up to Date · rN` (ready) | `···` |
 
 When several states apply, the row shows the first in this order: Unreachable,
 Invalid, Newer revision, Unmapped Lanes, Older Reference, Up to date.
 
-Row `···` menu: `Sync to another revision…`, `Remove subscription…`.
+Row `···` menu: `Sync to Another Revision…`, `Remove Subscription…`.
 
 ## 3. Update checks
 
@@ -159,10 +159,10 @@ All Reviews share one skeleton. Empty sections are omitted.
 1. **Header** — Back arrow, verb-first title with the target revision
    (for example `Publish Delivery r13`), one summary line.
 2. **Issues** — blockers (red) and warnings (amber). Each item carries an inline
-   fix or acknowledgment action (for example `Select item` selects the offending
-   Item in REAPER; `Publish unprocessed media`; `Allow Reference revision
-   difference`; Save As identity as two buttons `Continue existing` /
-   `Start new`).
+   fix or acknowledgment action (for example `Select Item` selects the offending
+   Item in REAPER; `Publish Unprocessed Media`; `Allow Reference revision
+   difference`; Save As identity as two buttons `Continue Existing` /
+   `Start New`).
 3. **Decisions** — choices the operation needs (Reference declaration, Lane
    Mapping table, target revision, parent for new tracks).
 4. **Details** — collapsible groups per Lane or Track, collapsed by default,
@@ -172,7 +172,7 @@ All Reviews share one skeleton. Empty sections are omitted.
    `Fix N issues to publish` (or the matching verb).
 
 **Stale state:** when the project changes after the Review was built, the whole
-body is replaced by `Project changed` + explanation + `Refresh review`. Stale
+body is replaced by `Review Out of Date` + explanation + `Refresh Review`. Stale
 decisions are never actionable (existing D067 behavior). This applies to the
 Delivery Publish and Reference Publish Reviews; the Delivery Import, Delivery
 Update, and Reference Update Reviews are not tracked for project changes.
@@ -183,7 +183,7 @@ Update, and Reference Update Reviews are not tracked for project changes.
 |---|---|---|---|---|
 | Reference Update (Source) | `Update Reference to rN` | Whole-project shift toggle, only when the start changed | Track, Marker, and Region counts and alignment mode | `Synchronize` |
 | Reference Publish (Master) | `Publish Reference rN` | Unchanged-publish confirmation when nothing changed | Registered Tracks, Markers/Regions | `Publish` |
-| Delivery Publish (Source) | `Publish Delivery rN` | Checked against Reference (D086); Save As identity | Clips per Lane | `Publish` |
+| Delivery Publish (Source) | `Publish Delivery rN` | Checked Against Reference (D086); Save As identity | Clips per Lane | `Publish` |
 | Delivery Import / Update (Master) | `Add <name>` / `Sync <name> to rN` | Lane Mapping table; target revision; parent for new tracks | Mapped Lanes with editable target | `Import` / `Sync` |
 
 Reference Update is a new Review view; its controls previously sat inline on
@@ -195,14 +195,14 @@ Reference-review confirmation step is removed (D086).
 Replaces the per-Lane button rows.
 
 - One row per Lane: Lane name, Clip count, one dropdown.
-- Dropdown groups: suggested Tracks (name match) first; then `New track`,
-  `Selected track`; then `Don't import`.
-- Default is `New track` in both the Delivery Import and Delivery Update
-  Reviews. A Lane the user previously chose not to import stays `Don't import`
+- Dropdown groups: suggested Tracks (name match) first; then `New Track`,
+  `Selected Track`; then `Don't Import`.
+- Default is `New Track` in both the Delivery Import and Delivery Update
+  Reviews. A Lane the user previously chose not to import stays `Don't Import`
   until they map it. Suggestions are never preselected (D054 unchanged).
-- Header control `New tracks go under: Top level | Selected folder track`
+- Header control `New tracks go under: Top Level | Selected Folder Track`
   replaces `Create All Under Selected Folder Track`.
-- `Selected track` with zero or several selected tracks shows an inline issue
+- `Selected Track` with zero or several selected tracks shows an inline issue
   on that row instead of a toast.
 - Already-mapped Lanes (Update Review) list their current target in the same
   dropdown so a Lane can be re-bound.
@@ -216,7 +216,7 @@ Replaces the per-Lane button rows.
 | Appearance | Theme: Auto / Light / Dark | Same |
 | About | ReaProjectLink, REAPER, ReaImGui versions | Same |
 
-`Unlock publishing…` lives in the lock banner, not in Settings.
+`Unlock Publishing…` lives in the lock banner, not in Settings.
 
 ## 6. Notifications
 

@@ -18,7 +18,7 @@ the projects and test media on the team's normal shared-storage arrangement.
 2. Switch Project Tabs and confirm the panel clears transient Reviews,
    decisions, mappings, overrides, messages, and observed lock data.
 3. Edit a project after opening a Publish Review. Confirm the UI shows
-   `Project changed` and requires `Refresh review` before publishing.
+   `Review Out of Date` and requires `Refresh Review` before publishing.
 4. Use Save As on each Project Type. Confirm Continue Existing Project keeps
    its IDs and package relationship, while Start New Project creates new
    Project and Delivery or Reference identities at the new package location.
@@ -52,17 +52,17 @@ the projects and test media on the team's normal shared-storage arrangement.
 2. Open Delivery Publish Review. Confirm every current Item is listed as Included
    without a Clip identity decision. If FX is intentionally unbaked, confirm
    Publish Unprocessed Media and its warning.
-3. Confirm the `Checked against Reference` choice: it defaults to the
+3. Confirm the `Checked Against Reference` choice: it defaults to the
    Synchronized Reference Revision, and offers the previously declared revision
    as an alternative when it differs. Choose `Publish`. Confirm
    `delivery.json`, `history/delivery-0001.json`, and copied Media Revisions
    exist under `_ReaProjectLink/<source-project-name>`, and that the manifest's
    `reference.reviewedRevision` records the revision chosen in the Review.
 4. In the Master Project, choose Add Delivery, select that `delivery.json`, and
-   map every Delivery Lane using its dropdown: suggested Tracks, `New track`,
-   `Selected track`, or `Don't import`. Confirm `New tracks go under: Top
-   level | Selected folder track` chooses the parent for lanes mapped to
-   `New track`.
+   map every Delivery Lane using its dropdown: suggested Tracks, `New Track`,
+   `Selected Track`, or `Don't Import`. Confirm `New tracks go under: Top
+   Level | Selected Folder Track` chooses the parent for lanes mapped to
+   `New Track`.
 5. Import the Delivery and verify position relative to Reference Start, source
    offset, length, fades, Item gain, and supported Take settings.
 
@@ -88,9 +88,9 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 - While Publishing Is Locked, confirm the possible publisher, computer, and
   start time are visible.
-- Confirm `Check now` (header) and `Retry` (card action) do not mutate the
+- Confirm `Check Now` (header) and `Retry` (card action) do not mutate the
   lock.
-- Choose `Unlock publishing...` only after confirming that no other user or
+- Choose `Unlock Publishing...` only after confirming that no other user or
   computer is publishing; then refresh the Review before retrying.
 
 ## Pointer checks
@@ -109,6 +109,6 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Review interactions
 
-1. In Delivery Publish Review, use `Select item` on a blocked Item. Confirm it
+1. In Delivery Publish Review, use `Select Item` on a blocked Item. Confirm it
    selects the Item in REAPER and confirm the Review does not immediately flip
-   to `Project changed`.
+   to `Review Out of Date`.

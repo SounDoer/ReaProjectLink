@@ -862,9 +862,11 @@ navigation rail. At most one card is highlighted as the next step; it carries th
 view's only primary button. Setup and low-frequency operations live in each
 card's `···` menu or in Settings, and first-time setup is reached through card
 empty states. Pointer files (never media) are read when the window opens, when
-the active project changes, and on `Check now`; there is no periodic polling.
+the active project changes, and on `Check Now`; there is no periodic polling.
 The UI offers Light and Dark themes plus Auto, which follows the brightness of
-the REAPER theme. Details: `docs/ui-spec.md`.
+the REAPER theme. Details: `docs/ui-spec.md`. Labels, titles, and status lines
+use Title Case per D080 and D081; explanatory text, notices, and messages use
+sentence case.
 
 ### D086 — The checked Reference revision is declared at Delivery Publish
 
