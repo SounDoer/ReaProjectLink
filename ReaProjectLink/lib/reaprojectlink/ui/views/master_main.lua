@@ -28,8 +28,9 @@ local ROW_MENU = {
 local function input(env, state)
   local services, adapter, app = env.services, env.adapter, env.app
   local tracks = services.reference_publish.reference_tracks(adapter)
+  local timeline_entries, marker_error = services.reference_publish.timeline_entries(adapter)
   local markers = 0
-  for _, entry in ipairs(services.reference_publish.timeline_entries(adapter) or {}) do
+  for _, entry in ipairs(timeline_entries or {}) do
     if entry.registered then markers = markers + 1 end
   end
   local rows = {}
@@ -49,13 +50,16 @@ local function input(env, state)
   return {
     track_count = #tracks,
     marker_count = markers,
+    marker_error = marker_error,
     reference_revision = state.reference_revision,
     rows = rows,
   }
 end
 
--- Moving a managed Item away from its bound Track prompts once (D083).
-local function confirm_moved_items(env)
+-- Moving a managed Item away from its bound Track prompts once (D083). The
+-- app shell calls this once per frame for every Master view (main panel,
+-- Reviews, Settings).
+function M.confirm_moved_items(env)
   local adapter, app = env.adapter, env.app
   local change_count = adapter.project_change_count()
   if change_count == app.moved_items_change_count then return end
@@ -102,12 +106,12 @@ local function handle_reference(env, action)
   elseif action == "register_markers" then
     local result, err = publish.register_selected_timeline_entries(adapter)
     run(env, result, err, function(value)
-      return string.format("Registered %d markers/regions.", value.added)
+      return string.format("Registered %d marker(s) or region(s).", value.added)
     end)
   elseif action == "unregister_markers" then
     local result, err = publish.unregister_selected_timeline_entries(adapter)
     run(env, result, err, function(value)
-      return string.format("Unregistered %d markers/regions.", value.removed)
+      return string.format("Unregistered %d marker(s) or region(s).", value.removed)
     end)
   elseif action == "set_start" then
     local result, err = publish.set_selected_reference_start(adapter)
@@ -201,8 +205,9 @@ end
 
 function M.draw(env, state)
   local ImGui, ctx, c = env.ImGui, env.ctx, env.c
-  confirm_moved_items(env)
-  local cards = view_models.master_cards(input(env, state))
+  local values = input(env, state)
+  local cards = view_models.master_cards(values)
+  if cards.reference and values.marker_error then cards.reference.note = values.marker_error end
   header.draw(env, state, "Master", cards.all_current and "All up to date" or nil)
   local width, side_by_side = c.card_width()
   local reference_action = card.draw(env, "master-reference", "film", "Reference", cards.reference,

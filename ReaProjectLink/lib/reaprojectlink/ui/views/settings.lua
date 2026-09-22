@@ -12,9 +12,10 @@ local THEMES = {
 
 local function draw_reference(env, state)
   local ImGui, ctx, c, adapter = env.ImGui, env.ctx, env.c, env.adapter
+  local connected = state.reference_manifest_path ~= nil and state.reference_manifest_path ~= ""
   c.section("Reference")
-  c.copy_value("reference-path", "reference.json", state.reference_manifest_path or "Not connected")
-  if c.button("Change...") then workflow.choose_reference(env) end
+  c.copy_value("reference-path", "reference.json", connected and state.reference_manifest_path or "Not connected")
+  if c.button(connected and "Change..." or "Choose...") then workflow.choose_reference(env) end
   local mode = adapter.get_project_value(constants.PROJECT_KEYS.reference_alignment_mode) or "mirror"
   local changed, mirror = ImGui.Checkbox(ctx, "Mirror Master timeline", mode ~= "relative")
   if changed then
