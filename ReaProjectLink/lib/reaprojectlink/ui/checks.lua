@@ -14,6 +14,9 @@ function M.run_source(env)
   local status, err, kind = env.services.reference_subscription.peek(env.adapter, env.fs)
   if status then
     env.app.checks.reference = { state = "done", latest = status.latest_revision }
+    -- A successful peek means the media is reachable again; the next Review
+    -- open re-runs the full media check.
+    env.app.media_error = nil
   elseif kind == "unsubscribed" then
     env.app.checks.reference = { state = "idle" }
   else

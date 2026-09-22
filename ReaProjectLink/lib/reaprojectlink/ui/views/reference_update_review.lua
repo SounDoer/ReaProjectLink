@@ -64,6 +64,7 @@ function M.draw(env)
       shift_entire_project = review.shift_entire_project,
     })
     if result then
+      app.media_error = nil
       app:back()
       app:notify(string.format("Synchronized Reference r%d.", status.latest_revision))
       app:request_check()

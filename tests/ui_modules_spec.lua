@@ -102,6 +102,25 @@ function tests.checks_store_pointer_results()
   equal(app.checks.deliveries.b.error, "bad", "delivery failure message")
 end
 
+function tests.checks_clear_media_error_on_successful_peek()
+  local checks = require("reaprojectlink.ui.checks")
+  local app = require("reaprojectlink.ui.app_state").new(function() return 0 end)
+  app.media_error = "Media File Not Found"
+  local env = {
+    app = app,
+    fs = {},
+    adapter = {},
+    services = {
+      reference_subscription = {
+        peek = function() return { latest_revision = 3 } end,
+      },
+    },
+  }
+  checks.run_source(env)
+  equal(app.checks.reference.state, "done", "reference peek success")
+  equal(app.media_error, nil, "stale media error is cleared")
+end
+
 local passed = 0
 for name, test in pairs(tests) do
   local ok, err = pcall(test)
