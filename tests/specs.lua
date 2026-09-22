@@ -18,4 +18,5 @@ return {
   "reference_subscription_spec.lua",
   "delivery_import_spec.lua",
   "delivery_update_spec.lua",
+  "ui_theme_spec.lua",
 }
