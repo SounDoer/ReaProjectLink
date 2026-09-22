@@ -22,4 +22,5 @@ return {
   "ui_view_models_spec.lua",
   "ui_app_state_spec.lua",
   "pointer_peek_spec.lua",
+  "ui_modules_spec.lua",
 }
