@@ -77,8 +77,13 @@ local function draw_issues(env, data, options)
   return changed
 end
 
-local function draw_declaration(env, data, options)
-  if data.synchronized_reference_revision == 0 then return false end
+-- Writes the choice directly into the persistent review instead of
+-- requesting a refresh, so changing it doesn't rebuild the whole Review
+-- (which re-hashes all media). `delivery_publish.publish` reads
+-- `review.reviewed_reference_revision` from `review.data`.
+local function draw_declaration(env, review)
+  local data = review.data
+  if data.synchronized_reference_revision == 0 then return end
   local c = env.c
   c.section("Checked against Reference")
   local choices = view_models.reference_declaration_options(
@@ -86,10 +91,9 @@ local function draw_declaration(env, data, options)
   )
   local chosen = c.segmented("declared-reference", choices, data.reviewed_reference_revision)
   if chosen ~= data.reviewed_reference_revision then
-    options.declared_reference_revision = chosen
-    return true
+    review.options.declared_reference_revision = chosen
+    data.reviewed_reference_revision = chosen
   end
-  return false
 end
 
 local function draw_details(env, data)
@@ -131,7 +135,7 @@ function M.draw(env)
         "The project was edited after this review was made.", "Refresh review")
     else
       changed = draw_issues(env, data, options)
-      changed = draw_declaration(env, data, options) or changed
+      draw_declaration(env, review)
       draw_details(env, data)
     end
   end
