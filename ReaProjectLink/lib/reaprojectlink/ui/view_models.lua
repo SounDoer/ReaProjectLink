@@ -7,7 +7,7 @@ end
 
 function M.project_name(path)
   local name = (path or ""):match("([^/\\]+)$")
-  if not name or name == "" then return "Untitled project" end
+  if not name or name == "" then return "Untitled Project" end
   return (name:gsub("%.[Rr][Pp][Pp]$", ""))
 end
 
@@ -41,7 +41,7 @@ function M.source_reference(input)
   local rows = { { "Synchronized", revision_label(synchronized) } }
   if not input.subscribed then
     return {
-      state = "unsubscribed", status = "Not connected", level = "warning",
+      state = "unsubscribed", status = "Not Connected", level = "warning",
       note = "Choose the reference.json your mix project published.",
       action = { id = "choose_reference", label = "Choose reference.json" },
       attention = true,
@@ -49,20 +49,20 @@ function M.source_reference(input)
   end
   if check.state == "unreachable" then
     return {
-      state = "unreachable", status = "Couldn't reach shared storage", level = "blocked",
+      state = "unreachable", status = "Couldn't Reach Shared Storage", level = "blocked",
       rows = rows, action = { id = "retry", label = "Retry" }, attention = true,
     }
   end
   if check.state == "invalid" then
     return {
-      state = "invalid", status = "Couldn't read the Reference", level = "blocked",
+      state = "invalid", status = "Couldn't Read the Reference", level = "blocked",
       note = check.error, rows = rows, action = { id = "retry", label = "Retry" }, attention = true,
     }
   end
   if input.media_error then
     return {
       state = "blocked", status = input.media_error, level = "blocked", rows = rows,
-      action = { id = "review_update", label = "Review update" }, attention = true,
+      action = { id = "review_update", label = "Review Update" }, attention = true,
     }
   end
   if check.state ~= "done" then
@@ -70,13 +70,13 @@ function M.source_reference(input)
   end
   if check.latest > synchronized then
     return {
-      state = "newer", status = string.format("Reference r%d available", check.latest),
+      state = "newer", status = string.format("Reference r%d Available", check.latest),
       level = "warning", rows = rows,
-      action = { id = "review_update", label = "Review update" }, attention = true,
+      action = { id = "review_update", label = "Review Update" }, attention = true,
     }
   end
   return {
-    state = "current", status = "Up to date", level = "ready",
+    state = "current", status = "Up to Date", level = "ready",
     rows = { { "Reference", revision_label(synchronized) } }, attention = false,
   }
 end
@@ -84,20 +84,20 @@ end
 function M.source_delivery(input, pending_reference)
   if (input.track_count or 0) == 0 then
     return {
-      state = "unconfigured", status = "No delivery tracks", level = "warning",
+      state = "unconfigured", status = "No Delivery Tracks", level = "warning",
       note = "Select tracks in REAPER first.",
-      action = { id = "register_tracks", label = "Register selected tracks" },
+      action = { id = "register_tracks", label = "Register Selected Tracks" },
       attention = true,
     }
   end
   local revision = input.delivery_revision or 0
   return {
     state = revision > 0 and "published" or "unpublished",
-    status = revision > 0 and ("Last published r" .. revision) or "Not published yet",
+    status = revision > 0 and ("Last Published r" .. revision) or "Not Published Yet",
     level = "neutral",
     rows = { { "Tracks", tostring(input.track_count) }, { "Items", tostring(input.item_count or 0) } },
     note = pending_reference and string.format("Will record Reference r%d", pending_reference) or nil,
-    action = { id = "review_publish", label = "Review and publish" },
+    action = { id = "review_publish", label = "Review and Publish" },
     attention = true,
   }
 end
@@ -116,9 +116,9 @@ end
 function M.master_reference(input)
   if (input.track_count or 0) == 0 then
     return {
-      state = "unconfigured", status = "No reference tracks", level = "warning",
+      state = "unconfigured", status = "No Reference Tracks", level = "warning",
       note = "Select video tracks in REAPER first.",
-      action = { id = "register_tracks", label = "Register selected tracks" },
+      action = { id = "register_tracks", label = "Register Selected Tracks" },
       attention = true,
     }
   end
@@ -126,13 +126,13 @@ function M.master_reference(input)
   local revision = input.reference_revision or 0
   if revision == 0 then
     return {
-      state = "unpublished", status = "Not published yet", level = "warning", rows = rows,
-      action = { id = "review_publish", label = "Review and publish" }, attention = true,
+      state = "unpublished", status = "Not Published Yet", level = "warning", rows = rows,
+      action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
   return {
     state = "published", status = "Published r" .. revision, level = "neutral", rows = rows,
-    action = { id = "review_publish", label = "Review and publish" }, attention = false,
+    action = { id = "review_publish", label = "Review and Publish" }, attention = false,
   }
 end
 
@@ -140,30 +140,31 @@ function M.delivery_row(row, master_reference_revision)
   local check = row.check or { state = "idle" }
   local accepted = row.accepted or 0
   if check.state == "unreachable" then
-    return { state = "unreachable", status = "Couldn't reach", level = "blocked",
+    return { state = "unreachable", status = "Couldn't Reach", level = "blocked",
       action = { id = "retry", label = "Retry" }, attention = true }
   end
   if check.state == "invalid" then
-    return { state = "invalid", status = "Couldn't read delivery", level = "blocked", note = check.error,
+    return { state = "invalid", status = "Couldn't Read Delivery", level = "blocked", note = check.error,
       action = { id = "retry", label = "Retry" }, attention = true }
   end
   if check.state ~= "done" then
     return { state = "checking", status = "Checking...", level = "neutral", attention = false }
   end
   if check.latest > accepted then
-    return { state = "newer", status = string.format("r%d available · have r%d", check.latest, accepted),
+    return { state = "newer", status = string.format("r%d Available · Have r%d", check.latest, accepted),
       level = "warning", action = { id = "sync", label = "Sync" }, attention = true }
   end
   if (row.unmapped_count or 0) > 0 then
-    return { state = "unmapped", status = M.count(row.unmapped_count, "lane") .. " not imported",
-      level = "neutral", action = { id = "map_lanes", label = "Map lanes" }, attention = true }
+    local n = row.unmapped_count
+    return { state = "unmapped", status = string.format("%d %s Not Imported", n, n == 1 and "Lane" or "Lanes"),
+      level = "neutral", action = { id = "map_lanes", label = "Map Lanes" }, attention = true }
   end
   if check.reviewed_reference and check.reviewed_reference < master_reference_revision then
     return { state = "older_reference",
-      status = string.format("Made against Reference r%d", check.reviewed_reference),
+      status = string.format("Made Against Reference r%d", check.reviewed_reference),
       level = "warning", attention = false }
   end
-  return { state = "current", status = string.format("Up to date · r%d", accepted),
+  return { state = "current", status = string.format("Up to Date · r%d", accepted),
     level = "ready", attention = false }
 end
 
@@ -189,9 +190,9 @@ function M.master_cards(input)
     highlight = highlight,
     all_current = highlight == nil and not checking,
     deliveries_empty = {
-      status = "No deliveries yet", level = "warning",
+      status = "No Deliveries Yet", level = "warning",
       note = "Add the delivery.json a department published.",
-      action = { id = "add_delivery", label = "Add delivery" },
+      action = { id = "add_delivery", label = "Add Delivery" },
     },
   }
 end
@@ -206,10 +207,10 @@ function M.lane_mapping_options(lane)
     end
     table.insert(options, { separator = true })
   end
-  table.insert(options, { id = "create", label = "New track" })
-  table.insert(options, { id = "selected", label = "Selected track" })
+  table.insert(options, { id = "create", label = "New Track" })
+  table.insert(options, { id = "selected", label = "Selected Track" })
   table.insert(options, { separator = true })
-  table.insert(options, { id = "unmapped", label = "Don't import" })
+  table.insert(options, { id = "unmapped", label = "Don't Import" })
   return options
 end
 
@@ -226,9 +227,9 @@ end
 
 function M.lane_mapping_label(mapping, default_kind, track_name)
   local kind = mapping and mapping.kind or default_kind
-  if kind == "unmapped" then return "Don't import" end
+  if kind == "unmapped" then return "Don't Import" end
   if kind == "existing" then return track_name(mapping.track_ref) end
-  return "New track"
+  return "New Track"
 end
 
 function M.mapping_summary(lanes, mappings, default_kind)
@@ -253,7 +254,7 @@ function M.with_parent(mappings, parent_track_ref)
 end
 
 function M.reference_declaration_options(synchronized, last_declared)
-  local options = { { id = synchronized, label = string.format("r%d (synced)", synchronized) } }
+  local options = { { id = synchronized, label = string.format("r%d (Synced)", synchronized) } }
   if last_declared and last_declared > 0 and last_declared ~= synchronized then
     table.insert(options, { id = last_declared, label = "r" .. last_declared })
   end

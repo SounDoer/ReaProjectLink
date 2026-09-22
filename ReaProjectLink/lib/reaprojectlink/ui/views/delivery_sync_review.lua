@@ -4,8 +4,8 @@ local workflow = require("reaprojectlink.ui.workflow")
 local M = {}
 
 local PARENTS = {
-  { id = "top", label = "Top level" },
-  { id = "selected", label = "Selected folder track" },
+  { id = "top", label = "Top Level" },
+  { id = "selected", label = "Selected Folder Track" },
 }
 
 function M.open_import(env)
@@ -40,7 +40,7 @@ end
 -- re-bound track was deleted after the Review was built.
 local function track_name(env, track_ref)
   if env.adapter.valid_track and not env.adapter.valid_track(track_ref) then
-    return "Missing track"
+    return "Missing Track"
   end
   return env.adapter.track_name(track_ref)
 end
@@ -68,7 +68,7 @@ local function draw_parent_choice(env, review)
     ImGui.AlignTextToFramePadding(ctx)
     c.inline_muted("Under " .. track_name(env, review.parent))
     ImGui.SameLine(ctx)
-    if c.button("Use current selection##parent-repick") then
+    if c.button("Use Current Selection##parent-repick") then
       local selected = env.adapter.selected_tracks()
       if #selected == 1 then
         review.parent, review.parent_error = selected[1], nil
@@ -133,7 +133,7 @@ local function draw_reference_issue(env, data, review, verb)
     c.notice("reference-warning", "warning",
       "Made against a different Reference revision. Continuing anyway.")
   elseif c.notice("reference-warning", "warning",
-      "This delivery was made against a different Reference revision.", { verb .. " anyway" }) == 1 then
+      "This delivery was made against a different Reference revision.", { verb .. " Anyway" }) == 1 then
     review.allow_reference = true
   end
 end
@@ -205,7 +205,7 @@ local function draw_bound_lanes(env, review)
   local ImGui, ctx, c = env.ImGui, env.ctx, env.c
   local lanes = review.data.bound_lanes
   if #lanes == 0 then return end
-  c.section("Mapped lanes")
+  c.section("Mapped Lanes")
   local column = ImGui.GetContentRegionAvail(ctx) * 0.45
   for _, lane in ipairs(lanes) do
     ImGui.Separator(ctx)
@@ -216,7 +216,7 @@ local function draw_bound_lanes(env, review)
     local preview = rebound and track_name(env, rebound) or lane.track_name
     local chosen = c.dropdown("bound-" .. lane.lane_id, preview, {
       { id = "current", label = "Keep " .. lane.track_name },
-      { id = "selected", label = "Selected track" },
+      { id = "selected", label = "Selected Track" },
     })
     if chosen and chosen.id == "current" then
       review.rebindings[lane.lane_id] = nil

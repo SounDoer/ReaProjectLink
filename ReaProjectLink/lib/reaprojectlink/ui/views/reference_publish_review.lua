@@ -34,7 +34,7 @@ local function draw_issues(env, data, options)
   if data.save_as_blocker then
     local choice = c.notice("save-as", "blocked",
       "This project was moved or saved under a new name. Is this the same Reference?",
-      { "Continue existing", "Start new" })
+      { "Continue Existing", "Start New" })
     if choice then
       options.save_as_decision = choice == 1 and "continue" or "new"
       changed = true
@@ -46,8 +46,8 @@ local function draw_issues(env, data, options)
   if data.unchanged and not options.publish_anyway then
     local choice = c.notice("unchanged", "warning",
       string.format("This Reference is identical to Reference r%d.", data.base_revision),
-      { "Publish anyway..." })
-    if choice == 1 and workflow.confirm(env.reaper, "Publish unchanged Reference",
+      { "Publish Anyway..." })
+    if choice == 1 and workflow.confirm(env.reaper, "Publish Unchanged Reference",
         "Publish a new unchanged Reference revision? Source projects will still need to synchronize it.") then
       options.publish_anyway = true
       changed = true
@@ -66,11 +66,11 @@ local function draw_details(env, data)
     c.end_group()
   end
   if c.begin_group("reference-markers", "Markers", view_models.count(#data.markers, "marker"), "neutral", false) then
-    for _, marker in ipairs(data.markers) do c.muted(marker.name ~= "" and marker.name or "Unnamed marker") end
+    for _, marker in ipairs(data.markers) do c.muted(marker.name ~= "" and marker.name or "Unnamed Marker") end
     c.end_group()
   end
   if c.begin_group("reference-regions", "Regions", view_models.count(#data.regions, "region"), "neutral", false) then
-    for _, region in ipairs(data.regions) do c.muted(region.name ~= "" and region.name or "Unnamed region") end
+    for _, region in ipairs(data.regions) do c.muted(region.name ~= "" and region.name or "Unnamed Region") end
     c.end_group()
   end
 end
@@ -89,8 +89,8 @@ function M.draw(env)
       view_models.count(#data.lanes, "track") .. " · " ..
         view_models.count(#data.markers + #data.regions, "marker"))
     if stale then
-      refresh_clicked = c.stale("Project changed",
-        "The project was edited after this review was made.", "Refresh review")
+      refresh_clicked = c.stale("Review Out of Date",
+        "The project was edited after this review was made.", "Refresh Review")
     else
       changed = draw_issues(env, data, options)
       draw_details(env, data)

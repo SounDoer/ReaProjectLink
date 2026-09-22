@@ -9,20 +9,20 @@ local delivery_sync_review = require("reaprojectlink.ui.views.delivery_sync_revi
 local M = {}
 
 local REFERENCE_MENU = {
-  { id = "register_tracks", label = "Register selected tracks" },
-  { id = "unregister_tracks", label = "Unregister selected tracks" },
+  { id = "register_tracks", label = "Register Selected Tracks" },
+  { id = "unregister_tracks", label = "Unregister Selected Tracks" },
   { separator = true },
-  { id = "register_markers", label = "Register selected markers/regions" },
-  { id = "unregister_markers", label = "Unregister selected markers/regions" },
-  { id = "set_start", label = "Set selected marker as Reference Start" },
+  { id = "register_markers", label = "Register Selected Markers/Regions" },
+  { id = "unregister_markers", label = "Unregister Selected Markers/Regions" },
+  { id = "set_start", label = "Set Selected Marker as Reference Start" },
   { separator = true },
-  { id = "reset_items", label = "Treat selected items as new..." },
-  { id = "reset_tracks", label = "Treat selected tracks as new..." },
+  { id = "reset_items", label = "Treat Selected Items as New..." },
+  { id = "reset_tracks", label = "Treat Selected Tracks as New..." },
 }
 
 local ROW_MENU = {
-  { id = "sync_other", label = "Sync to another revision..." },
-  { id = "remove", label = "Remove subscription..." },
+  { id = "sync_other", label = "Sync to Another Revision..." },
+  { id = "remove", label = "Remove Subscription..." },
 }
 
 local function input(env, state)
@@ -113,7 +113,7 @@ local function handle_reference(env, action)
     local result, err = publish.set_selected_reference_start(adapter)
     workflow.report(env, result, err, "Reference Start set.")
   elseif action == "reset_items" then
-    if workflow.confirm(env.reaper, "Treat Reference items as new",
+    if workflow.confirm(env.reaper, "Treat Reference Items as New",
         "Assign new identities? Source projects will see these as new Reference items.") then
       local result, err = publish.reset_selected_reference_items(adapter)
       workflow.report(env, result, err, function(value)
@@ -121,7 +121,7 @@ local function handle_reference(env, action)
       end)
     end
   elseif action == "reset_tracks" then
-    if workflow.confirm(env.reaper, "Treat Reference tracks as new",
+    if workflow.confirm(env.reaper, "Treat Reference Tracks as New",
         "Assign new identities? Source projects will see these as new Reference tracks.") then
       local result, err = publish.reset_selected_reference_tracks(adapter)
       workflow.report(env, result, err, function(value)
@@ -140,7 +140,7 @@ local function handle_delivery(env, action)
   elseif action.id == "retry" then
     app:request_check()
   elseif action.id == "remove" then
-    if workflow.confirm(env.reaper, "Remove subscription",
+    if workflow.confirm(env.reaper, "Remove Subscription",
         string.format("Stop following %s? Its tracks and items stay in this project.", action.row.name)) then
       local result, err = env.services.delivery_import.remove_subscription(env.adapter, action.row.id)
       workflow.report(env, result, err, "Subscription removed. Tracks and items were kept.")
@@ -179,7 +179,7 @@ local function draw_deliveries(env, cards, width)
   if c.begin_card("master-deliveries", width, highlighted) then
     c.card_header("download", "Deliveries")
     c.same_line_right(ImGui.GetFrameHeight(ctx))
-    if c.icon_button("add-delivery", "plus", "Add delivery") then chosen = { id = "add_delivery" } end
+    if c.icon_button("add-delivery", "plus", "Add Delivery") then chosen = { id = "add_delivery" } end
     if #cards.rows == 0 then
       local empty = cards.deliveries_empty
       c.status(empty.status, empty.level)
@@ -204,7 +204,7 @@ function M.draw(env, state)
   local values = input(env, state)
   local cards = view_models.master_cards(values)
   if cards.reference and values.marker_error then cards.reference.note = values.marker_error end
-  header.draw(env, state, "Master", cards.all_current and "All up to date" or nil)
+  header.draw(env, state, "Master", cards.all_current and "All Up to Date" or nil)
   local width, side_by_side = c.card_width()
   local reference_action = card.draw(env, "master-reference", "film", "Reference", cards.reference,
     cards.highlight == "reference", width, REFERENCE_MENU)

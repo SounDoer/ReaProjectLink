@@ -56,7 +56,7 @@ end
 
 function M.unlock(env)
   local app = env.app
-  if not M.confirm(env.reaper, "Unlock publishing",
+  if not M.confirm(env.reaper, "Unlock Publishing",
       "Unlock publishing only if no other user or computer is publishing to this package.") then
     return
   end
@@ -70,7 +70,7 @@ function M.unlock(env)
 end
 
 function M.choose_reference(env)
-  local path = M.choose_json(env.reaper, "Select published reference.json")
+  local path = M.choose_json(env.reaper, "Select Published reference.json")
   if not path then return end
   local result, err = env.services.reference_subscription.subscribe(env.adapter, env.fs, path)
   if result then
@@ -93,7 +93,7 @@ function M.draw_notices(env, state)
     local text = string.format("Publishing is locked by %s on %s since %s.",
       lock.user or "an unknown user", lock.machine or "an unknown computer",
       lock.started_at or "an unknown time")
-    if c.notice("publish-lock", "blocked", text, { "Unlock publishing..." }) == 1 then
+    if c.notice("publish-lock", "blocked", text, { "Unlock Publishing..." }) == 1 then
       M.unlock(env)
     end
   end

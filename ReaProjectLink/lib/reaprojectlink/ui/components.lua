@@ -213,7 +213,7 @@ function M.create(ImGui, ctx, theme)
   -- { id = ..., label = ... } or { separator = true }. Returns the chosen id.
   function c.menu(id, entries, align_right)
     if align_right ~= false then c.same_line_right(ImGui.GetFrameHeight(ctx)) end
-    if c.icon_button(id .. "-open", "more", "More actions") then ImGui.OpenPopup(ctx, id) end
+    if c.icon_button(id .. "-open", "more", "More Actions") then ImGui.OpenPopup(ctx, id) end
     local chosen
     if ImGui.BeginPopup(ctx, id) then
       for _, entry in ipairs(entries) do

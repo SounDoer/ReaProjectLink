@@ -8,13 +8,13 @@ local delivery_publish_review = require("reaprojectlink.ui.views.delivery_publis
 local M = {}
 
 local REFERENCE_MENU = {
-  { id = "detach_items", label = "Detach selected items..." },
-  { id = "detach_tracks", label = "Detach selected tracks..." },
+  { id = "detach_items", label = "Detach Selected Items..." },
+  { id = "detach_tracks", label = "Detach Selected Tracks..." },
 }
 
 local DELIVERY_MENU = {
-  { id = "register_tracks", label = "Register selected tracks" },
-  { id = "unregister_tracks", label = "Unregister selected tracks..." },
+  { id = "register_tracks", label = "Register Selected Tracks" },
+  { id = "unregister_tracks", label = "Unregister Selected Tracks..." },
 }
 
 local function input(env, state)
@@ -48,7 +48,7 @@ local function handle(env, action)
       return string.format("Registered %s.", view_models.count(value.added, "track"))
     end)
   elseif action == "unregister_tracks" then
-    if workflow.confirm(env.reaper, "Unregister delivery tracks",
+    if workflow.confirm(env.reaper, "Unregister Delivery Tracks",
         "Stop publishing the selected tracks? Their items stay in the project.") then
       local result, err = services.project_service.unregister_selected_tracks(adapter)
       workflow.report(env, result, err, function(value)
@@ -56,7 +56,7 @@ local function handle(env, action)
       end)
     end
   elseif action == "detach_items" then
-    if workflow.confirm(env.reaper, "Detach Reference items",
+    if workflow.confirm(env.reaper, "Detach Reference Items",
         "Detach the selected Reference items? Later Reference updates won't change them.") then
       local result, err = services.reference_subscription.detach_selected_reference_items(adapter)
       workflow.report(env, result, err, function(value)
@@ -64,7 +64,7 @@ local function handle(env, action)
       end)
     end
   elseif action == "detach_tracks" then
-    if workflow.confirm(env.reaper, "Detach Reference tracks",
+    if workflow.confirm(env.reaper, "Detach Reference Tracks",
         "Detach the selected Reference tracks? Later Reference updates won't change them.") then
       local result, err = services.reference_subscription.detach_selected_reference_tracks(adapter)
       workflow.report(env, result, err, function(value)

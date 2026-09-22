@@ -42,7 +42,7 @@ local function draw_issues(env, data, options)
   if data.save_as_blocker then
     local choice = c.notice("save-as", "blocked",
       "This project was moved or saved under a new name. Is this the same delivery?",
-      { "Continue existing", "Start new" })
+      { "Continue Existing", "Start New" })
     if choice then
       options.save_as_decision = choice == 1 and "continue" or "new"
       changed = true
@@ -51,8 +51,8 @@ local function draw_issues(env, data, options)
   if data.has_unprocessed_fx and not options.publish_anyway then
     local choice = c.notice("unprocessed-fx", "warning",
       "Track or Take FX were found. Published audio won't include them.",
-      { "Publish unprocessed media..." })
-    if choice == 1 and workflow.confirm(env.reaper, "Publish unprocessed media",
+      { "Publish Unprocessed Media..." })
+    if choice == 1 and workflow.confirm(env.reaper, "Publish Unprocessed Media",
         "Detected Track FX or Take FX will not be included in the published media. Continue?") then
       options.publish_anyway = true
       changed = true
@@ -67,8 +67,8 @@ local function draw_issues(env, data, options)
     for index, row in ipairs(lane.clips) do
       for blocker_index, blocker in ipairs(row.blockers) do
         local id = string.format("clip-%s-%d-%d", lane.lane_id, index, blocker_index)
-        local text = string.format("%s: %s", row.display_name or "Unnamed item", blocker)
-        if c.notice(id, "blocked", text, { "Select item" }) == 1 and row.clip.item_ref then
+        local text = string.format("%s: %s", row.display_name or "Unnamed Item", blocker)
+        if c.notice(id, "blocked", text, { "Select Item" }) == 1 and row.clip.item_ref then
           env.adapter.select_items({ row.clip.item_ref })
         end
       end
@@ -85,7 +85,7 @@ local function draw_declaration(env, review)
   local data = review.data
   if data.synchronized_reference_revision == 0 then return end
   local c = env.c
-  c.section("Checked against Reference")
+  c.section("Checked Against Reference")
   local choices = view_models.reference_declaration_options(
     data.synchronized_reference_revision, data.last_declared_reference_revision
   )
@@ -111,7 +111,7 @@ local function draw_details(env, data)
       c.clipped(#lane.clips, function(index)
         local row = lane.clips[index]
         ImGui.TextColored(ctx, #row.blockers > 0 and colors.blocked or colors.text,
-          row.display_name or "Unnamed item")
+          row.display_name or "Unnamed Item")
       end)
       c.end_group()
     end
@@ -131,8 +131,8 @@ function M.draw(env)
     back = c.review_header(string.format("Publish Delivery r%d", data.delivery_revision),
       view_models.count(#data.lanes, "track") .. " · " .. view_models.count(item_count(data), "item"))
     if stale then
-      refresh_clicked = c.stale("Project changed",
-        "The project was edited after this review was made.", "Refresh review")
+      refresh_clicked = c.stale("Review Out of Date",
+        "The project was edited after this review was made.", "Refresh Review")
     else
       changed = draw_issues(env, data, options)
       draw_declaration(env, review)

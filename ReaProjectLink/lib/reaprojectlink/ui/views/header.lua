@@ -15,13 +15,13 @@ function M.draw(env, state, badge, status_text)
   ImGui.PushFont(ctx, theme.fonts.small)
   local label_width = ImGui.CalcTextSize(ctx, label)
   ImGui.PopFont(ctx)
-  c.same_line_right(label_width + 8 + c.button_width("Check now") + 8 + ImGui.GetFrameHeight(ctx))
+  c.same_line_right(label_width + 8 + c.button_width("Check Now") + 8 + ImGui.GetFrameHeight(ctx))
   ImGui.AlignTextToFramePadding(ctx)
   ImGui.PushFont(ctx, theme.fonts.small)
   ImGui.TextColored(ctx, theme.colors.muted, label)
   ImGui.PopFont(ctx)
   ImGui.SameLine(ctx, 0, 8)
-  if c.button("Check now") then app:request_check() end
+  if c.button("Check Now") then app:request_check() end
   ImGui.SameLine(ctx, 0, 8)
   if c.icon_button("open-settings", "gear", "Settings") then app:open_settings() end
 

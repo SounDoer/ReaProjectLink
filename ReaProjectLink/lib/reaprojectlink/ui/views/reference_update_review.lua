@@ -35,12 +35,12 @@ function M.draw(env)
       if changed then review.shift_entire_project = value end
       c.small("The whole Reference moved. Shift your project with it to stay in sync.")
     end
-    c.section("In this revision")
+    c.section("In This Revision")
     c.key_value("Tracks", #(snapshot.lanes or {}))
     c.key_value("Markers", #(snapshot.markers or {}))
     c.key_value("Regions", #(snapshot.regions or {}))
     c.key_value("Alignment", status.alignment_mode == "relative" and
-      "Relative to Reference Start" or "Mirror Master timeline")
+      "Relative to Reference Start" or "Mirror Master Timeline")
   end
   local page = c.end_page()
 
