@@ -323,5 +323,4 @@ function M.synchronize(adapter, status, options)
   return result
 end
 
-
 return M

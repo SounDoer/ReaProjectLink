@@ -40,7 +40,7 @@ local item = {
 local track = { name = "DX", lane_id = "lane-1", items = { item } }
 local events = {}
 local project_path = "C:/show/CIN_030_DX.rpp"
-local ids = { "delivery-1", "clip-1", "tx-1", "clip-2" }
+local ids = { "delivery-1", "clip-1", "tx-1", "clip-2", "tx-2", "clip-3" }
 local id_index = 0
 local adapter = {}
 function adapter.project_path() return project_path end
@@ -113,9 +113,21 @@ assert(declared_default.reviewed_reference_revision == 8,
 assert(declared_default.last_declared_reference_revision == 7, "previous declaration is offered")
 local declared_older = assert(service.review(adapter, fs, { declared_reference_revision = 7 }))
 assert(declared_older.reviewed_reference_revision == 7, "the previous revision may be declared")
+local older_result, older_error = service.publish(declared_older, adapter, fs, {
+  published_at = "2026-09-13T13:05:00+08:00",
+  published_by = "Alice",
+})
+assert(older_result, older_error)
+assert(captured_publish.snapshot.reference.reviewedRevision == 7,
+  "the older declared revision is what publishes, not the Synchronized one")
+assert(project_values.reviewed_reference_revision == "7",
+  "the older declared revision persists even while Synchronized is ahead")
+files[review.package_root .. "/delivery.json"] = json.encode(captured_publish.pointer)
+files[review.package_root .. "/history/delivery-0002.json"] = json.encode(captured_publish.snapshot)
 project_values.synchronized_reference_revision = nil
 local unsynchronized = assert(service.review(adapter, fs, {}))
 assert(unsynchronized.reference_blocker, "publishing requires a Synchronized Reference Revision")
+assert(unsynchronized.blocker_count > 0, "an unsynchronized Reference blocks Publish")
 project_values.synchronized_reference_revision = "8"
 
 project_path = "C:/show/renamed/CIN_030_DX_New.rpp"
