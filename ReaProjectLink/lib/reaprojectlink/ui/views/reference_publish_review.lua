@@ -119,6 +119,7 @@ function M.draw(env)
       local message, is_error = workflow.publish_message("Reference", result.reference_revision, result)
       app:back()
       app:notify(message, is_error)
+      app:request_check()
     else
       app:notify(err, true)
       workflow.inspect_lock(env, data.package_root)

@@ -66,7 +66,8 @@ function M.draw(env, state)
   if reset then
     if workflow.confirm(env.reaper, "Reset ReaProjectLink State",
         "Remove all ReaProjectLink data from this project? Published packages and media Items are kept. " ..
-        "You can undo this with Edit > Undo.") then
+        "This can't be undone: REAPER Undo does not restore the project's ReaProjectLink data. " ..
+        "Save a copy of the project first if you might need it.") then
       local result, err = env.services.project_service.reset(env.adapter)
       if result then
         env.app:reset()

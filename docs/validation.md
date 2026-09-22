@@ -119,8 +119,8 @@ the projects and test media on the team's normal shared-storage arrangement.
    `Reset ReaProjectLink State...`. Confirm the project returns to the setup
    view (as if never initialized), while Tracks, Items, and any published
    packages are untouched.
-2. Use Edit > Undo in REAPER. Confirm the reset project and object state is
-   restored and the panel shows the project's prior type and data again.
+2. Confirm the confirmation dialog states that the reset can't be undone
+   (REAPER Undo restores Track and Item keys but not project extension state).
 
 ## Master package check
 

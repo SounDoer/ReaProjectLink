@@ -884,8 +884,10 @@ are unchanged.
 ### D087 — Project state can be reset explicitly
 
 Settings offers Reset ReaProjectLink State..., which clears the project's
-ReaProjectLink extension state and the ReaProjectLink Track and Item keys in
-one undoable step. Published packages and media Items are kept; only the
+ReaProjectLink extension state and the ReaProjectLink Track and Item keys.
+REAPER Undo does not restore project extension state, so Reset is presented as
+irreversible and its confirmation suggests saving a copy of the project first.
+Published packages and media Items are kept; only the
 project's own type, IDs, subscriptions, and revision pointers are removed.
 D049's storage model is unchanged, and Reset simply empties it.
 
