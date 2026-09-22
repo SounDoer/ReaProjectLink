@@ -36,21 +36,33 @@ function M.open_update(env, source_project_id, target_revision)
   })
 end
 
+-- Returns "Missing track" instead of crashing/misleading when a mapped or
+-- re-bound track was deleted after the Review was built.
+local function track_name(env, track_ref)
+  if env.adapter.valid_track and not env.adapter.valid_track(track_ref) then
+    return "Missing track"
+  end
+  return env.adapter.track_name(track_ref)
+end
+
 local function draw_parent_choice(env, review)
   local ImGui, ctx, c = env.ImGui, env.ctx, env.c
   ImGui.AlignTextToFramePadding(ctx)
   c.inline_muted("New tracks go under")
   ImGui.SameLine(ctx)
-  local chosen = c.segmented("parent", PARENTS, review.parent and "selected" or "top")
-  if chosen == "selected" and not review.parent then
-    local selected = env.adapter.selected_tracks()
-    if #selected == 1 then
-      review.parent, review.parent_error = selected[1], nil
-    else
-      review.parent_error = "Select exactly one folder track in REAPER first."
+  local current = review.parent and "selected" or "top"
+  local chosen = c.segmented("parent", PARENTS, current)
+  if chosen ~= current then
+    if chosen == "selected" then
+      local selected = env.adapter.selected_tracks()
+      if #selected == 1 then
+        review.parent, review.parent_error = selected[1], nil
+      else
+        review.parent_error = "Select exactly one folder track in REAPER first."
+      end
+    elseif chosen == "top" then
+      review.parent, review.parent_error = nil, nil
     end
-  elseif chosen == "top" then
-    review.parent, review.parent_error = nil, nil
   end
   if review.parent_error then c.notice("parent-error", "warning", review.parent_error) end
 end
@@ -69,7 +81,7 @@ local function draw_mapping_table(env, lanes, review, default_kind)
     ImGui.SameLine(ctx, column)
     local mapping = review.mappings[lane.lane_id]
     local chosen = c.dropdown("lane-" .. lane.lane_id,
-      view_models.lane_mapping_label(mapping, default_kind, env.adapter.track_name),
+      view_models.lane_mapping_label(mapping, default_kind, function(ref) return track_name(env, ref) end),
       view_models.lane_mapping_options(lane))
     if chosen then
       local next_mapping, err = view_models.mapping_from_option(chosen, env.adapter.selected_tracks())
@@ -181,7 +193,7 @@ local function draw_bound_lanes(env, review)
     ImGui.Text(ctx, lane.display_name)
     ImGui.SameLine(ctx, column)
     local rebound = review.rebindings[lane.lane_id]
-    local preview = rebound and env.adapter.track_name(rebound) or lane.track_name
+    local preview = rebound and track_name(env, rebound) or lane.track_name
     local chosen = c.dropdown("bound-" .. lane.lane_id, preview, {
       { id = "current", label = "Keep " .. lane.track_name },
       { id = "selected", label = "Selected track" },
@@ -230,7 +242,7 @@ local function draw_update(env, review)
   local summary, level = string.format("Syncs Delivery r%d", data.target_revision), "neutral"
   if data.blocker_count > 0 then
     summary, level = view_models.blocked_summary(data.blocker_count, "sync"), "blocked"
-  elseif data.pending_count == 0 then
+  elseif data.pending_count == 0 and next(review.rebindings) == nil then
     summary = "Nothing to sync"
   end
   local sync = c.footer(page, summary, level, "Sync", ready)
