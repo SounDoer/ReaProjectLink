@@ -104,6 +104,10 @@ function M.create(deps)
     theme:use(scenario.theme)
     fixed_width = scenario.width
     env.app:reset()
+    env.app:request_check()
+    -- Force the "shown" phase so the pointer check runs during this scenario's
+    -- frame, exercising checks.run_source/run_master and the checked states.
+    env.app.check_phase = "shown"
     if scenario.view == "settings" then
       env.app:open_settings()
     elseif scenario.review then

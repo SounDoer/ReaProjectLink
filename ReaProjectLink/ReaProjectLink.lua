@@ -92,12 +92,23 @@ local function finish_smoke(ok, err)
 end
 
 local function loop()
+  if smoke_path and #smoke_scenarios == 0 then
+    finish_smoke(false, "no smoke scenarios; run tests/run_ui_smoke.lua")
+    return
+  end
+  local ok, err
   if smoke_path then
     smoke_frame = smoke_frame + 1
     local scenario = smoke_scenarios[smoke_frame]
-    if scenario then shell.apply_smoke(scenario) end
+    -- Applying the scenario is part of the protected call so a fixture or
+    -- apply error is written as FAIL instead of raising a ReaScript dialog.
+    ok, err = xpcall(function()
+      if scenario then shell.apply_smoke(scenario) end
+      shell.draw()
+    end, debug.traceback)
+  else
+    ok, err = xpcall(shell.draw, debug.traceback)
   end
-  local ok, err = xpcall(shell.draw, debug.traceback)
   if smoke_path then
     if not ok or smoke_frame > #smoke_scenarios then
       finish_smoke(ok, err)
