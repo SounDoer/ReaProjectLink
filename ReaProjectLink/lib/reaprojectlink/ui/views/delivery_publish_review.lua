@@ -17,10 +17,15 @@ function M.open(env)
   env.app:open_review("delivery_publish", { data = review, options = options })
 end
 
-local function refresh(env)
-  local current = env.app.review
-  local review, err = build(env, current.options)
-  if review then current.data = review else env.app:notify(err, true) end
+local function refresh(env, options)
+  local review, err = build(env, options)
+  if review then
+    local current = env.app.review
+    current.options = options
+    current.data = review
+  else
+    env.app:notify(err, true)
+  end
 end
 
 local function item_count(data)
@@ -35,7 +40,7 @@ local function draw_issues(env, data, options)
   local changed = false
   if data.reference_blocker then c.notice("reference-blocker", "blocked", data.reference_blocker) end
   if data.save_as_blocker then
-    local choice = c.notice("save-as", "warning",
+    local choice = c.notice("save-as", "blocked",
       "This project was moved or saved under a new name. Is this the same delivery?",
       { "Continue existing", "Start new" })
     if choice then
@@ -46,7 +51,7 @@ local function draw_issues(env, data, options)
   if data.has_unprocessed_fx and not options.publish_anyway then
     local choice = c.notice("unprocessed-fx", "warning",
       "Track or Take FX were found. Published audio won't include them.",
-      { "Publish without FX..." })
+      { "Publish unprocessed media..." })
     if choice == 1 and workflow.confirm(env.reaper, "Publish unprocessed media",
         "Detected Track FX or Take FX will not be included in the published media. Continue?") then
       options.publish_anyway = true
@@ -112,7 +117,9 @@ end
 function M.draw(env)
   local c, app = env.c, env.app
   local review = app.review
-  local data, options = review.data, review.options
+  local data = review.data
+  local options = {}
+  for key, value in pairs(review.options) do options[key] = value end
   local stale = workflow.is_stale(env, data)
   local back, changed, refresh_clicked = false, false, false
   if c.begin_page("delivery-publish", true) then
@@ -141,8 +148,10 @@ function M.draw(env)
 
   if back then
     app:back()
-  elseif changed or refresh_clicked then
-    refresh(env)
+  elseif refresh_clicked then
+    refresh(env, review.options)
+  elseif changed then
+    refresh(env, options)
   elseif publish then
     local result, err = env.services.delivery_publish.publish(data, env.adapter, env.fs, workflow.metadata())
     if result then
