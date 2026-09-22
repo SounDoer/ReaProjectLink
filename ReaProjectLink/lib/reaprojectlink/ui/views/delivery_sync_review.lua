@@ -67,6 +67,12 @@ local function draw_parent_choice(env, review)
   if review.parent_error then c.notice("parent-error", "warning", review.parent_error) end
 end
 
+-- A Lane the user previously chose not to import stays that way until they
+-- map it; every other Lane defaults to `default_kind`.
+local function lane_default(lane, default_kind)
+  return lane.skipped and "unmapped" or default_kind
+end
+
 local function draw_mapping_table(env, lanes, review, default_kind)
   local ImGui, ctx, c, colors = env.ImGui, env.ctx, env.c, env.theme.colors
   c.section("Lanes")
@@ -81,7 +87,8 @@ local function draw_mapping_table(env, lanes, review, default_kind)
     ImGui.SameLine(ctx, column)
     local mapping = review.mappings[lane.lane_id]
     local chosen = c.dropdown("lane-" .. lane.lane_id,
-      view_models.lane_mapping_label(mapping, default_kind, function(ref) return track_name(env, ref) end),
+      view_models.lane_mapping_label(mapping, lane_default(lane, default_kind),
+        function(ref) return track_name(env, ref) end),
       view_models.lane_mapping_options(lane))
     if chosen then
       local next_mapping, err = view_models.mapping_from_option(chosen, env.adapter.selected_tracks())
@@ -100,7 +107,7 @@ end
 local function collect_mappings(lanes, review, default_kind)
   local mappings = {}
   for _, lane in ipairs(lanes) do
-    mappings[lane.lane_id] = review.mappings[lane.lane_id] or { kind = default_kind }
+    mappings[lane.lane_id] = review.mappings[lane.lane_id] or { kind = lane_default(lane, default_kind) }
   end
   return view_models.with_parent(mappings, review.parent)
 end

@@ -134,6 +134,8 @@ function M.review(adapter, fs, source_project_id, target_revision)
         lane_id = lane.laneId,
         display_name = lane.displayName,
         orphaned = orphaned,
+        -- The Master user previously chose not to import this Lane.
+        skipped = binding ~= nil and binding.unmapped == true,
         clips = {},
         suggestions = track_suggestions.for_lane(adapter, master_tracks, lane.displayName),
       }

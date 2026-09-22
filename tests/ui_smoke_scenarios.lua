@@ -80,6 +80,7 @@ local reviews = {
           blocker_count = 0, reference_warning = false, additions = {},
           unmapped_lanes = {
             { lane_id = "c", display_name = "DX_Radio", orphaned = true, clips = { {} }, suggestions = {} },
+            { lane_id = "d", display_name = "DX_Alt", skipped = true, clips = { {} }, suggestions = {} },
           },
           bound_lanes = { { lane_id = "a", display_name = "DX_Main", track_name = "DX Main" } },
         },

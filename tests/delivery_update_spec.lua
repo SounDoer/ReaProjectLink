@@ -107,6 +107,7 @@ assert(review.replacement_count == 2, "all managed Items will be replaced")
 assert(review.source_item_count == 2, "complete Source snapshot counted")
 assert(#review.additions == 1 and review.additions[1].clip.clipId == "r2-a", "mapped Lane is ready to import")
 assert(#review.unmapped_lanes == 1 and review.unmapped_lanes[1].lane_id == "lane-2", "unmapped Lane still needs routing")
+assert(review.unmapped_lanes[1].skipped == true, "a Lane the user chose not to import is reported as skipped")
 
 stale = true
 local stale_result, stale_error = delivery_update.apply(review, adapter, {
