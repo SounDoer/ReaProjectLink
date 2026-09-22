@@ -64,6 +64,19 @@ local function draw_parent_choice(env, review)
       review.parent, review.parent_error = nil, nil
     end
   end
+  if review.parent then
+    ImGui.AlignTextToFramePadding(ctx)
+    c.inline_muted("Under " .. track_name(env, review.parent))
+    ImGui.SameLine(ctx)
+    if c.button("Use current selection##parent-repick") then
+      local selected = env.adapter.selected_tracks()
+      if #selected == 1 then
+        review.parent, review.parent_error = selected[1], nil
+      else
+        review.parent_error = "Select exactly one folder track in REAPER first."
+      end
+    end
+  end
   if review.parent_error then c.notice("parent-error", "warning", review.parent_error) end
 end
 
