@@ -29,11 +29,10 @@ function M.draw(env)
     if not status.available then c.notice("reference-media", "blocked", status.video_error) end
     if status.can_shift_entire_project then
       c.section("Decision")
-      local changed, value = ImGui.Checkbox(ctx,
-        string.format("Shift the entire project by %.3f seconds", status.shift_seconds),
-        review.shift_entire_project)
+      local label, note = view_models.shift_texts(status.shift_seconds)
+      local changed, value = ImGui.Checkbox(ctx, label, review.shift_entire_project)
       if changed then review.shift_entire_project = value end
-      c.small("The whole Reference moved. Shift your project with it to stay in sync.")
+      c.small(note)
     end
     c.section("In This Revision")
     c.key_value("Tracks", #(snapshot.lanes or {}))

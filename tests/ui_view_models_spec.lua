@@ -275,6 +275,17 @@ function tests.reference_declaration_options()
   equal(#view_models.reference_declaration_options(5, 0), 1, "no previous declaration")
 end
 
+function tests.whole_project_shift_texts_state_the_direction()
+  local label, note = view_models.shift_texts(1.5)
+  equal(label, "Move All Project Content 1.500 s Later", "later label")
+  equal(note, "The whole Reference moved 1.500 s later. Move your items, markers, and regions with it to stay in sync.",
+    "later note")
+  label, note = view_models.shift_texts(-0.5)
+  equal(label, "Move All Project Content 0.500 s Earlier", "earlier label")
+  equal(note, "The whole Reference moved 0.500 s earlier. Move your items, markers, and regions with it to stay in sync.",
+    "earlier note")
+end
+
 local passed = 0
 for name, test in pairs(tests) do
   local ok, err = pcall(test)

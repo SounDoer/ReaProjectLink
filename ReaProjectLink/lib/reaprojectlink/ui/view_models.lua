@@ -253,6 +253,19 @@ function M.with_parent(mappings, parent_track_ref)
   return result
 end
 
+-- Label and explanation for the whole-project shift (D065); a negative delta
+-- means the Reference moved earlier.
+function M.shift_texts(seconds)
+  local amount = string.format("%.3f s", math.abs(seconds))
+  local direction = seconds < 0 and "earlier" or "later"
+  local label = string.format("Move All Project Content %s %s", amount,
+    seconds < 0 and "Earlier" or "Later")
+  local note = string.format(
+    "The whole Reference moved %s %s. Move your items, markers, and regions with it to stay in sync.",
+    amount, direction)
+  return label, note
+end
+
 function M.reference_declaration_options(synchronized, last_declared)
   local options = { { id = synchronized, label = string.format("r%d (Synced)", synchronized) } }
   if last_declared and last_declared > 0 and last_declared ~= synchronized then
