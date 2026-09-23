@@ -70,7 +70,6 @@ function M.unlock(env)
   local removed, err = env.fs.remove_lock(app.lock.package_root, app.lock.info.token)
   if removed then
     app.lock = nil
-    app:notify("Publishing unlocked. Review again before publishing.")
   else
     app:notify(err, true)
   end
@@ -81,7 +80,6 @@ function M.choose_reference(env)
   if not path then return end
   local result, err = env.services.reference_subscription.subscribe(env.adapter, env.fs, path)
   if result then
-    env.app:notify("Connected to the Reference.")
     env.app:request_check()
   else
     env.app:notify(err, true)

@@ -36,10 +36,10 @@ function M.draw(env, state)
   c.end_page()
   if source then
     local result, err = service.initialize_source(env.adapter)
-    workflow.report(env, result, err, "Source Project initialized.")
+    workflow.apply(env, result, err)
   elseif master then
     local result, err = service.initialize_master(env.adapter)
-    workflow.report(env, result, err, "Master Project initialized.")
+    workflow.apply(env, result, err)
   end
   if source or master then app:request_check() end
 end

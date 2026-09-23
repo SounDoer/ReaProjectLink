@@ -22,8 +22,7 @@ local function draw_reference(env, state)
     local result, err = env.services.reference_subscription.set_alignment_mode(
       adapter, mirror and "mirror" or "relative"
     )
-    workflow.report(env, result, err, mirror and "Mirroring the Master timeline." or
-      "Aligning relative to Reference Start.")
+    workflow.apply(env, result, err)
   end
 end
 
@@ -71,7 +70,6 @@ function M.draw(env, state)
       local result, err = env.services.project_service.reset(env.adapter)
       if result then
         env.app:reset()
-        env.app:notify("ReaProjectLink state was reset.")
         env.app:request_check()
       else
         env.app:notify(err, true)

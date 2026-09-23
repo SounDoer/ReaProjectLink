@@ -245,12 +245,16 @@ Replaces the per-Lane button rows.
   Locked) stay in the layout under the header.
 - Success toasts disappear after ~4 s; error toasts stay until dismissed.
 - Errors that belong to a Review are shown as Review issues, not toasts.
-- Routine, selection-based operations (Register Selected, Unregister Selected,
-  Detach Items/Tracks, Set Reference Start, Treat Items/Tracks as New) are
-  silent on success — the row or card updates in place. Workflow completions (Publish, Import, Sync, subscribing via `Choose
-  reference.json`, Unlock Publishing, Reset, Remove Subscription, and keeping a
-  moved Item as local) still show a success toast. Errors always show a toast,
-  for every operation.
+- A success toast appears only when the result is not already visible in the
+  panel: publishing a Reference or a Delivery, synchronizing a Reference,
+  importing or synchronizing a Delivery, and keeping moved Items as local
+  content. These write outside the panel — a published package, or a batch of
+  Items in REAPER — and their toast names the revision or the counts.
+- Everything else is silent on success, because the view already shows the
+  result: registering and unregistering, detaching, Set Reference Start, Treat
+  as New, initializing a project, subscribing to a Reference, removing a
+  subscription, the alignment toggle, unlocking, and resetting the project.
+- Errors always show a toast, for every operation.
 
 ## 7. Visual system
 

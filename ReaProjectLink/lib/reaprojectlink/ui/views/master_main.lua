@@ -130,7 +130,7 @@ local function handle_delivery(env, action)
     if workflow.confirm(env.reaper, "Remove Subscription",
         string.format("Stop following %s? Its tracks and items stay in this project.", action.row.name)) then
       local result, err = env.services.delivery_import.remove_subscription(env.adapter, action.row.id)
-      workflow.report(env, result, err, "Subscription removed. Tracks and items were kept.")
+      workflow.apply(env, result, err)
       app:request_check()
     end
   end
