@@ -88,8 +88,8 @@ function M.choose_reference(env)
   end
 end
 
--- Unsaved-project and lock banners, then the toast. Views call this directly
--- under their header.
+-- Unsaved-project and lock banners. Views call this directly under their
+-- header; the toast floats over the window and is drawn by the shell.
 function M.draw_notices(env, state)
   local c, app = env.c, env.app
   if state and state.path == "" then
@@ -104,8 +104,6 @@ function M.draw_notices(env, state)
       M.unlock(env)
     end
   end
-  local toast = app:visible_toast()
-  if toast and c.toast(toast) then app:dismiss_toast() end
 end
 
 return M

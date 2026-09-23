@@ -14,6 +14,7 @@ local PAGE_MAX_WIDTH = 720
 local FOOTER_HEIGHT = 48
 local STACK_BELOW = 560
 local VALUE_COLUMN = 130
+local TOAST_MAX_WIDTH = 520
 local LEVEL_COLOR = { neutral = "muted", ready = "ready", warning = "warning", blocked = "blocked" }
 local NOTICE_STYLE = {
   blocked = { "blocked_bg", "blocked", "cross" },
@@ -263,9 +264,23 @@ function M.create(ImGui, ctx, theme)
     return chosen
   end
 
-  function c.toast(toast)
+  -- Floats the message over the bottom of the window so appearing and
+  -- disappearing never moves the content underneath. The height comes from the
+  -- previous frame because the notice sizes itself to its text.
+  local toast_height = 44
+
+  function c.toast_overlay(toast)
+    local window_x, window_y = ImGui.GetWindowPos(ctx)
+    local window_width, window_height = ImGui.GetWindowSize(ctx)
+    local margin = 12
+    local width = math.min(window_width - margin * 2, TOAST_MAX_WIDTH)
+    local x = window_x + window_width - margin - width
+    local y = math.max(window_y + margin, window_y + window_height - margin - toast_height)
+    ImGui.SetCursorScreenPos(ctx, x, y)
     local chosen = c.notice("toast", toast.is_error and "blocked" or "ready", toast.text,
       toast.is_error and { "Dismiss" } or nil)
+    local _, height = ImGui.GetItemRectSize(ctx)
+    if height and height > 0 then toast_height = height end
     return chosen == 1
   end
 

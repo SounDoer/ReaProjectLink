@@ -90,6 +90,9 @@ function M.create(deps)
         master_main.confirm_moved_items(env)
       end
       draw_body(state)
+      -- Drawn last so it floats over the view instead of moving it.
+      local toast = env.app:visible_toast()
+      if toast and env.c.toast_overlay(toast) then env.app:dismiss_toast() end
       ImGui.PopFont(ctx)
       -- ReaImGui only accepts End() when Begin() returned true, unlike Dear ImGui.
       ImGui.End(ctx)
@@ -108,6 +111,9 @@ function M.create(deps)
     -- Force the "shown" phase so the pointer check runs during this scenario's
     -- frame, exercising checks.run_source/run_master and the checked states.
     env.app.check_phase = "shown"
+    -- Renders the toast overlay in every scenario; narrow frames use the error
+    -- variant so its Dismiss button is drawn too.
+    env.app:notify("Smoke toast", scenario.width == 320)
     if scenario.view == "settings" then
       env.app:open_settings()
     elseif scenario.review then

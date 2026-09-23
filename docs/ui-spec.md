@@ -240,7 +240,9 @@ Replaces the per-Lane button rows.
 
 ## 6. Notifications
 
-- Transient toast at the top of the content area.
+- Transient toast floating over the bottom of the window, so it never moves
+  the content underneath. Persistent banners (unsaved project, Publishing Is
+  Locked) stay in the layout under the header.
 - Success toasts disappear after ~4 s; error toasts stay until dismissed.
 - Errors that belong to a Review are shown as Review issues, not toasts.
 - Routine, selection-based operations (Register Selected, Unregister Selected,
