@@ -356,16 +356,6 @@ function tests.selection_text_summarizes_the_reaper_selection()
   }), "Selected: 2 Tracks, 1 Marker and 3 Regions", "three kinds")
 end
 
-function tests.unregister_confirmation_counts_registered_selection()
-  equal(view_models.unregister_confirmation({}), nil, "nothing registered")
-  equal(view_models.unregister_confirmation({
-    tracks = { registered = 2 }, regions = { registered = 1 },
-  }), "Unregister 2 Tracks and 1 Region? They stay in the project.", "master mixed kinds")
-  equal(view_models.unregister_confirmation({ tracks = { registered = 2 } },
-    { noun_prefix = "Delivery ", tail = "Their items stay in the project." }),
-    "Unregister 2 Delivery Tracks? Their items stay in the project.", "source delivery tracks")
-end
-
 function tests.reference_declaration_options()
   local options = view_models.reference_declaration_options(5, 4)
   equal(#options, 2, "two choices")

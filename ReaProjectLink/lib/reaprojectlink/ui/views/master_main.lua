@@ -94,12 +94,8 @@ local function handle_reference(env, action)
     local result, err = publish.register_selected(adapter)
     workflow.apply(env, result, err)
   elseif action == "unregister_selected" then
-    local counts = publish.selection_counts(adapter)
-    local text = counts and view_models.unregister_confirmation(counts)
-    if not text or workflow.confirm(env.reaper, "Unregister Selected", text) then
-      local result, err = publish.unregister_selected(adapter)
-      workflow.apply(env, result, err)
-    end
+    local result, err = publish.unregister_selected(adapter)
+    workflow.apply(env, result, err)
   elseif action == "set_start" then
     local result, err = publish.set_selected_reference_start(adapter)
     workflow.apply(env, result, err)

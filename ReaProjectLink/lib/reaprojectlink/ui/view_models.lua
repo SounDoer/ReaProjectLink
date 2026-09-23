@@ -57,28 +57,6 @@ function M.selection_text(counts)
   return "Selected: " .. join_list(parts)
 end
 
--- Confirmation text for Unregister Selected, counting `.registered` (what
--- will actually change). `options.noun_prefix` qualifies the Track noun (for
--- example "Delivery "); `options.tail` replaces the default "They stay in
--- the project." sentence.
-function M.unregister_confirmation(counts, options)
-  options = options or {}
-  local nouns = {
-    tracks = (options.noun_prefix or "") .. "Track",
-    markers = "Marker",
-    regions = "Region",
-  }
-  local parts = {}
-  for _, key in ipairs(SELECTION_ORDER) do
-    local bucket = counts[key]
-    local n = bucket and bucket.registered or 0
-    if n > 0 then table.insert(parts, M.count(n, nouns[key])) end
-  end
-  if #parts == 0 then return nil end
-  return string.format("Unregister %s? %s", join_list(parts),
-    options.tail or "They stay in the project.")
-end
-
 local function revision_label(value)
   return value > 0 and ("r" .. value) or "None"
 end

@@ -42,13 +42,8 @@ local function handle(env, action)
     local result, err = services.project_service.register_selected_tracks(adapter)
     workflow.apply(env, result, err)
   elseif action == "unregister_selected" then
-    local counts = services.project_service.selection_counts(adapter)
-    local text = counts and view_models.unregister_confirmation(counts,
-      { noun_prefix = "Delivery ", tail = "Their items stay in the project." })
-    if not text or workflow.confirm(env.reaper, "Unregister Selected", text) then
-      local result, err = services.project_service.unregister_selected_tracks(adapter)
-      workflow.apply(env, result, err)
-    end
+    local result, err = services.project_service.unregister_selected_tracks(adapter)
+    workflow.apply(env, result, err)
   elseif action == "detach_items" then
     if workflow.confirm(env.reaper, "Detach Reference Items",
         "Detach the selected Reference items? Later Reference updates won't change them.") then
