@@ -144,4 +144,68 @@ item.path = "C:/show/not-reference.wav"
 local rejected = assert(service.review(adapter, fs))
 assert(rejected.blocker_count > 0, "audio Item cannot become Reference")
 
-return 5
+-- Kind-specific Marker/Region register and unregister -------------------------
+
+local function kind_fixture()
+  local values = { project_type = "master", reference_timeline_entries = "[]" }
+  local entries = {
+    { guid = "marker-a", kind = "marker", selected = true, name = "M" },
+    { guid = "region-a", kind = "region", selected = true, name = "R" },
+  }
+  local kind_adapter = {}
+  local kind_ids = { "id-1", "id-2", "id-3", "id-4" }
+  local kind_id_index = 0
+  function kind_adapter.get_project_value(key) return values[key] end
+  function kind_adapter.set_project_value(key, value) values[key] = tostring(value) end
+  function kind_adapter.mark_project_dirty() end
+  function kind_adapter.timeline_entries() return entries end
+  function kind_adapter.new_id() kind_id_index = kind_id_index + 1; return kind_ids[kind_id_index] end
+  return kind_adapter, entries, values
+end
+
+do
+  local kind_adapter, entries = kind_fixture()
+  local marker_result, marker_err = service.register_selected_markers(kind_adapter)
+  assert(marker_result, marker_err)
+  assert(marker_result.added == 1, "registers only the selected Marker")
+  local stored = json.decode(kind_adapter.get_project_value("reference_timeline_entries"))
+  assert(#stored == 1 and stored[1].guid == "marker-a" and stored[1].kind == "marker",
+    "registering Markers does not touch selected Regions")
+
+  local region_result, region_err = service.register_selected_regions(kind_adapter)
+  assert(region_result, region_err)
+  assert(region_result.added == 1, "registers only the selected Region")
+  stored = json.decode(kind_adapter.get_project_value("reference_timeline_entries"))
+  assert(#stored == 2, "Region registration adds alongside the existing Marker")
+
+  local no_marker, no_marker_err = service.register_selected_markers(kind_adapter)
+  assert(not no_marker and no_marker_err == "Select at least one unregistered Marker.",
+    "register Markers error is Marker-specific")
+  local no_region, no_region_err = service.register_selected_regions(kind_adapter)
+  assert(not no_region and no_region_err == "Select at least one unregistered Region.",
+    "register Regions error is Region-specific")
+
+  entries[1].selected, entries[2].selected = true, false
+  local unregister_marker, unregister_marker_err = service.unregister_selected_markers(kind_adapter)
+  assert(unregister_marker, unregister_marker_err)
+  assert(unregister_marker.removed == 1, "unregisters only the selected Marker")
+  stored = json.decode(kind_adapter.get_project_value("reference_timeline_entries"))
+  assert(#stored == 1 and stored[1].kind == "region",
+    "unregistering Markers does not touch registered Regions")
+
+  entries[1].selected, entries[2].selected = false, true
+  local unregister_region, unregister_region_err = service.unregister_selected_regions(kind_adapter)
+  assert(unregister_region, unregister_region_err)
+  assert(unregister_region.removed == 1, "unregisters only the selected Region")
+
+  local no_unregister_marker, no_unregister_marker_err = service.unregister_selected_markers(kind_adapter)
+  assert(not no_unregister_marker and
+    no_unregister_marker_err == "Select at least one registered Marker.",
+    "unregister Markers error is Marker-specific")
+  local no_unregister_region, no_unregister_region_err = service.unregister_selected_regions(kind_adapter)
+  assert(not no_unregister_region and
+    no_unregister_region_err == "Select at least one registered Region.",
+    "unregister Regions error is Region-specific")
+end
+
+return 6

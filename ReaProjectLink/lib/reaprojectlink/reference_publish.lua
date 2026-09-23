@@ -84,6 +84,8 @@ local function add_blocker(result, message)
   table.insert(result.blockers, message)
 end
 
+local KIND_LABELS = { marker = "Marker", region = "Region" }
+
 function M.create(dependencies)
   dependencies = dependencies or {}
   local writer = dependencies.reference_writer or default_reference_writer
@@ -191,14 +193,14 @@ function M.create(dependencies)
     return result
   end
 
-  function service.register_selected_timeline_entries(adapter)
+  local function register_selected_kind(adapter, kind)
     local current, current_error = service.timeline_entries(adapter)
     if not current then return nil, current_error end
     local stored, registry_error = registry(adapter)
     if not stored then return nil, registry_error end
     local added = 0
     for _, entry in ipairs(current) do
-      if entry.selected and not entry.registered then
+      if entry.kind == kind and entry.selected and not entry.registered then
         table.insert(stored, {
           guid = entry.guid,
           entryId = adapter.new_id(),
@@ -207,15 +209,17 @@ function M.create(dependencies)
         added = added + 1
       end
     end
-    if added == 0 then return nil, "Select at least one unregistered Marker or Region." end
+    if added == 0 then
+      return nil, "Select at least one unregistered " .. KIND_LABELS[kind] .. "."
+    end
     save_registry(adapter, stored)
     return { added = added }
   end
 
-  function service.unregister_selected_timeline_entries(adapter)
+  local function unregister_selected_kind(adapter, kind)
     local selected = {}
     for _, entry in ipairs(adapter.timeline_entries()) do
-      if entry.selected then selected[entry.guid] = true end
+      if entry.kind == kind and entry.selected then selected[entry.guid] = true end
     end
     local stored, registry_error = registry(adapter)
     if not stored then return nil, registry_error end
@@ -224,10 +228,17 @@ function M.create(dependencies)
       if selected[entry.guid] then removed = removed + 1
       else table.insert(kept, entry) end
     end
-    if removed == 0 then return nil, "Select at least one registered Marker or Region." end
+    if removed == 0 then
+      return nil, "Select at least one registered " .. KIND_LABELS[kind] .. "."
+    end
     save_registry(adapter, kept)
     return { removed = removed }
   end
+
+  function service.register_selected_markers(adapter) return register_selected_kind(adapter, "marker") end
+  function service.register_selected_regions(adapter) return register_selected_kind(adapter, "region") end
+  function service.unregister_selected_markers(adapter) return unregister_selected_kind(adapter, "marker") end
+  function service.unregister_selected_regions(adapter) return unregister_selected_kind(adapter, "region") end
 
   function service.set_selected_reference_start(adapter)
     local selected

@@ -12,8 +12,8 @@ local REFERENCE_MENU = {
   { id = "register_tracks", label = "Register Selected Tracks" },
   { id = "unregister_tracks", label = "Unregister Selected Tracks" },
   { separator = true },
-  { id = "register_markers", label = "Register Selected Markers/Regions" },
-  { id = "unregister_markers", label = "Unregister Selected Markers/Regions" },
+  { id = "unregister_markers", label = "Unregister Selected Markers" },
+  { id = "unregister_regions", label = "Unregister Selected Regions" },
   { id = "set_start", label = "Set Selected Marker as Reference Start" },
   { separator = true },
   { id = "reset_items", label = "Treat Selected Items as New..." },
@@ -29,9 +29,12 @@ local function input(env, state)
   local services, adapter, app = env.services, env.adapter, env.app
   local tracks = services.reference_publish.reference_tracks(adapter)
   local timeline_entries, marker_error = services.reference_publish.timeline_entries(adapter)
-  local markers = 0
+  local markers, regions = 0, 0
   for _, entry in ipairs(timeline_entries or {}) do
-    if entry.registered then markers = markers + 1 end
+    if entry.registered then
+      if entry.kind == "region" then regions = regions + 1
+      else markers = markers + 1 end
+    end
   end
   local rows = {}
   for _, entry in ipairs(checks.subscriptions(adapter)) do
@@ -50,6 +53,7 @@ local function input(env, state)
   return {
     track_count = #tracks,
     marker_count = markers,
+    region_count = regions,
     marker_error = marker_error,
     reference_revision = state.reference_revision,
     package_check = app.checks.reference,
@@ -101,14 +105,24 @@ local function handle_reference(env, action)
       return "Unregistered " .. view_models.count(value.removed, "Reference track") .. "."
     end)
   elseif action == "register_markers" then
-    local result, err = publish.register_selected_timeline_entries(adapter)
+    local result, err = publish.register_selected_markers(adapter)
     workflow.report(env, result, err, function(value)
-      return string.format("Registered %d marker(s) or region(s).", value.added)
+      return string.format("Registered %d Marker(s).", value.added)
+    end)
+  elseif action == "register_regions" then
+    local result, err = publish.register_selected_regions(adapter)
+    workflow.report(env, result, err, function(value)
+      return string.format("Registered %d Region(s).", value.added)
     end)
   elseif action == "unregister_markers" then
-    local result, err = publish.unregister_selected_timeline_entries(adapter)
+    local result, err = publish.unregister_selected_markers(adapter)
     workflow.report(env, result, err, function(value)
-      return string.format("Unregistered %d marker(s) or region(s).", value.removed)
+      return string.format("Unregistered %d Marker(s).", value.removed)
+    end)
+  elseif action == "unregister_regions" then
+    local result, err = publish.unregister_selected_regions(adapter)
+    workflow.report(env, result, err, function(value)
+      return string.format("Unregistered %d Region(s).", value.removed)
     end)
   elseif action == "set_start" then
     local result, err = publish.set_selected_reference_start(adapter)

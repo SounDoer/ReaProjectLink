@@ -113,20 +113,33 @@ function M.source_cards(input)
   }
 end
 
+local MASTER_REGISTER_ACTIONS = {
+  { id = "register_tracks", label = "Register Selected Tracks" },
+  { id = "register_markers", label = "Register Selected Markers" },
+  { id = "register_regions", label = "Register Selected Regions" },
+}
+
 function M.master_reference(input)
-  if (input.track_count or 0) == 0 then
+  local track_count = input.track_count or 0
+  local marker_count = input.marker_count or 0
+  local region_count = input.region_count or 0
+  local rows = {
+    { "Tracks", tostring(track_count) },
+    { "Markers", tostring(marker_count) },
+    { "Regions", tostring(region_count) },
+  }
+  if track_count == 0 and marker_count == 0 and region_count == 0 then
     return {
-      state = "unconfigured", status = "No Reference Tracks", level = "warning",
-      note = "Select video tracks in REAPER first.",
-      action = { id = "register_tracks", label = "Register Selected Tracks" },
-      attention = true,
+      state = "unregistered", status = "Nothing Registered", level = "warning", rows = rows,
+      note = "Select Tracks, Markers, or Regions in REAPER, then register them.",
+      register_actions = MASTER_REGISTER_ACTIONS, attention = true,
     }
   end
-  local rows = { { "Tracks", tostring(input.track_count) }, { "Markers", tostring(input.marker_count or 0) } }
   local revision = input.reference_revision or 0
   if revision == 0 then
     return {
       state = "unpublished", status = "Not Published Yet", level = "warning", rows = rows,
+      register_actions = MASTER_REGISTER_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
@@ -137,11 +150,13 @@ function M.master_reference(input)
       note = string.format(
         "Published files for Reference r%d weren't found. Publish again to restore them.", revision
       ),
+      register_actions = MASTER_REGISTER_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
   return {
     state = "published", status = "Published r" .. revision, level = "neutral", rows = rows,
+    register_actions = MASTER_REGISTER_ACTIONS,
     action = { id = "review_publish", label = "Review and Publish" }, attention = false,
   }
 end
