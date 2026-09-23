@@ -25,10 +25,12 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Reference flow
 
-1. Initialize the Master Project and register one or more Reference Tracks.
-2. Register any required Markers and Regions. Optionally assign one registered
-   Marker as the Reference Start; its displayed name may be anything, including
-   an industry label such as FFOP.
+1. Initialize the Master Project and use the Reference card's `Register
+   Selected Tracks` button to register one or more Reference Tracks.
+2. Use the Reference card's `Register Selected Markers` and `Register Selected
+   Regions` buttons to register any required Markers and Regions. Optionally
+   assign one registered Marker as the Reference Start from the `···` menu; its
+   displayed name may be anything, including an industry label such as FFOP.
 3. Open Reference Publish Review and choose `Publish`.
 4. Confirm that `_ReaProjectLink/<master-project-name>/reference.json` and
    `history/reference-0001.json` exist beside the Master Project.

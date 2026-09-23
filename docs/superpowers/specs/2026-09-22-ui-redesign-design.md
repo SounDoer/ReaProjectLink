@@ -64,7 +64,7 @@ Source priority (first match wins):
 
 Master priority:
 
-1. No Reference Tracks registered
+1. Nothing registered (no Reference Tracks, Markers, or Regions)
 2. Reference never published
 3. No Delivery subscriptions
 4. Any subscription with a newer Delivery Revision, unmapped Lanes, or a read failure
@@ -128,17 +128,21 @@ the button stays enabled and a hint reads `Will record Reference rN`.
 
 ### 3.3 Master · Reference
 
+The card always shows three register buttons — `Register Selected Tracks`,
+`Register Selected Markers`, `Register Selected Regions` — laid out on one line
+when they fit, stacked otherwise. Rows are `Tracks`, `Markers`, `Regions`.
+
 | State | Status line | Info | Button |
 |---|---|---|---|
-| No tracks | `No Reference Tracks` (warning) | "Select video tracks in REAPER first." | `Register Selected Tracks` |
-| Never published | `Not Published Yet` (warning) | `N tracks · M markers` | `Review and Publish` |
-| Published | `Published rN` (neutral) | `N tracks · M markers` | `Review and Publish` |
-| Package Missing | `Package Missing` (blocked) | `N tracks · M markers`; note explains published files weren't found | `Review and Publish` |
+| Nothing registered | `Nothing Registered` (warning) | "Select Tracks, Markers, or Regions in REAPER, then register them." | — |
+| Never published | `Not Published Yet` (warning) | `N tracks · M markers · P regions` | `Review and Publish` |
+| Published | `Published rN` (neutral) | `N tracks · M markers · P regions` | `Review and Publish` |
+| Package Missing | `Package Missing` (blocked) | `N tracks · M markers · P regions`; note explains published files weren't found | `Review and Publish` |
 
 `···` menu, grouped with separators:
 
 - Tracks: `Register Selected Tracks`, `Unregister Selected Tracks`
-- Markers: `Register Selected Markers/Regions`, `Unregister Selected Markers/Regions`,
+- Markers/Regions: `Unregister Selected Markers`, `Unregister Selected Regions`,
   `Set Selected Marker as Reference Start`
 - Advanced: `Treat Selected Items as New…`, `Treat Selected Tracks as New…`
 
