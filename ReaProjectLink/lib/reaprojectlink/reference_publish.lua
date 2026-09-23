@@ -86,6 +86,50 @@ end
 
 local KIND_LABELS = { marker = "Marker", region = "Region" }
 
+local function join_and(parts)
+  if #parts == 0 then return "" end
+  if #parts == 1 then return parts[1] end
+  return table.concat(parts, ", ", 1, #parts - 1) .. " and " .. parts[#parts]
+end
+
+local function count_phrase(n, noun)
+  return string.format("%d %s", n, n == 1 and noun or noun .. "s")
+end
+
+-- What the last published Reference revision contained that is no longer
+-- registered now (D089). Comparison is by stable identity (laneId/entryId),
+-- so re-registering the same object under its existing identity is not a
+-- removal, and a Save As "new" review (which starts from an empty published
+-- baseline) never reports one either.
+local function removed_content(published, result)
+  local removed = { tracks = 0, markers = 0, regions = 0, total = 0 }
+  if not published then return removed end
+  local current_lane_ids, current_marker_ids, current_region_ids = {}, {}, {}
+  for _, lane in ipairs(result.lanes) do current_lane_ids[lane.laneId] = true end
+  for _, entry in ipairs(result.markers) do current_marker_ids[entry.entryId] = true end
+  for _, entry in ipairs(result.regions) do current_region_ids[entry.entryId] = true end
+  for _, lane in ipairs(published.snapshot.lanes or {}) do
+    if not current_lane_ids[lane.laneId] then removed.tracks = removed.tracks + 1 end
+  end
+  for _, entry in ipairs(published.snapshot.markers or {}) do
+    if not current_marker_ids[entry.entryId] then removed.markers = removed.markers + 1 end
+  end
+  for _, entry in ipairs(published.snapshot.regions or {}) do
+    if not current_region_ids[entry.entryId] then removed.regions = removed.regions + 1 end
+  end
+  removed.total = removed.tracks + removed.markers + removed.regions
+  return removed
+end
+
+local function removed_blocker_text(removed, base_revision)
+  local parts = {}
+  if removed.tracks > 0 then table.insert(parts, count_phrase(removed.tracks, "Track")) end
+  if removed.markers > 0 then table.insert(parts, count_phrase(removed.markers, "Marker")) end
+  if removed.regions > 0 then table.insert(parts, count_phrase(removed.regions, "Region")) end
+  return string.format("%s from Reference r%d %s no longer registered.",
+    join_and(parts), base_revision, removed.total == 1 and "is" or "are")
+end
+
 function M.create(dependencies)
   dependencies = dependencies or {}
   local writer = dependencies.reference_writer or default_reference_writer
@@ -552,6 +596,12 @@ function M.create(dependencies)
     end
     table.sort(kept_registry, function(left, right) return left.entryId < right.entryId end)
     result.registry_after_publish = kept_registry
+
+    result.removed = removed_content(not starts_new and published or nil, result)
+    if result.removed.total > 0 and not options.allow_removals then
+      result.removed_blocker = removed_blocker_text(result.removed, result.base_revision)
+      add_blocker(result, result.removed_blocker)
+    end
 
     if #result.lanes == 0 and #result.markers == 0 and #result.regions == 0 then
       result.empty_blocker = "Register Reference Tracks, Markers, or Regions before Publish."

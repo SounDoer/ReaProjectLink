@@ -158,4 +158,113 @@ local package_events_after = 0
 for _, event in ipairs(events) do if event == "publish package" then package_events_after = package_events_after + 1 end end
 assert(package_events_after == package_events, "package writer is not called after save failure")
 
-return 7
+-- Removed-content detection at Publish Review (D089) --------------------------
+
+local function removed_fixture()
+  local rem_project_path = "C:/show3/CIN_088_DX.rpp"
+  local rem_files = {
+    ["C:/show3/a.wav"] = "audio a", ["C:/show3/b.wav"] = "audio b",
+  }
+  local rem_values = {
+    project_type = "source", project_id = "rem-source-1",
+    reference_id = "reference-1", synchronized_reference_revision = "1",
+    reference_start_samples = "0", reference_start_sample_rate = "48000",
+  }
+  local item_a = {
+    name = "Lane A", clip_id = "",
+    media = { path = "C:/show3/a.wav", sample_rate = 48000, channel_count = 1 },
+    presentation = {
+      start_offset_samples = 0, source_offset_samples = 0, length_samples = 48000,
+      item_gain = 1, fade_in_samples = 0, fade_out_samples = 0, take = {},
+    },
+  }
+  local item_b = {
+    name = "Lane B", clip_id = "",
+    media = { path = "C:/show3/b.wav", sample_rate = 48000, channel_count = 1 },
+    presentation = {
+      start_offset_samples = 0, source_offset_samples = 0, length_samples = 48000,
+      item_gain = 1, fade_in_samples = 0, fade_out_samples = 0, take = {},
+    },
+  }
+  local track_a = { name = "A", lane_id = "lane-a", items = { item_a } }
+  local track_b = { name = "B", lane_id = "lane-b", items = { item_b } }
+  local rem_tracks = { track_a, track_b }
+  local rem_ids, rem_id_index = {}, 0
+  for i = 1, 20 do rem_ids[i] = "rem3-id-" .. i end
+  local rem_adapter = {}
+  function rem_adapter.project_path() return rem_project_path end
+  function rem_adapter.set_project_path(value) rem_project_path = value end
+  function rem_adapter.get_project_value(key) return rem_values[key] end
+  function rem_adapter.set_project_value(key, value) rem_values[key] = tostring(value) end
+  function rem_adapter.all_tracks() return rem_tracks end
+  function rem_adapter.get_track_lane_id(value) return value.lane_id end
+  function rem_adapter.track_name(value) return value.name end
+  function rem_adapter.track_fx_count() return 0 end
+  function rem_adapter.track_items(value) return value.items end
+  function rem_adapter.get_item_clip_id(value) return value.clip_id end
+  function rem_adapter.set_item_clip_id(value, clip_id) value.clip_id = clip_id end
+  function rem_adapter.item_display_name(value) return value.name end
+  function rem_adapter.active_take_media(value) return value.media end
+  function rem_adapter.item_presentation(value) return value.presentation end
+  function rem_adapter.project_sample_rate() return 48000 end
+  function rem_adapter.file_exists(path) return rem_files[path] ~= nil end
+  function rem_adapter.new_id() rem_id_index = rem_id_index + 1; return rem_ids[rem_id_index] end
+  function rem_adapter.begin_undo() end
+  function rem_adapter.end_undo() end
+  function rem_adapter.mark_project_dirty() end
+  function rem_adapter.save_project() return true end
+  return rem_adapter, rem_values, rem_tracks
+end
+
+do
+  local rem_adapter, rem_values, rem_tracks = removed_fixture()
+  local rem_files = {}
+  local rem_fs = {}
+  function rem_fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
+  function rem_fs.exists(path)
+    return path == "C:/show3/a.wav" or path == "C:/show3/b.wav" or rem_files[path] ~= nil
+  end
+  function rem_fs.read_file(path) return rem_files[path] end
+  function rem_fs.file_size(path) return path:match("%.wav$") and 9 or nil end
+  function rem_fs.hash_file(path)
+    if path == "C:/show3/a.wav" then return "hash-a" end
+    if path == "C:/show3/b.wav" then return "hash-b" end
+  end
+  local rem_writer = {}
+  function rem_writer.publish(input)
+    rem_files[rem_fs.join(input.package_root, "delivery.json")] = json.encode(input.pointer)
+    rem_files[rem_fs.join(input.package_root, input.pointer.manifest)] = json.encode(input.snapshot)
+    return { delivery_revision = input.pointer.latestDeliveryRevision }
+  end
+  local rem_service = delivery_publish.create({ delivery_writer = rem_writer })
+
+  -- Publish once with two Delivery Lanes registered.
+  local first_review = assert(rem_service.review(rem_adapter, rem_fs, {}))
+  assert(first_review.removed.total == 0, "nothing published yet, so nothing is removed")
+  local first_result, first_err = rem_service.publish(first_review, rem_adapter, rem_fs, {
+    published_at = "2026-09-23T00:00:00+00:00", published_by = "Bob",
+  })
+  assert(first_result, first_err)
+
+  -- Unregister Lane B.
+  rem_tracks[2] = nil
+  local blocked = assert(rem_service.review(rem_adapter, rem_fs, {}))
+  assert(blocked.removed.lanes == 1 and blocked.removed.total == 1,
+    "the removed Lane is counted")
+  assert(blocked.removed_blocker == "1 Lane from Delivery r1 is no longer registered.",
+    "removed-content blocker names the count and the last published revision")
+  assert(blocked.blocker_count == 1, "removed content blocks Publish")
+
+  local allowed = assert(rem_service.review(rem_adapter, rem_fs, { allow_removals = true }))
+  assert(allowed.removed.total == 1, "allow_removals still reports what was removed")
+  assert(not allowed.removed_blocker, "allow_removals clears the removed-content blocker")
+  assert(allowed.blocker_count == 0, "allow_removals unblocks Publish")
+
+  -- A Save As "new" review starts fresh: nothing counts as removed.
+  rem_adapter.set_project_path("C:/show3/renamed/CIN_088_DX_New.rpp")
+  local new_review = assert(rem_service.review(rem_adapter, rem_fs, { save_as_decision = "new" }))
+  assert(new_review.removed.total == 0, "Save As new reports no removals")
+  assert(not new_review.removed_blocker, "Save As new has no removed-content blocker")
+end
+
+return 8

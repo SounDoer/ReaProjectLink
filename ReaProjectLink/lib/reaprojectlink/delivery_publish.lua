@@ -11,6 +11,32 @@ local paths = require("reaprojectlink.paths")
 
 local M = {}
 
+local function count_phrase(n, noun)
+  return string.format("%d %s", n, n == 1 and noun or noun .. "s")
+end
+
+-- What the last published Delivery revision contained that is no longer
+-- registered now (D089). Comparison is by stable Lane identity, so
+-- re-registering the same Track under its existing Lane identity is not a
+-- removal, and a Save As "new" review (which starts from an empty published
+-- baseline) never reports one either.
+local function removed_content(previous, current)
+  local removed = { lanes = 0, total = 0 }
+  if not previous then return removed end
+  local current_lane_ids = {}
+  for _, lane in ipairs(current.lanes) do current_lane_ids[lane.lane_id] = true end
+  for _, lane in ipairs(previous.lanes or {}) do
+    if not current_lane_ids[lane.laneId] then removed.lanes = removed.lanes + 1 end
+  end
+  removed.total = removed.lanes
+  return removed
+end
+
+local function removed_blocker_text(removed, base_revision)
+  return string.format("%s from Delivery r%d %s no longer registered.",
+    count_phrase(removed.lanes, "Lane"), base_revision, removed.total == 1 and "is" or "are")
+end
+
 local function load_previous(fs, package_root)
   local pointer_path = fs.join(package_root, "delivery.json")
   if not fs.exists(pointer_path) then return nil, nil, nil end
@@ -115,6 +141,11 @@ function M.create(dependencies)
     review.project_file = path
     review.base_revision = pointer and pointer.latestDeliveryRevision or 0
     review.previous_snapshot = previous
+    review.removed = removed_content(previous, review.current)
+    if review.removed.total > 0 and not options.allow_removals then
+      review.removed_blocker = removed_blocker_text(review.removed, review.base_revision)
+      review.blocker_count = review.blocker_count + 1
+    end
     review.source_project_id = not starts_new and
       (stored_source_id or (pointer and pointer.sourceProjectId)) or nil
     review.delivery_id = not starts_new and

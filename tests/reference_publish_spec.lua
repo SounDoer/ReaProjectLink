@@ -305,4 +305,123 @@ do
     "unregister_selected requires a registered selection")
 end
 
-return 12
+-- Removed-content detection at Publish Review (D089) --------------------------
+
+local function removed_fixture()
+  local project_path = "C:/show2/CIN_099_MIX.rpp"
+  local values = { project_type = "master", reference_timeline_entries = "[]" }
+  local reference_item = { reference_id = "", reference_item_id = "", path = "C:/show2/ref.mov" }
+  local reference_track = { reference_lane_id = "", name = "Reference Cam", items = { reference_item } }
+  local timeline_entries = {
+    { guid = "marker-r", kind = "marker", selected = false, name = "Slate", start_samples = 0, end_samples = 0, color = 0 },
+    { guid = "region-r", kind = "region", selected = false, name = "Take", start_samples = 100, end_samples = 200, color = 0 },
+  }
+  local rem_ids, rem_id_index = {}, 0
+  for i = 1, 20 do rem_ids[i] = "rem-id-" .. i end
+  local rem_adapter = {}
+  function rem_adapter.project_path() return project_path end
+  function rem_adapter.set_project_path(value) project_path = value end
+  function rem_adapter.project_token() return "removed-master" end
+  function rem_adapter.project_change_count() return 1 end
+  function rem_adapter.get_project_value(key) return values[key] end
+  function rem_adapter.set_project_value(key, value) values[key] = tostring(value) end
+  function rem_adapter.all_tracks() return { reference_track } end
+  function rem_adapter.selected_tracks() return {} end
+  function rem_adapter.track_items(value) return value.items end
+  function rem_adapter.track_name(value) return value.name end
+  function rem_adapter.get_track_reference_lane_id(value) return value.reference_lane_id end
+  function rem_adapter.set_track_reference_lane_id(value, id) value.reference_lane_id = id end
+  function rem_adapter.set_track_reference_id(value, id) value.reference_id = id end
+  function rem_adapter.get_item_reference_id(value) return value.reference_id end
+  function rem_adapter.set_item_reference_id(value, id) value.reference_id = id end
+  function rem_adapter.get_item_reference_item_id(value) return value.reference_item_id end
+  function rem_adapter.set_item_reference_item_id(value, id) value.reference_item_id = id end
+  function rem_adapter.item_display_name() return "Ref Cam Item" end
+  function rem_adapter.reference_item_state(value)
+    return {
+      video_file = value.path, source_offset_samples = 0, duration_samples = 48000,
+      playback_rate = 1, reference_start_samples = 0,
+    }
+  end
+  function rem_adapter.timeline_state()
+    return {
+      sample_rate = 48000, project_timecode_offset_samples = 0,
+      frame_rate = { numerator = 24, denominator = 1, drop_frame = false },
+    }
+  end
+  function rem_adapter.timeline_entries() return timeline_entries end
+  function rem_adapter.new_id() rem_id_index = rem_id_index + 1; return rem_ids[rem_id_index] end
+  function rem_adapter.begin_undo() end
+  function rem_adapter.end_undo() end
+  function rem_adapter.mark_project_dirty() end
+  function rem_adapter.save_project() return true end
+  return rem_adapter, values, reference_track, timeline_entries
+end
+
+do
+  local rem_adapter, values, reference_track, timeline_entries = removed_fixture()
+  local rem_files = {}
+  local rem_fs = {}
+  function rem_fs.join(...) return table.concat({ ... }, "/"):gsub("/+", "/") end
+  function rem_fs.exists(path) return path == "C:/show2/ref.mov" or rem_files[path] ~= nil end
+  function rem_fs.read_file(path) return rem_files[path] end
+  function rem_fs.hash_file(path) if path == "C:/show2/ref.mov" then return "ref-hash" end end
+  local rem_writer = {}
+  function rem_writer.publish(input)
+    rem_files[rem_fs.join(input.package_root, "reference.json")] = json.encode(input.pointer)
+    rem_files[rem_fs.join(input.package_root, input.pointer.manifest)] = json.encode(input.snapshot)
+    return { reference_revision = input.pointer.latestReferenceRevision }
+  end
+  local rem_service = reference_publish.create({ reference_writer = rem_writer })
+
+  -- Publish once with a Track, a Marker, and a Region registered.
+  reference_track.reference_lane_id = "lane-pub"
+  values.reference_timeline_entries = json.encode({
+    { guid = "marker-r", entryId = "marker-pub", kind = "marker" },
+    { guid = "region-r", entryId = "region-pub", kind = "region" },
+  })
+  local first_review = assert(rem_service.review(rem_adapter, rem_fs))
+  assert(first_review.removed.total == 0, "nothing published yet, so nothing is removed")
+  local first_result, first_err = rem_service.publish(first_review, rem_adapter, rem_fs, {
+    published_at = "2026-09-23T00:00:00+00:00", published_by = "Bob",
+  })
+  assert(first_result, first_err)
+
+  -- Unregister the Track and the Marker; keep the Region.
+  reference_track.reference_lane_id = ""
+  values.reference_timeline_entries = json.encode({
+    { guid = "region-r", entryId = "region-pub", kind = "region" },
+  })
+  local blocked = assert(rem_service.review(rem_adapter, rem_fs))
+  assert(blocked.removed.tracks == 1 and blocked.removed.markers == 1 and
+    blocked.removed.regions == 0 and blocked.removed.total == 2,
+    "removed content is counted by kind")
+  assert(blocked.removed_blocker ==
+    "1 Track and 1 Marker from Reference r1 are no longer registered.",
+    "removed-content blocker names the counts and the last published revision")
+  assert(blocked.blocker_count == 1, "removed content blocks Publish")
+
+  local allowed = assert(rem_service.review(rem_adapter, rem_fs, { allow_removals = true }))
+  assert(allowed.removed.total == 2, "allow_removals still reports what was removed")
+  assert(not allowed.removed_blocker, "allow_removals clears the removed-content blocker")
+  assert(allowed.blocker_count == 0, "allow_removals unblocks Publish")
+
+  -- Re-registering the exact same Track and Marker identities is not a removal.
+  reference_track.reference_lane_id = "lane-pub"
+  values.reference_timeline_entries = json.encode({
+    { guid = "marker-r", entryId = "marker-pub", kind = "marker" },
+    { guid = "region-r", entryId = "region-pub", kind = "region" },
+  })
+  local restored = assert(rem_service.review(rem_adapter, rem_fs))
+  assert(restored.removed.total == 0, "re-registering the same identity is not a removal")
+
+  -- A Save As "new" review starts fresh: nothing counts as removed.
+  reference_track.reference_lane_id = ""
+  values.reference_timeline_entries = "[]"
+  rem_adapter.set_project_path("C:/show2/renamed/CIN_099_MIX_New.rpp")
+  local new_review = assert(rem_service.review(rem_adapter, rem_fs, { save_as_decision = "new" }))
+  assert(new_review.removed.total == 0, "Save As new reports no removals")
+  assert(not new_review.removed_blocker, "Save As new has no removed-content blocker")
+end
+
+return 13
