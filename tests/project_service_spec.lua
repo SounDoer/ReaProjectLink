@@ -120,6 +120,18 @@ function tests.registers_only_unregistered_selected_tracks()
   equal(adapter.undo_depth(), 0, "balanced undo")
 end
 
+function tests.reports_selection_counts_for_selected_tracks()
+  local registered = { lane_id = "lane-1" }
+  local unregistered = { lane_id = "" }
+  local adapter = fake_adapter({
+    project_values = { project_type = "source" },
+    selected = { registered, unregistered },
+  })
+  local counts = project_service.selection_counts(adapter)
+  equal(counts.tracks.selected, 2, "selected Track count")
+  equal(counts.tracks.registered, 1, "registered-and-selected Track count")
+end
+
 function tests.scans_registered_tracks_and_reports_blockers()
   local adapter = fake_adapter({
     project_values = { project_type = "source" },

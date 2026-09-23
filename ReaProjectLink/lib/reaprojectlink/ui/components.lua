@@ -81,25 +81,12 @@ function M.create(ImGui, ctx, theme)
     ImGui.TextWrapped(ctx, tostring(value))
   end
 
-  -- Like `key_value`, but with optional right-aligned icon buttons after the
-  -- value. `actions` is a list of { id = ..., icon = ..., tooltip = ... };
-  -- returns the id of the one clicked, if any.
-  function c.value_row(id, label, value, actions)
+  function c.value_row(label, value)
     ImGui.AlignTextToFramePadding(ctx)
     ImGui.TextColored(ctx, colors().muted, label)
     ImGui.SameLine(ctx, VALUE_COLUMN)
     ImGui.AlignTextToFramePadding(ctx)
     ImGui.TextWrapped(ctx, tostring(value))
-    local chosen
-    if actions and #actions > 0 then
-      local width = #actions * ImGui.GetFrameHeight(ctx) + (#actions - 1) * 4
-      c.same_line_right(width)
-      for index, action in ipairs(actions) do
-        if index > 1 then ImGui.SameLine(ctx, 0, 4) end
-        if c.icon_button(id .. "-" .. action.id, action.icon, action.tooltip) then chosen = action.id end
-      end
-    end
-    return chosen
   end
 
   function c.copy_value(id, label, value)

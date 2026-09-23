@@ -208,4 +208,101 @@ do
     "unregister Regions error is Region-specific")
 end
 
-return 6
+-- Combined selection register/unregister (single card actions) ----------------
+
+local function selection_fixture()
+  local values = {
+    project_type = "master",
+    reference_timeline_entries = json.encode({
+      { guid = "region-a", entryId = "region-1", kind = "region" },
+      { guid = "marker-registered", entryId = "marker-x", kind = "marker" },
+    }),
+  }
+  local registered_track = { reference_lane_id = "lane-existing" }
+  local unregistered_track = { reference_lane_id = "" }
+  local entries = {
+    { guid = "marker-a", kind = "marker", selected = true, name = "M" },
+    { guid = "region-a", kind = "region", selected = true, name = "R" },
+    { guid = "marker-registered", kind = "marker", selected = false, name = "M2" },
+  }
+  local selected_tracks = { registered_track, unregistered_track }
+  local sel_ids = { "id-1", "id-2", "id-3", "id-4" }
+  local sel_id_index = 0
+  local sel_adapter = {}
+  function sel_adapter.get_project_value(key) return values[key] end
+  function sel_adapter.set_project_value(key, value) values[key] = tostring(value) end
+  function sel_adapter.mark_project_dirty() end
+  function sel_adapter.begin_undo() end
+  function sel_adapter.end_undo() end
+  function sel_adapter.timeline_entries() return entries end
+  function sel_adapter.selected_tracks() return selected_tracks end
+  function sel_adapter.get_track_reference_lane_id(track) return track.reference_lane_id end
+  function sel_adapter.set_track_reference_lane_id(track, id) track.reference_lane_id = id end
+  function sel_adapter.new_id() sel_id_index = sel_id_index + 1; return sel_ids[sel_id_index] end
+  return sel_adapter, registered_track, unregistered_track, entries
+end
+
+do
+  local sel_adapter = selection_fixture()
+  local counts, counts_err = service.selection_counts(sel_adapter)
+  assert(counts, counts_err)
+  assert(counts.tracks.selected == 2 and counts.tracks.registered == 1, "track selection counts")
+  assert(counts.markers.selected == 1 and counts.markers.registered == 0, "marker selection counts")
+  assert(counts.regions.selected == 1 and counts.regions.registered == 1, "region selection counts")
+end
+
+do
+  local sel_adapter, registered_track, unregistered_track = selection_fixture()
+  local result, err = service.register_selected(sel_adapter)
+  assert(result, err)
+  assert(result.tracks == 1 and result.markers == 1 and result.regions == 0 and result.total == 2,
+    "register_selected registers only the unregistered selection")
+  assert(unregistered_track.reference_lane_id ~= "", "unregistered Track gains a lane id")
+  assert(registered_track.reference_lane_id == "lane-existing", "already-registered Track untouched")
+  local stored = json.decode(sel_adapter.get_project_value("reference_timeline_entries"))
+  assert(#stored == 3, "already-registered Region is not duplicated; unregistered Marker is added")
+end
+
+do
+  -- Nothing selected at all.
+  local sel_adapter, _, _, entries = selection_fixture()
+  function sel_adapter.selected_tracks() return {} end
+  entries[1].selected, entries[2].selected = false, false
+  local result, err = service.register_selected(sel_adapter)
+  assert(not result and err == "Select Tracks, Markers, or Regions in REAPER first.",
+    "register_selected requires a selection")
+end
+
+do
+  -- Something selected, but it is all already registered.
+  local sel_adapter, registered_track, _, entries = selection_fixture()
+  function sel_adapter.selected_tracks() return { registered_track } end
+  entries[1].selected, entries[2].selected, entries[3].selected = false, true, false
+  local result, err = service.register_selected(sel_adapter)
+  assert(not result and err == "The selected Tracks, Markers, and Regions are already registered.",
+    "register_selected refuses an all-registered selection")
+end
+
+do
+  local sel_adapter, registered_track, unregistered_track = selection_fixture()
+  local result, err = service.unregister_selected(sel_adapter)
+  assert(result, err)
+  assert(result.tracks == 1 and result.markers == 0 and result.regions == 1 and result.total == 2,
+    "unregister_selected removes only the selected-and-registered selection")
+  assert(registered_track.reference_lane_id == "", "registered+selected Track is unregistered")
+  assert(unregistered_track.reference_lane_id == "", "never-registered Track untouched")
+  local stored = json.decode(sel_adapter.get_project_value("reference_timeline_entries"))
+  assert(#stored == 1 and stored[1].guid == "marker-registered",
+    "selected+registered Region is removed; unselected registered Marker is kept")
+end
+
+do
+  local sel_adapter, _, unregistered_track, entries = selection_fixture()
+  function sel_adapter.selected_tracks() return { unregistered_track } end
+  entries[1].selected, entries[2].selected, entries[3].selected = false, false, false
+  local result, err = service.unregister_selected(sel_adapter)
+  assert(not result and err == "Select registered Tracks, Markers, or Regions in REAPER first.",
+    "unregister_selected requires a registered selection")
+end
+
+return 12

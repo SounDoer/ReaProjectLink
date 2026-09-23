@@ -24,6 +24,7 @@ local function input(env, state)
     track_count = #lanes,
     item_count = items,
     delivery_revision = state.delivery_revision,
+    selection_counts = env.services.project_service.selection_counts(env.adapter),
   }
 end
 
@@ -37,12 +38,14 @@ local function handle(env, action)
     reference_update_review.open(env)
   elseif action == "review_publish" then
     delivery_publish_review.open(env)
-  elseif action == "register_tracks" then
+  elseif action == "register_selected" then
     local result, err = services.project_service.register_selected_tracks(adapter)
     workflow.apply(env, result, err)
-  elseif action == "unregister_tracks" then
-    if workflow.confirm(env.reaper, "Unregister Delivery Tracks",
-        "Stop publishing the selected tracks? Their items stay in the project.") then
+  elseif action == "unregister_selected" then
+    local counts = services.project_service.selection_counts(adapter)
+    local text = counts and view_models.unregister_confirmation(counts,
+      { noun_prefix = "Delivery ", tail = "Their items stay in the project." })
+    if not text or workflow.confirm(env.reaper, "Unregister Selected", text) then
       local result, err = services.project_service.unregister_selected_tracks(adapter)
       workflow.apply(env, result, err)
     end

@@ -114,23 +114,26 @@ function tests.source_delivery_card_states()
   equal(empty.action, nil, "no card action when unconfigured")
   equal(empty.rows[1].label, "Tracks", "tracks row label")
   equal(empty.rows[1].value, "0", "tracks row value")
-  equal(empty.rows[1].register, "register_tracks", "tracks row register id")
-  equal(empty.rows[1].unregister, "unregister_tracks", "tracks row unregister id")
   equal(empty.rows[2].label, "Items", "items row label")
   equal(empty.rows[2].value, "0", "items row value")
-  equal(empty.rows[2].register, nil, "items row has no register action")
-  equal(empty.rows[2].unregister, nil, "items row has no unregister action")
+  equal(empty.selection_actions[1].id, "register_selected", "register selected action id")
+  equal(empty.selection_actions[1].label, "Register Selected", "register selected label")
+  equal(empty.selection_actions[2].id, "unregister_selected", "unregister selected action id")
+  equal(empty.selection_actions[2].label, "Unregister Selected", "unregister selected label")
+  equal(empty.selection_note, "Nothing selected in REAPER", "default selection note")
   local never = view_models.source_cards(source_input({ delivery_revision = 0 })).delivery
   equal(never.status, "Not Published Yet", "never published")
   equal(never.level, "neutral", "source not-published level")
   local published = view_models.source_cards(source_input()).delivery
   equal(published.status, "Last Published r12", "published")
   equal(published.rows[1].value, "3", "track count")
-  equal(published.rows[1].register, "register_tracks", "published tracks row register id")
-  equal(published.rows[1].unregister, "unregister_tracks", "published tracks row unregister id")
   equal(published.rows[2].value, "18", "item count")
   equal(published.action.id, "review_publish", "publish action")
   equal(published.note, nil, "no pending note")
+  local selecting = view_models.source_cards(source_input({
+    selection_counts = { tracks = { selected = 2, registered = 1 } },
+  })).delivery
+  equal(selecting.selection_note, "Selected: 2 Tracks", "delivery selection note")
   local pending = view_models.source_cards(source_input({ check = { state = "done", latest = 5 } })).delivery
   equal(pending.note, "Will record Reference r4", "pending note")
   local unsynchronized = view_models.source_cards(source_input({
@@ -182,16 +185,10 @@ local function assert_master_rows(rows, track_count, marker_count, region_count)
   equal(#rows, 3, "three rows")
   equal(rows[1].label, "Tracks", "tracks label")
   equal(rows[1].value, tostring(track_count), "tracks value")
-  equal(rows[1].register, "register_tracks", "tracks register id")
-  equal(rows[1].unregister, "unregister_tracks", "tracks unregister id")
   equal(rows[2].label, "Markers", "markers label")
   equal(rows[2].value, tostring(marker_count), "markers value")
-  equal(rows[2].register, "register_markers", "markers register id")
-  equal(rows[2].unregister, "unregister_markers", "markers unregister id")
   equal(rows[3].label, "Regions", "regions label")
   equal(rows[3].value, tostring(region_count), "regions value")
-  equal(rows[3].register, "register_regions", "regions register id")
-  equal(rows[3].unregister, "unregister_regions", "regions unregister id")
 end
 
 function tests.master_reference_card_states()
@@ -204,6 +201,9 @@ function tests.master_reference_card_states()
   equal(unregistered.action, nil, "nothing registered has no publish action")
   equal(unregistered.attention, true, "nothing registered needs attention")
   assert_master_rows(unregistered.rows, 0, 0, 0)
+  equal(unregistered.selection_actions[1].id, "register_selected", "register selected action id")
+  equal(unregistered.selection_actions[2].id, "unregister_selected", "unregister selected action id")
+  equal(unregistered.selection_note, "Nothing selected in REAPER", "default selection note")
 
   local unpublished = view_models.master_cards(master_input({ reference_revision = 0 })).reference
   equal(unpublished.status, "Not Published Yet", "unpublished")
@@ -217,6 +217,13 @@ function tests.master_reference_card_states()
   equal(published.level, "neutral", "published level")
   equal(published.attention, false, "published needs no attention")
   assert_master_rows(published.rows, 1, 2, 0)
+
+  local selecting = view_models.master_cards(master_input({
+    selection_counts = {
+      tracks = { selected = 2 }, markers = { selected = 0 }, regions = { selected = 1 },
+    },
+  })).reference
+  equal(selecting.selection_note, "Selected: 2 Tracks and 1 Region", "master selection note")
 
   local empty = view_models.master_cards(master_input({ rows = {} })).deliveries_empty
   equal(empty.action.id, "add_delivery", "add action")
@@ -334,6 +341,29 @@ function tests.mapping_summary_and_parent()
     "suggestions do not preselect the summary")
   equal(view_models.lane_mapping_label(nil, "create", tostring), "New Track",
     "suggestions do not preselect the label")
+end
+
+function tests.selection_text_summarizes_the_reaper_selection()
+  equal(view_models.selection_text({}), "Nothing selected in REAPER", "nothing selected")
+  equal(view_models.selection_text({
+    tracks = { selected = 0 }, markers = { selected = 0 }, regions = { selected = 0 },
+  }), "Nothing selected in REAPER", "all zero")
+  equal(view_models.selection_text({ tracks = { selected = 1 } }), "Selected: 1 Track", "one track")
+  equal(view_models.selection_text({ tracks = { selected = 2 }, regions = { selected = 1 } }),
+    "Selected: 2 Tracks and 1 Region", "two kinds")
+  equal(view_models.selection_text({
+    tracks = { selected = 2 }, markers = { selected = 1 }, regions = { selected = 3 },
+  }), "Selected: 2 Tracks, 1 Marker and 3 Regions", "three kinds")
+end
+
+function tests.unregister_confirmation_counts_registered_selection()
+  equal(view_models.unregister_confirmation({}), nil, "nothing registered")
+  equal(view_models.unregister_confirmation({
+    tracks = { registered = 2 }, regions = { registered = 1 },
+  }), "Unregister 2 Tracks and 1 Region? They stay in the project.", "master mixed kinds")
+  equal(view_models.unregister_confirmation({ tracks = { registered = 2 } },
+    { noun_prefix = "Delivery ", tail = "Their items stay in the project." }),
+    "Unregister 2 Delivery Tracks? Their items stay in the project.", "source delivery tracks")
 end
 
 function tests.reference_declaration_options()

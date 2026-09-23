@@ -31,6 +31,54 @@ function M.blocked_summary(count, verb)
   return string.format("Fix %s to %s", M.count(count, "issue"), verb)
 end
 
+local SELECTION_ORDER = { "tracks", "markers", "regions" }
+local SELECTION_NOUNS = { tracks = "Track", markers = "Marker", regions = "Region" }
+local SELECTION_ACTIONS = {
+  { id = "register_selected", label = "Register Selected" },
+  { id = "unregister_selected", label = "Unregister Selected" },
+}
+
+local function join_list(parts)
+  if #parts == 1 then return parts[1] end
+  return table.concat(parts, ", ", 1, #parts - 1) .. " and " .. parts[#parts]
+end
+
+-- "Selected: 2 Tracks, 1 Region" style summary of what's selected in REAPER,
+-- read from the `.selected` counts of the shape reference_publish/project_service
+-- `selection_counts` return.
+function M.selection_text(counts)
+  local parts = {}
+  for _, key in ipairs(SELECTION_ORDER) do
+    local bucket = counts[key]
+    local n = bucket and bucket.selected or 0
+    if n > 0 then table.insert(parts, M.count(n, SELECTION_NOUNS[key])) end
+  end
+  if #parts == 0 then return "Nothing selected in REAPER" end
+  return "Selected: " .. join_list(parts)
+end
+
+-- Confirmation text for Unregister Selected, counting `.registered` (what
+-- will actually change). `options.noun_prefix` qualifies the Track noun (for
+-- example "Delivery "); `options.tail` replaces the default "They stay in
+-- the project." sentence.
+function M.unregister_confirmation(counts, options)
+  options = options or {}
+  local nouns = {
+    tracks = (options.noun_prefix or "") .. "Track",
+    markers = "Marker",
+    regions = "Region",
+  }
+  local parts = {}
+  for _, key in ipairs(SELECTION_ORDER) do
+    local bucket = counts[key]
+    local n = bucket and bucket.registered or 0
+    if n > 0 then table.insert(parts, M.count(n, nouns[key])) end
+  end
+  if #parts == 0 then return nil end
+  return string.format("Unregister %s? %s", join_list(parts),
+    options.tail or "They stay in the project.")
+end
+
 local function revision_label(value)
   return value > 0 and ("r" .. value) or "None"
 end
@@ -84,16 +132,16 @@ end
 function M.source_delivery(input, pending_reference)
   local track_count = input.track_count or 0
   local rows = {
-    { label = "Tracks", value = tostring(track_count),
-      register = "register_tracks", unregister = "unregister_tracks",
-      register_tooltip = "Register Selected Tracks", unregister_tooltip = "Unregister Selected Tracks..." },
+    { label = "Tracks", value = tostring(track_count) },
     { label = "Items", value = tostring(input.item_count or 0) },
   }
+  local selection_note = M.selection_text(input.selection_counts or {})
   if track_count == 0 then
     return {
       state = "unconfigured", status = "No Delivery Tracks", level = "warning",
       note = "Select tracks in REAPER first.",
       rows = rows,
+      selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
       attention = true,
     }
   end
@@ -104,6 +152,7 @@ function M.source_delivery(input, pending_reference)
     level = "neutral",
     rows = rows,
     note = pending_reference and string.format("Will record Reference r%d", pending_reference) or nil,
+    selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
     action = { id = "review_publish", label = "Review and Publish" },
     attention = true,
   }
@@ -125,20 +174,16 @@ function M.master_reference(input)
   local marker_count = input.marker_count or 0
   local region_count = input.region_count or 0
   local rows = {
-    { label = "Tracks", value = tostring(track_count),
-      register = "register_tracks", unregister = "unregister_tracks",
-      register_tooltip = "Register Selected Tracks", unregister_tooltip = "Unregister Selected Tracks..." },
-    { label = "Markers", value = tostring(marker_count),
-      register = "register_markers", unregister = "unregister_markers",
-      register_tooltip = "Register Selected Markers", unregister_tooltip = "Unregister Selected Markers..." },
-    { label = "Regions", value = tostring(region_count),
-      register = "register_regions", unregister = "unregister_regions",
-      register_tooltip = "Register Selected Regions", unregister_tooltip = "Unregister Selected Regions..." },
+    { label = "Tracks", value = tostring(track_count) },
+    { label = "Markers", value = tostring(marker_count) },
+    { label = "Regions", value = tostring(region_count) },
   }
+  local selection_note = M.selection_text(input.selection_counts or {})
   if track_count == 0 and marker_count == 0 and region_count == 0 then
     return {
       state = "unregistered", status = "Nothing Registered", level = "warning", rows = rows,
       note = "Select Tracks, Markers, or Regions in REAPER, then register them.",
+      selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
       attention = true,
     }
   end
@@ -146,6 +191,7 @@ function M.master_reference(input)
   if revision == 0 then
     return {
       state = "unpublished", status = "Not Published Yet", level = "warning", rows = rows,
+      selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
@@ -156,11 +202,13 @@ function M.master_reference(input)
       note = string.format(
         "Published files for Reference r%d weren't found. Publish again to restore them.", revision
       ),
+      selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
   return {
     state = "published", status = "Published r" .. revision, level = "neutral", rows = rows,
+    selection_note = selection_note, selection_actions = SELECTION_ACTIONS,
     action = { id = "review_publish", label = "Review and Publish" }, attention = false,
   }
 end

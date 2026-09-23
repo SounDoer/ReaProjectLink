@@ -2,14 +2,13 @@
 local M = {}
 
 M.NAMES = {
-  "more", "gear", "dot", "back", "plus", "minus", "check", "cross", "warning", "film", "upload", "download",
+  "more", "gear", "dot", "back", "plus", "check", "cross", "warning", "film", "upload", "download",
 }
 
 -- Line segments in unit coordinates: { x1, y1, x2, y2 }.
 local SEGMENTS = {
   back = { { 0.8, 0.5, 0.2, 0.5 }, { 0.2, 0.5, 0.45, 0.25 }, { 0.2, 0.5, 0.45, 0.75 } },
   plus = { { 0.5, 0.2, 0.5, 0.8 }, { 0.2, 0.5, 0.8, 0.5 } },
-  minus = { { 0.2, 0.5, 0.8, 0.5 } },
   check = { { 0.2, 0.55, 0.42, 0.75 }, { 0.42, 0.75, 0.8, 0.28 } },
   cross = { { 0.25, 0.25, 0.75, 0.75 }, { 0.75, 0.25, 0.25, 0.75 } },
   warning = {

@@ -135,6 +135,18 @@ function M.register_selected_tracks(adapter)
   return { selected = #selected, added = #pending }
 end
 
+function M.selection_counts(adapter)
+  local counts = { tracks = { selected = 0, registered = 0 } }
+  for _, track in ipairs(adapter.selected_tracks()) do
+    counts.tracks.selected = counts.tracks.selected + 1
+    local lane_id = adapter.get_track_lane_id(track)
+    if lane_id and lane_id ~= "" then
+      counts.tracks.registered = counts.tracks.registered + 1
+    end
+  end
+  return counts
+end
+
 function M.unregister_selected_tracks(adapter)
   if current_type(adapter) ~= constants.PROJECT_TYPES.source then
     return nil, "Only a Source Project can unregister Delivery Tracks."

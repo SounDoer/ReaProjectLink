@@ -52,6 +52,7 @@ local function input(env, state)
     marker_error = marker_error,
     reference_revision = state.reference_revision,
     package_check = app.checks.reference,
+    selection_counts = services.reference_publish.selection_counts(adapter),
     rows = rows,
   }
 end
@@ -89,31 +90,14 @@ local function handle_reference(env, action)
   local publish, adapter = env.services.reference_publish, env.adapter
   if action == "review_publish" then
     reference_publish_review.open(env)
-  elseif action == "register_tracks" then
-    local result, err = publish.register_selected_tracks(adapter)
+  elseif action == "register_selected" then
+    local result, err = publish.register_selected(adapter)
     workflow.apply(env, result, err)
-  elseif action == "unregister_tracks" then
-    if workflow.confirm(env.reaper, "Unregister Reference Tracks",
-        "Unregister the selected Reference Tracks? Their items stay in the project.") then
-      local result, err = publish.unregister_selected_tracks(adapter)
-      workflow.apply(env, result, err)
-    end
-  elseif action == "register_markers" then
-    local result, err = publish.register_selected_markers(adapter)
-    workflow.apply(env, result, err)
-  elseif action == "register_regions" then
-    local result, err = publish.register_selected_regions(adapter)
-    workflow.apply(env, result, err)
-  elseif action == "unregister_markers" then
-    if workflow.confirm(env.reaper, "Unregister Reference Markers",
-        "Unregister the selected Reference Markers? They stay in the project.") then
-      local result, err = publish.unregister_selected_markers(adapter)
-      workflow.apply(env, result, err)
-    end
-  elseif action == "unregister_regions" then
-    if workflow.confirm(env.reaper, "Unregister Reference Regions",
-        "Unregister the selected Reference Regions? They stay in the project.") then
-      local result, err = publish.unregister_selected_regions(adapter)
+  elseif action == "unregister_selected" then
+    local counts = publish.selection_counts(adapter)
+    local text = counts and view_models.unregister_confirmation(counts)
+    if not text or workflow.confirm(env.reaper, "Unregister Selected", text) then
+      local result, err = publish.unregister_selected(adapter)
       workflow.apply(env, result, err)
     end
   elseif action == "set_start" then

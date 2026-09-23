@@ -240,6 +240,123 @@ function M.create(dependencies)
   function service.unregister_selected_markers(adapter) return unregister_selected_kind(adapter, "marker") end
   function service.unregister_selected_regions(adapter) return unregister_selected_kind(adapter, "region") end
 
+  function service.selection_counts(adapter)
+    local counts = {
+      tracks = { selected = 0, registered = 0 },
+      markers = { selected = 0, registered = 0 },
+      regions = { selected = 0, registered = 0 },
+    }
+    for _, track in ipairs(adapter.selected_tracks()) do
+      counts.tracks.selected = counts.tracks.selected + 1
+      local lane_id = adapter.get_track_reference_lane_id(track)
+      if lane_id and lane_id ~= "" then
+        counts.tracks.registered = counts.tracks.registered + 1
+      end
+    end
+    local entries, entries_error = service.timeline_entries(adapter)
+    if not entries then return nil, entries_error end
+    for _, entry in ipairs(entries) do
+      if entry.selected then
+        local bucket = entry.kind == "region" and counts.regions or counts.markers
+        bucket.selected = bucket.selected + 1
+        if entry.registered then bucket.registered = bucket.registered + 1 end
+      end
+    end
+    return counts
+  end
+
+  function service.register_selected(adapter)
+    local selected_tracks = adapter.selected_tracks()
+    local current, current_error = service.timeline_entries(adapter)
+    if not current then return nil, current_error end
+    local selected_entries = {}
+    for _, entry in ipairs(current) do
+      if entry.selected then table.insert(selected_entries, entry) end
+    end
+    if #selected_tracks == 0 and #selected_entries == 0 then
+      return nil, "Select Tracks, Markers, or Regions in REAPER first."
+    end
+
+    local unregistered_tracks = {}
+    for _, track in ipairs(selected_tracks) do
+      local id = adapter.get_track_reference_lane_id(track)
+      if not id or id == "" then table.insert(unregistered_tracks, track) end
+    end
+    local unregistered_entries = {}
+    for _, entry in ipairs(selected_entries) do
+      if not entry.registered then table.insert(unregistered_entries, entry) end
+    end
+    if #unregistered_tracks == 0 and #unregistered_entries == 0 then
+      return nil, "The selected Tracks, Markers, and Regions are already registered."
+    end
+
+    local stored, registry_error = registry(adapter)
+    if not stored then return nil, registry_error end
+
+    adapter.begin_undo("Register ReaProjectLink Reference selection")
+    for _, track in ipairs(unregistered_tracks) do
+      adapter.set_track_reference_lane_id(track, adapter.new_id())
+    end
+    local markers, regions = 0, 0
+    for _, entry in ipairs(unregistered_entries) do
+      table.insert(stored, { guid = entry.guid, entryId = adapter.new_id(), kind = entry.kind })
+      if entry.kind == "region" then regions = regions + 1 else markers = markers + 1 end
+    end
+    if #unregistered_entries > 0 then save_registry(adapter, stored) end
+    adapter.mark_project_dirty()
+    adapter.end_undo("Register ReaProjectLink Reference selection")
+
+    return {
+      tracks = #unregistered_tracks, markers = markers, regions = regions,
+      total = #unregistered_tracks + markers + regions,
+    }
+  end
+
+  function service.unregister_selected(adapter)
+    local selected_tracks = adapter.selected_tracks()
+    local current, current_error = service.timeline_entries(adapter)
+    if not current then return nil, current_error end
+
+    local registered_tracks = {}
+    for _, track in ipairs(selected_tracks) do
+      local id = adapter.get_track_reference_lane_id(track)
+      if id and id ~= "" then table.insert(registered_tracks, track) end
+    end
+    local registered_entries = {}
+    for _, entry in ipairs(current) do
+      if entry.selected and entry.registered then table.insert(registered_entries, entry) end
+    end
+    if #registered_tracks == 0 and #registered_entries == 0 then
+      return nil, "Select registered Tracks, Markers, or Regions in REAPER first."
+    end
+
+    local stored, registry_error = registry(adapter)
+    if not stored then return nil, registry_error end
+    local remove_guid = {}
+    for _, entry in ipairs(registered_entries) do remove_guid[entry.guid] = true end
+    local kept, markers, regions = {}, 0, 0
+    for _, item in ipairs(stored) do
+      if remove_guid[item.guid] then
+        if item.kind == "region" then regions = regions + 1 else markers = markers + 1 end
+      else
+        table.insert(kept, item)
+      end
+    end
+
+    adapter.begin_undo("Unregister ReaProjectLink Reference selection")
+    for _, track in ipairs(registered_tracks) do
+      adapter.set_track_reference_lane_id(track, "")
+    end
+    if #registered_entries > 0 then save_registry(adapter, kept) end
+    adapter.mark_project_dirty()
+    adapter.end_undo("Unregister ReaProjectLink Reference selection")
+
+    return {
+      tracks = #registered_tracks, markers = markers, regions = regions,
+      total = #registered_tracks + markers + regions,
+    }
+  end
+
   function service.set_selected_reference_start(adapter)
     local selected
     local current, current_error = service.timeline_entries(adapter)

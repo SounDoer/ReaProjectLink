@@ -25,13 +25,14 @@ the projects and test media on the team's normal shared-storage arrangement.
 
 ## Reference flow
 
-1. Initialize the Master Project and use the `+` button on the Reference
-   card's `Tracks` row to register one or more Reference Tracks.
-2. Use the `+` buttons on the `Markers` and `Regions` rows to register any
-   required Markers and Regions. Optionally assign one registered Marker as
-   the Reference Start from the `···` menu; its displayed name may be
-   anything, including an industry label such as FFOP. Use the `−` button on a
-   row to unregister and confirm the resulting confirmation dialog.
+1. Initialize the Master Project, select one or more Tracks in REAPER, and use
+   the Reference card's `Register Selected` button to register them as
+   Reference Tracks.
+2. Select Markers and Regions in REAPER and use `Register Selected` again to
+   register them. Optionally assign one registered Marker as the Reference
+   Start from the `···` menu; its displayed name may be anything, including an
+   industry label such as FFOP. Select registered Tracks, Markers, or Regions
+   and use `Unregister Selected`, confirming the resulting dialog.
 3. Open Reference Publish Review and choose `Publish`.
 4. Confirm that `_ReaProjectLink/<master-project-name>/reference.json` and
    `history/reference-0001.json` exist beside the Master Project.

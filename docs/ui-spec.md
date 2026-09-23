@@ -75,8 +75,10 @@ remaining setup.
 
 Every card has the same anatomy: icon + title + optional `···` menu; one status
 line (colored dot + text); up to two key/value rows; at most one card-level
-button. A row may carry its own `+`/`−` icon buttons (Register/Unregister) at
-the right instead of, or in addition to, the card-level button.
+button. On a card with registerable content, the rows are followed by one
+small muted selection line (`Selected: 2 Tracks, 1 Region` or `Nothing
+selected in REAPER`) and two secondary buttons, `Register Selected` and
+`Unregister Selected`, that act on whatever is selected in REAPER.
 
 ### 2.1 Source · Reference
 
@@ -96,9 +98,9 @@ The "synchronized but not reviewed" state no longer exists (D086).
 
 ### 2.2 Source · Delivery
 
-The `Tracks` row always carries `+`/`−` icon buttons (`Register Selected
-Tracks` / `Unregister Selected Tracks…`); the `Items` row has none. There is no
-`···` menu on this card.
+Below the `Tracks` and `Items` rows, the selection line and the `Register
+Selected` / `Unregister Selected` buttons act on whatever Tracks are selected
+in REAPER. There is no `···` menu on this card.
 
 | State | Status line | Info | Button |
 |---|---|---|---|
@@ -111,9 +113,9 @@ the button stays enabled and a hint reads `Will record Reference rN`.
 
 ### 2.3 Master · Reference
 
-Each row — `Tracks`, `Markers`, `Regions` — carries its own `+`/`−` icon
-buttons (`Register Selected Tracks` / `Unregister Selected Tracks…`, and the
-Marker/Region equivalents) instead of card-level register buttons.
+Below the `Tracks`, `Markers`, and `Regions` rows, the selection line and the
+`Register Selected` / `Unregister Selected` buttons register or unregister
+whatever Tracks, Markers, or Regions are selected in REAPER.
 
 | State | Status line | Info | Button |
 |---|---|---|---|
@@ -127,8 +129,8 @@ Marker/Region equivalents) instead of card-level register buttons.
 - `Set Selected Marker as Reference Start`
 - Advanced: `Treat Selected Items as New…`, `Treat Selected Tracks as New…`
 
-Unregistering Tracks, Markers, or Regions from their row's `−` button asks for
-confirmation first (its items, if any, stay in the project).
+`Unregister Selected` asks for confirmation first, naming the Tracks, Markers,
+and Regions it will unregister (they stay in the project).
 
 ### 2.4 Master · Deliveries
 
@@ -241,10 +243,9 @@ Replaces the per-Lane button rows.
 - Transient toast at the top of the content area.
 - Success toasts disappear after ~4 s; error toasts stay until dismissed.
 - Errors that belong to a Review are shown as Review issues, not toasts.
-- Routine, selection-based operations (Register/Unregister Tracks, Markers,
-  Regions, or Delivery Tracks; Detach Items/Tracks; Set Reference Start; Treat
-  Items/Tracks as New) are silent on success — the row or card updates in
-  place. Workflow completions (Publish, Import, Sync, subscribing via `Choose
+- Routine, selection-based operations (Register Selected, Unregister Selected,
+  Detach Items/Tracks, Set Reference Start, Treat Items/Tracks as New) are
+  silent on success — the row or card updates in place. Workflow completions (Publish, Import, Sync, subscribing via `Choose
   reference.json`, Unlock Publishing, Reset, Remove Subscription, and keeping a
   moved Item as local) still show a success toast. Errors always show a toast,
   for every operation.
@@ -303,7 +304,7 @@ list row height 28; corner radius 6; 1 px borders.
 ### 7.4 Icons
 
 Drawn with the ImGui DrawList in the current text/token color and scaled with
-the font size: more (`···`), gear, back arrow, plus, minus, check, cross,
+the font size: more (`···`), gear, back arrow, plus, check, cross,
 warning triangle, dot, film, upload, download. Tree and dropdown arrows are
 ImGui's own. No icon font.
 
