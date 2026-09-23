@@ -48,6 +48,16 @@ local function draw_issues(env, data, options)
       changed = true
     end
   end
+  if data.removed_blocker and not options.allow_removals then
+    local choice = c.notice("removed", "blocked", data.removed_blocker, { "Publish Without Them..." })
+    if choice == 1 and workflow.confirm(env.reaper, "Publish Without Them",
+        "The Master Project will see them as removed, and registering again gives them new identities. Continue?") then
+      options.allow_removals = true
+      changed = true
+    end
+  elseif data.removed and data.removed.total > 0 then
+    c.notice("removed-accepted", "warning", "Removed Lanes won't be part of this Delivery.")
+  end
   if data.has_unprocessed_fx and not options.publish_anyway then
     local choice = c.notice("unprocessed-fx", "warning",
       "Track or Take FX were found. Published audio won't include them.",

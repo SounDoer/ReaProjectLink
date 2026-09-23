@@ -40,8 +40,20 @@ local function draw_issues(env, data, options)
       changed = true
     end
   end
+  if data.removed_blocker and not options.allow_removals then
+    local choice = c.notice("removed", "blocked", data.removed_blocker, { "Publish Without Them..." })
+    if choice == 1 and workflow.confirm(env.reaper, "Publish Without Them",
+        "Source Projects will see them as removed, and registering again gives them new identities. Continue?") then
+      options.allow_removals = true
+      changed = true
+    end
+  elseif data.removed and data.removed.total > 0 then
+    c.notice("removed-accepted", "warning", "Removed content won't be part of this Reference.")
+  end
   for index, blocker in ipairs(data.blockers or {}) do
-    if blocker ~= data.save_as_blocker then c.notice("blocker-" .. index, "blocked", blocker) end
+    if blocker ~= data.save_as_blocker and blocker ~= data.removed_blocker then
+      c.notice("blocker-" .. index, "blocked", blocker)
+    end
   end
   if data.unchanged and not options.publish_anyway then
     local choice = c.notice("unchanged", "warning",
