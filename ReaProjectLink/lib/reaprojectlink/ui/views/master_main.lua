@@ -106,13 +106,13 @@ local function handle_reference(env, action)
     workflow.apply(env, result, err)
   elseif action == "unregister_markers" then
     if workflow.confirm(env.reaper, "Unregister Reference Markers",
-        "Unregister the selected Reference Markers?") then
+        "Unregister the selected Reference Markers? They stay in the project.") then
       local result, err = publish.unregister_selected_markers(adapter)
       workflow.apply(env, result, err)
     end
   elseif action == "unregister_regions" then
     if workflow.confirm(env.reaper, "Unregister Reference Regions",
-        "Unregister the selected Reference Regions?") then
+        "Unregister the selected Reference Regions? They stay in the project.") then
       local result, err = publish.unregister_selected_regions(adapter)
       workflow.apply(env, result, err)
     end
