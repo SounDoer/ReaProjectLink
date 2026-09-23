@@ -82,8 +82,8 @@ Master priority:
 
 An uninitialized project shows only a setup view with two large choices:
 
-- "This Is a Department Project" → Initialize as Source Project
-- "This Is the Mix Project" → Initialize as Master Project
+- `Source Project` → `Initialize Source Project`
+- `Master Project` → `Initialize Master Project`
 
 Each has one sentence of explanation. After initialization the main panel
 appears and card empty states guide the remaining setup.
@@ -97,7 +97,7 @@ line (colored dot + text); up to two key/value lines; at most one button.
 
 | State | Status line | Info | Button |
 |---|---|---|---|
-| Not subscribed | `Not Connected` (warning) | "Choose the reference.json your mix project published." | `Choose reference.json` |
+| Not subscribed | `Not Connected` (warning) | "Choose the reference.json the Master Project published." | `Choose reference.json` |
 | Checking | `Checking…` (neutral) | Last known revision | — |
 | Unreachable | `Couldn't Reach Shared Storage` (blocked) | Last known revision | `Retry` |
 | Invalid (pointer unreadable or identity changed) | `Couldn't Read the Reference` (blocked) | Error detail | `Retry` |

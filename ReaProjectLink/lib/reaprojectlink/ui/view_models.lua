@@ -42,7 +42,7 @@ function M.source_reference(input)
   if not input.subscribed then
     return {
       state = "unsubscribed", status = "Not Connected", level = "warning",
-      note = "Choose the reference.json your mix project published.",
+      note = "Choose the reference.json the Master Project published.",
       action = { id = "choose_reference", label = "Choose reference.json" },
       attention = true,
     }
@@ -201,7 +201,7 @@ function M.master_cards(input)
     all_current = highlight == nil and not checking,
     deliveries_empty = {
       status = "No Deliveries Yet", level = "warning",
-      note = "Add the delivery.json a department published.",
+      note = "Add the delivery.json a Source Project published.",
       action = { id = "add_delivery", label = "Add Delivery" },
     },
   }
