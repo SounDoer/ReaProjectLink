@@ -32,7 +32,8 @@ the projects and test media on the team's normal shared-storage arrangement.
    register them. Optionally assign one registered Marker as the Reference
    Start from the `···` menu; its displayed name may be anything, including an
    industry label such as FFOP. Select registered Tracks, Markers, or Regions
-   and use `Unregister Selected`, confirming the resulting dialog.
+   and use `Unregister Selected`. Confirm it unregisters immediately, without
+   a confirmation dialog.
 3. Open Reference Publish Review and choose `Publish`.
 4. Confirm that `_ReaProjectLink/<master-project-name>/reference.json` and
    `history/reference-0001.json` exist beside the Master Project.
@@ -125,6 +126,19 @@ the projects and test media on the team's normal shared-storage arrangement.
    packages are untouched.
 2. Confirm the confirmation dialog states that the reset can't be undone
    (REAPER Undo restores Track and Item keys but not project extension state).
+
+## Removed-content confirmation
+
+1. Publish a Reference from the Master Project, then unregister a previously
+   published Track, Marker, or Region and select `Register Selected`/`···`
+   elsewhere as needed to leave it unregistered. Open Reference Publish
+   Review and confirm the removed-content blocker names the counts and the
+   last published revision, and that `Publish Without Them...` unlocks
+   `Publish`.
+2. Do the same on the Source side: publish a Delivery, unregister a
+   previously published Delivery Track, and confirm Delivery Publish Review
+   shows the equivalent Lane blocker and that `Publish Without Them...`
+   unlocks `Publish`.
 
 ## Master package check
 

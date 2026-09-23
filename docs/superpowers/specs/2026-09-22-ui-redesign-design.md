@@ -150,8 +150,9 @@ whatever Tracks, Markers, or Regions are selected in REAPER.
 - `Set Selected Marker as Reference Start`
 - Advanced: `Treat Selected Items as New…`, `Treat Selected Tracks as New…`
 
-`Unregister Selected` asks for confirmation first, naming the Tracks, Markers,
-and Regions it will unregister (they stay in the project).
+`Unregister Selected` acts immediately, without a confirmation dialog; the
+consequence only becomes real at Publish, where Publish Review blocks on
+content removed since the last published revision (D089).
 
 ### 3.4 Master · Deliveries
 
@@ -201,8 +202,9 @@ All Reviews share one skeleton. Empty sections are omitted.
 2. **Issues** — blockers (red) and warnings (amber). Each item carries an inline
    fix or acknowledgment action (for example `Select Item` selects the offending
    Item in REAPER; `Publish Unprocessed Media`; `Allow Reference revision
-   difference`; Save As identity as two buttons `Continue Existing` /
-   `Start New`).
+   difference`; `Publish Without Them...` for Tracks, Markers, Regions, or
+   Lanes removed since the last published revision (D089); Save As identity
+   as two buttons `Continue Existing` / `Start New`).
 3. **Decisions** — choices the operation needs (Reference declaration, Lane
    Mapping table, target revision, parent for new tracks).
 4. **Details** — collapsible groups per Lane or Track, collapsed by default,

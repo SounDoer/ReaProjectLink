@@ -897,3 +897,15 @@ The pointer check that runs on window open, project change, and Check Now
 also confirms that the Master's own published `reference.json` still exists
 alongside its manifest. If it is missing, the Reference card shows Package
 Missing and offers Review and Publish so the user can restore the package.
+
+### D089 — Publish Review confirms content removed since the last revision
+
+Unregistering is silent while the user is still picking what to publish;
+`Unregister Selected` no longer asks for confirmation. The consequence only
+becomes real at Publish, so both Publish Reviews compare the last published
+revision against what is registered now: Reference Publish Review by Track,
+Marker, and Region identity, and Delivery Publish Review by Lane identity.
+Missing Tracks, Markers, Regions, or Lanes block Publish with a blocker
+naming the counts and the last published revision, until the user confirms
+`Publish Without Them...`. A Save As "new" review starts from an empty
+published baseline, so nothing counts as removed.
