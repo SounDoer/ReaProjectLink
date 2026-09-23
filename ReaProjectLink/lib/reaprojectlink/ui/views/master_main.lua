@@ -9,11 +9,6 @@ local delivery_sync_review = require("reaprojectlink.ui.views.delivery_sync_revi
 local M = {}
 
 local REFERENCE_MENU = {
-  { id = "register_tracks", label = "Register Selected Tracks" },
-  { id = "unregister_tracks", label = "Unregister Selected Tracks" },
-  { separator = true },
-  { id = "unregister_markers", label = "Unregister Selected Markers" },
-  { id = "unregister_regions", label = "Unregister Selected Regions" },
   { id = "set_start", label = "Set Selected Marker as Reference Start" },
   { separator = true },
   { id = "reset_items", label = "Treat Selected Items as New..." },
@@ -96,52 +91,45 @@ local function handle_reference(env, action)
     reference_publish_review.open(env)
   elseif action == "register_tracks" then
     local result, err = publish.register_selected_tracks(adapter)
-    workflow.report(env, result, err, function(value)
-      return "Registered " .. view_models.count(value.added, "Reference track") .. "."
-    end)
+    workflow.apply(env, result, err)
   elseif action == "unregister_tracks" then
-    local result, err = publish.unregister_selected_tracks(adapter)
-    workflow.report(env, result, err, function(value)
-      return "Unregistered " .. view_models.count(value.removed, "Reference track") .. "."
-    end)
+    if workflow.confirm(env.reaper, "Unregister Reference Tracks",
+        "Unregister the selected Reference Tracks? Their items stay in the project.") then
+      local result, err = publish.unregister_selected_tracks(adapter)
+      workflow.apply(env, result, err)
+    end
   elseif action == "register_markers" then
     local result, err = publish.register_selected_markers(adapter)
-    workflow.report(env, result, err, function(value)
-      return string.format("Registered %d Marker(s).", value.added)
-    end)
+    workflow.apply(env, result, err)
   elseif action == "register_regions" then
     local result, err = publish.register_selected_regions(adapter)
-    workflow.report(env, result, err, function(value)
-      return string.format("Registered %d Region(s).", value.added)
-    end)
+    workflow.apply(env, result, err)
   elseif action == "unregister_markers" then
-    local result, err = publish.unregister_selected_markers(adapter)
-    workflow.report(env, result, err, function(value)
-      return string.format("Unregistered %d Marker(s).", value.removed)
-    end)
+    if workflow.confirm(env.reaper, "Unregister Reference Markers",
+        "Unregister the selected Reference Markers?") then
+      local result, err = publish.unregister_selected_markers(adapter)
+      workflow.apply(env, result, err)
+    end
   elseif action == "unregister_regions" then
-    local result, err = publish.unregister_selected_regions(adapter)
-    workflow.report(env, result, err, function(value)
-      return string.format("Unregistered %d Region(s).", value.removed)
-    end)
+    if workflow.confirm(env.reaper, "Unregister Reference Regions",
+        "Unregister the selected Reference Regions?") then
+      local result, err = publish.unregister_selected_regions(adapter)
+      workflow.apply(env, result, err)
+    end
   elseif action == "set_start" then
     local result, err = publish.set_selected_reference_start(adapter)
-    workflow.report(env, result, err, "Reference Start set.")
+    workflow.apply(env, result, err)
   elseif action == "reset_items" then
     if workflow.confirm(env.reaper, "Treat Reference Items as New",
         "Assign new identities? Source projects will see these as new Reference items.") then
       local result, err = publish.reset_selected_reference_items(adapter)
-      workflow.report(env, result, err, function(value)
-        return "Assigned new identities to " .. view_models.count(value.reset, "item") .. "."
-      end)
+      workflow.apply(env, result, err)
     end
   elseif action == "reset_tracks" then
     if workflow.confirm(env.reaper, "Treat Reference Tracks as New",
         "Assign new identities? Source projects will see these as new Reference tracks.") then
       local result, err = publish.reset_selected_reference_tracks(adapter)
-      workflow.report(env, result, err, function(value)
-        return "Assigned new identities to " .. view_models.count(value.reset, "track") .. "."
-      end)
+      workflow.apply(env, result, err)
     end
   end
 end

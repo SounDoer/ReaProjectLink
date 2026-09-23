@@ -60,6 +60,20 @@ function tests.workflow_formats_publish_results()
   equal(is_error, true, "follow-up errors are errors")
 end
 
+function tests.workflow_apply_is_silent_on_success()
+  local workflow = require("reaprojectlink.ui.workflow")
+  local notifications = {}
+  local app = { notify = function(_, text, is_error) table.insert(notifications, { text = text, is_error = is_error }) end }
+  local env = { app = app }
+  local result = workflow.apply(env, { added = 2 }, nil)
+  equal(result.added, 2, "apply returns the result")
+  equal(#notifications, 0, "no toast on success")
+  workflow.apply(env, nil, "boom")
+  equal(#notifications, 1, "toast on failure")
+  equal(notifications[1].text, "boom", "failure text")
+  equal(notifications[1].is_error, true, "failure is marked as an error")
+end
+
 function tests.workflow_detects_stale_reviews()
   local workflow = require("reaprojectlink.ui.workflow")
   local env = { adapter = { project_change_count = function() return 5 end } }

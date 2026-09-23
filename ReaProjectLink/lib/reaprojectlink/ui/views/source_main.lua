@@ -12,11 +12,6 @@ local REFERENCE_MENU = {
   { id = "detach_tracks", label = "Detach Selected Tracks..." },
 }
 
-local DELIVERY_MENU = {
-  { id = "register_tracks", label = "Register Selected Tracks" },
-  { id = "unregister_tracks", label = "Unregister Selected Tracks..." },
-}
-
 local function input(env, state)
   local lanes = env.services.project_service.delivery_tracks(env.adapter)
   local items = 0
@@ -44,32 +39,24 @@ local function handle(env, action)
     delivery_publish_review.open(env)
   elseif action == "register_tracks" then
     local result, err = services.project_service.register_selected_tracks(adapter)
-    workflow.report(env, result, err, function(value)
-      return string.format("Registered %s.", view_models.count(value.added, "track"))
-    end)
+    workflow.apply(env, result, err)
   elseif action == "unregister_tracks" then
     if workflow.confirm(env.reaper, "Unregister Delivery Tracks",
         "Stop publishing the selected tracks? Their items stay in the project.") then
       local result, err = services.project_service.unregister_selected_tracks(adapter)
-      workflow.report(env, result, err, function(value)
-        return string.format("Unregistered %s.", view_models.count(value.removed, "track"))
-      end)
+      workflow.apply(env, result, err)
     end
   elseif action == "detach_items" then
     if workflow.confirm(env.reaper, "Detach Reference Items",
         "Detach the selected Reference items? Later Reference updates won't change them.") then
       local result, err = services.reference_subscription.detach_selected_reference_items(adapter)
-      workflow.report(env, result, err, function(value)
-        return string.format("Detached %s.", view_models.count(value.detached, "item"))
-      end)
+      workflow.apply(env, result, err)
     end
   elseif action == "detach_tracks" then
     if workflow.confirm(env.reaper, "Detach Reference Tracks",
         "Detach the selected Reference tracks? Later Reference updates won't change them.") then
       local result, err = services.reference_subscription.detach_selected_reference_tracks(adapter)
-      workflow.report(env, result, err, function(value)
-        return string.format("Detached %s.", view_models.count(value.detached, "track"))
-      end)
+      workflow.apply(env, result, err)
     end
   end
 end
@@ -84,7 +71,7 @@ function M.draw(env, state)
     cards.highlight == "reference", width, values.subscribed and REFERENCE_MENU or nil)
   if side_by_side then ImGui.SameLine(ctx, 0, 12) end
   local delivery_action = card.draw(env, "source-delivery", "upload", "Delivery", cards.delivery,
-    cards.highlight == "delivery", width, values.track_count > 0 and DELIVERY_MENU or nil)
+    cards.highlight == "delivery", width, nil)
   local action = reference_action or delivery_action
   if action then handle(env, action) end
 end

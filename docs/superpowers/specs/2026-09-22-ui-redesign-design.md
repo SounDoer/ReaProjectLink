@@ -95,7 +95,9 @@ remaining setup.
 ## 3. Cards
 
 Every card has the same anatomy: icon + title + optional `···` menu; one status
-line (colored dot + text); up to two key/value lines; at most one button.
+line (colored dot + text); up to two key/value rows; at most one card-level
+button. A row may carry its own `+`/`−` icon buttons (Register/Unregister) at
+the right instead of, or in addition to, the card-level button.
 
 ### 3.1 Source · Reference
 
@@ -115,22 +117,24 @@ The "synchronized but not reviewed" state no longer exists (section 9.1).
 
 ### 3.2 Source · Delivery
 
+The `Tracks` row always carries `+`/`−` icon buttons (`Register Selected
+Tracks` / `Unregister Selected Tracks…`); the `Items` row has none. There is no
+`···` menu on this card.
+
 | State | Status line | Info | Button |
 |---|---|---|---|
-| No tracks | `No Delivery Tracks` (warning) | "Select tracks in REAPER first." | `Register Selected Tracks` |
+| No tracks | `No Delivery Tracks` (warning) | "Select tracks in REAPER first."; rows show `Tracks 0`, `Items 0` | — |
 | Never published | `Not Published Yet` (neutral) | `N tracks · M items` | `Review and Publish` |
 | Published | `Last Published rN` (neutral) | `N tracks · M items` | `Review and Publish` |
 
 When the Delivery card is not highlighted because a newer Reference is pending,
 the button stays enabled and a hint reads `Will record Reference rN`.
 
-`···` menu: `Register Selected Tracks`, `Unregister Selected Tracks…`.
-
 ### 3.3 Master · Reference
 
-The card always shows three register buttons — `Register Selected Tracks`,
-`Register Selected Markers`, `Register Selected Regions` — laid out on one line
-when they fit, stacked otherwise. Rows are `Tracks`, `Markers`, `Regions`.
+Each row — `Tracks`, `Markers`, `Regions` — carries its own `+`/`−` icon
+buttons (`Register Selected Tracks` / `Unregister Selected Tracks…`, and the
+Marker/Region equivalents) instead of card-level register buttons.
 
 | State | Status line | Info | Button |
 |---|---|---|---|
@@ -139,12 +143,13 @@ when they fit, stacked otherwise. Rows are `Tracks`, `Markers`, `Regions`.
 | Published | `Published rN` (neutral) | `N tracks · M markers · P regions` | `Review and Publish` |
 | Package Missing | `Package Missing` (blocked) | `N tracks · M markers · P regions`; note explains published files weren't found | `Review and Publish` |
 
-`···` menu, grouped with separators:
+`···` menu:
 
-- Tracks: `Register Selected Tracks`, `Unregister Selected Tracks`
-- Markers/Regions: `Unregister Selected Markers`, `Unregister Selected Regions`,
-  `Set Selected Marker as Reference Start`
+- `Set Selected Marker as Reference Start`
 - Advanced: `Treat Selected Items as New…`, `Treat Selected Tracks as New…`
+
+Unregistering Tracks, Markers, or Regions from their row's `−` button asks for
+confirmation first (its items, if any, stay in the project).
 
 ### 3.4 Master · Deliveries
 
@@ -254,6 +259,13 @@ Replaces the per-Lane button rows.
 - Transient toast at the top of the content area.
 - Success toasts disappear after ~4 s; error toasts stay until dismissed.
 - Errors that belong to a Review are shown as Review issues, not toasts.
+- Routine, selection-based operations (Register/Unregister Tracks, Markers,
+  Regions, or Delivery Tracks; Detach Items/Tracks; Set Reference Start; Treat
+  Items/Tracks as New) are silent on success — the row or card updates in
+  place. Workflow completions (Publish, Import, Sync, subscribing via `Choose
+  reference.json`, Unlock Publishing, Reset, Remove Subscription, and keeping a
+  moved Item as local) still show a success toast. Errors always show a toast,
+  for every operation.
 
 ## 8. Visual system
 
@@ -309,8 +321,9 @@ list row height 28; corner radius 6; 1 px borders.
 ### 8.4 Icons
 
 Drawn with the ImGui DrawList in the current text/token color and scaled with
-the font size: more (`···`), gear, back arrow, plus, check, cross, warning
-triangle, dot, film, upload, download. Tree and dropdown arrows are ImGui's own.
+the font size: more (`···`), gear, back arrow, plus, minus, check, cross,
+warning triangle, dot, film, upload, download. Tree and dropdown arrows are
+ImGui's own.
 No icon font.
 
 ### 8.5 Component inventory

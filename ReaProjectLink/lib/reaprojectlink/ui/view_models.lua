@@ -82,11 +82,18 @@ function M.source_reference(input)
 end
 
 function M.source_delivery(input, pending_reference)
-  if (input.track_count or 0) == 0 then
+  local track_count = input.track_count or 0
+  local rows = {
+    { label = "Tracks", value = tostring(track_count),
+      register = "register_tracks", unregister = "unregister_tracks",
+      register_tooltip = "Register Selected Tracks", unregister_tooltip = "Unregister Selected Tracks..." },
+    { label = "Items", value = tostring(input.item_count or 0) },
+  }
+  if track_count == 0 then
     return {
       state = "unconfigured", status = "No Delivery Tracks", level = "warning",
       note = "Select tracks in REAPER first.",
-      action = { id = "register_tracks", label = "Register Selected Tracks" },
+      rows = rows,
       attention = true,
     }
   end
@@ -95,7 +102,7 @@ function M.source_delivery(input, pending_reference)
     state = revision > 0 and "published" or "unpublished",
     status = revision > 0 and ("Last Published r" .. revision) or "Not Published Yet",
     level = "neutral",
-    rows = { { "Tracks", tostring(input.track_count) }, { "Items", tostring(input.item_count or 0) } },
+    rows = rows,
     note = pending_reference and string.format("Will record Reference r%d", pending_reference) or nil,
     action = { id = "review_publish", label = "Review and Publish" },
     attention = true,
@@ -113,33 +120,32 @@ function M.source_cards(input)
   }
 end
 
-local MASTER_REGISTER_ACTIONS = {
-  { id = "register_tracks", label = "Register Selected Tracks" },
-  { id = "register_markers", label = "Register Selected Markers" },
-  { id = "register_regions", label = "Register Selected Regions" },
-}
-
 function M.master_reference(input)
   local track_count = input.track_count or 0
   local marker_count = input.marker_count or 0
   local region_count = input.region_count or 0
   local rows = {
-    { "Tracks", tostring(track_count) },
-    { "Markers", tostring(marker_count) },
-    { "Regions", tostring(region_count) },
+    { label = "Tracks", value = tostring(track_count),
+      register = "register_tracks", unregister = "unregister_tracks",
+      register_tooltip = "Register Selected Tracks", unregister_tooltip = "Unregister Selected Tracks..." },
+    { label = "Markers", value = tostring(marker_count),
+      register = "register_markers", unregister = "unregister_markers",
+      register_tooltip = "Register Selected Markers", unregister_tooltip = "Unregister Selected Markers..." },
+    { label = "Regions", value = tostring(region_count),
+      register = "register_regions", unregister = "unregister_regions",
+      register_tooltip = "Register Selected Regions", unregister_tooltip = "Unregister Selected Regions..." },
   }
   if track_count == 0 and marker_count == 0 and region_count == 0 then
     return {
       state = "unregistered", status = "Nothing Registered", level = "warning", rows = rows,
       note = "Select Tracks, Markers, or Regions in REAPER, then register them.",
-      register_actions = MASTER_REGISTER_ACTIONS, attention = true,
+      attention = true,
     }
   end
   local revision = input.reference_revision or 0
   if revision == 0 then
     return {
       state = "unpublished", status = "Not Published Yet", level = "warning", rows = rows,
-      register_actions = MASTER_REGISTER_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
@@ -150,13 +156,11 @@ function M.master_reference(input)
       note = string.format(
         "Published files for Reference r%d weren't found. Publish again to restore them.", revision
       ),
-      register_actions = MASTER_REGISTER_ACTIONS,
       action = { id = "review_publish", label = "Review and Publish" }, attention = true,
     }
   end
   return {
     state = "published", status = "Published r" .. revision, level = "neutral", rows = rows,
-    register_actions = MASTER_REGISTER_ACTIONS,
     action = { id = "review_publish", label = "Review and Publish" }, attention = false,
   }
 end

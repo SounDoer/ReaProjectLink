@@ -109,16 +109,26 @@ function tests.source_reference_card_text_and_actions()
 end
 
 function tests.source_delivery_card_states()
-  local empty = view_models.source_cards(source_input({ track_count = 0 })).delivery
+  local empty = view_models.source_cards(source_input({ track_count = 0, item_count = 0 })).delivery
   equal(empty.status, "No Delivery Tracks", "no tracks")
-  equal(empty.action.id, "register_tracks", "register action")
+  equal(empty.action, nil, "no card action when unconfigured")
+  equal(empty.rows[1].label, "Tracks", "tracks row label")
+  equal(empty.rows[1].value, "0", "tracks row value")
+  equal(empty.rows[1].register, "register_tracks", "tracks row register id")
+  equal(empty.rows[1].unregister, "unregister_tracks", "tracks row unregister id")
+  equal(empty.rows[2].label, "Items", "items row label")
+  equal(empty.rows[2].value, "0", "items row value")
+  equal(empty.rows[2].register, nil, "items row has no register action")
+  equal(empty.rows[2].unregister, nil, "items row has no unregister action")
   local never = view_models.source_cards(source_input({ delivery_revision = 0 })).delivery
   equal(never.status, "Not Published Yet", "never published")
   equal(never.level, "neutral", "source not-published level")
   local published = view_models.source_cards(source_input()).delivery
   equal(published.status, "Last Published r12", "published")
-  equal(published.rows[1][2], "3", "track count")
-  equal(published.rows[2][2], "18", "item count")
+  equal(published.rows[1].value, "3", "track count")
+  equal(published.rows[1].register, "register_tracks", "published tracks row register id")
+  equal(published.rows[1].unregister, "unregister_tracks", "published tracks row unregister id")
+  equal(published.rows[2].value, "18", "item count")
   equal(published.action.id, "review_publish", "publish action")
   equal(published.note, nil, "no pending note")
   local pending = view_models.source_cards(source_input({ check = { state = "done", latest = 5 } })).delivery
@@ -168,15 +178,20 @@ function tests.master_highlight_priority()
   equal(no_tracks_no_rows.highlight, "reference", "reference wins over no subscriptions")
 end
 
-local function assert_register_actions(reference)
-  local actions = reference.register_actions
-  equal(#actions, 3, "three register actions")
-  equal(actions[1].id, "register_tracks", "register tracks action id")
-  equal(actions[1].label, "Register Selected Tracks", "register tracks label")
-  equal(actions[2].id, "register_markers", "register markers action id")
-  equal(actions[2].label, "Register Selected Markers", "register markers label")
-  equal(actions[3].id, "register_regions", "register regions action id")
-  equal(actions[3].label, "Register Selected Regions", "register regions label")
+local function assert_master_rows(rows, track_count, marker_count, region_count)
+  equal(#rows, 3, "three rows")
+  equal(rows[1].label, "Tracks", "tracks label")
+  equal(rows[1].value, tostring(track_count), "tracks value")
+  equal(rows[1].register, "register_tracks", "tracks register id")
+  equal(rows[1].unregister, "unregister_tracks", "tracks unregister id")
+  equal(rows[2].label, "Markers", "markers label")
+  equal(rows[2].value, tostring(marker_count), "markers value")
+  equal(rows[2].register, "register_markers", "markers register id")
+  equal(rows[2].unregister, "unregister_markers", "markers unregister id")
+  equal(rows[3].label, "Regions", "regions label")
+  equal(rows[3].value, tostring(region_count), "regions value")
+  equal(rows[3].register, "register_regions", "regions register id")
+  equal(rows[3].unregister, "unregister_regions", "regions unregister id")
 end
 
 function tests.master_reference_card_states()
@@ -188,24 +203,20 @@ function tests.master_reference_card_states()
     "nothing registered note")
   equal(unregistered.action, nil, "nothing registered has no publish action")
   equal(unregistered.attention, true, "nothing registered needs attention")
-  equal(unregistered.rows[1][2], "0", "tracks row still shown")
-  assert_register_actions(unregistered)
+  assert_master_rows(unregistered.rows, 0, 0, 0)
 
   local unpublished = view_models.master_cards(master_input({ reference_revision = 0 })).reference
   equal(unpublished.status, "Not Published Yet", "unpublished")
   equal(unpublished.action.id, "review_publish", "publish action")
   equal(unpublished.level, "warning", "master not-published level")
   equal(unpublished.attention, true, "unpublished needs attention")
-  assert_register_actions(unpublished)
+  assert_master_rows(unpublished.rows, 1, 2, 0)
 
   local published = view_models.master_cards(master_input()).reference
   equal(published.status, "Published r8", "published")
   equal(published.level, "neutral", "published level")
   equal(published.attention, false, "published needs no attention")
-  equal(published.rows[1][2], "1", "track count")
-  equal(published.rows[2][2], "2", "marker count")
-  equal(published.rows[3][2], "0", "region count")
-  assert_register_actions(published)
+  assert_master_rows(published.rows, 1, 2, 0)
 
   local empty = view_models.master_cards(master_input({ rows = {} })).deliveries_empty
   equal(empty.action.id, "add_delivery", "add action")
@@ -223,8 +234,7 @@ function tests.master_reference_package_missing()
   equal(missing.action.id, "review_publish", "package missing action")
   equal(missing.note, "Published files for Reference r8 weren't found. Publish again to restore them.",
     "package missing note")
-  equal(missing.rows[2][2], "2", "marker count kept")
-  assert_register_actions(missing)
+  assert_master_rows(missing.rows, 1, 2, 0)
   local highlight = view_models.master_cards(master_input({
     package_check = { state = "missing" },
   })).highlight

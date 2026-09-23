@@ -40,6 +40,13 @@ function M.report(env, result, err, success)
   return result
 end
 
+-- Like M.report, but silent on success. Used for routine, selection-based
+-- operations where a toast would just be noise; errors still notify.
+function M.apply(env, result, err)
+  if not result then env.app:notify(err, true) end
+  return result
+end
+
 function M.publish_message(noun, revision, result)
   local message = string.format("Published %s r%d.", noun, revision)
   if result.project_save_error then message = message .. " " .. result.project_save_error end
