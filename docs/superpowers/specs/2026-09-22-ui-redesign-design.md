@@ -80,13 +80,17 @@ Master priority:
 
 ### 2.4 First run
 
-An uninitialized project shows only a setup view with two large choices:
+An uninitialized project shows only a setup view, titled `Set Up
+ReaProjectLink` with the line "Choose the type for this project." and two
+cards laid out like the main panel's:
 
-- `Source Project` → `Initialize Source Project`
-- `Master Project` → `Initialize Master Project`
+- `Source Project` — "An editing project that publishes Deliveries to the
+  Master Project." → `Initialize Source Project`
+- `Master Project` — "An integration project that publishes the Reference and
+  receives Deliveries." → `Initialize Master Project`
 
-Each has one sentence of explanation. After initialization the main panel
-appears and card empty states guide the remaining setup.
+After initialization the main panel appears and card empty states guide the
+remaining setup.
 
 ## 3. Cards
 

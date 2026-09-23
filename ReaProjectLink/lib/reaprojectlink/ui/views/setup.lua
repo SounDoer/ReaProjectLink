@@ -22,15 +22,15 @@ function M.draw(env, state)
   workflow.draw_notices(env, state)
   if c.begin_page("setup", false) then
     c.title("Set Up ReaProjectLink")
-    c.muted("Choose the Project Type for this REAPER project. A project is either a Source Project or a Master Project.")
+    c.muted("Choose the type for this project.")
     ImGui.Dummy(ctx, 0, 8)
     local width, side_by_side = c.card_width()
     source = choice(env, "setup-source", width, "upload", "Source Project",
-      "A dialogue, music, or sound design project. It keeps its own working structure and publishes Delivery Revisions for the Master Project.",
+      "An editing project that publishes Deliveries to the Master Project.",
       "Initialize Source Project")
     if side_by_side then ImGui.SameLine(ctx, 0, 12) end
     master = choice(env, "setup-master", width, "download", "Master Project",
-      "The integration project. It publishes the Reference for Source Projects and subscribes to the Deliveries they publish.",
+      "An integration project that publishes the Reference and receives Deliveries.",
       "Initialize Master Project")
   end
   c.end_page()

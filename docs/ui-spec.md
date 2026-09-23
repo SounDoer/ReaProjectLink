@@ -59,13 +59,17 @@ Master priority:
 
 ### 1.4 First run
 
-An uninitialized project shows only a setup view with two large choices:
+An uninitialized project shows only a setup view, titled `Set Up
+ReaProjectLink` with the line "Choose the type for this project." and two
+cards laid out like the main panel's:
 
-- `Source Project` → `Initialize Source Project`
-- `Master Project` → `Initialize Master Project`
+- `Source Project` — "An editing project that publishes Deliveries to the
+  Master Project." → `Initialize Source Project`
+- `Master Project` — "An integration project that publishes the Reference and
+  receives Deliveries." → `Initialize Master Project`
 
-Each has one sentence of explanation. After initialization the main panel
-appears and card empty states guide the remaining setup.
+After initialization the main panel appears and card empty states guide the
+remaining setup.
 
 ## 2. Cards
 
@@ -144,7 +148,7 @@ Row `···` menu: `Sync to Another Revision…`, `Remove Subscription…`.
 
 - Reference and Delivery pointers (small JSON files only, never media) are read
   once when the window opens and once when the active REAPER project changes,
-  plus on `Check now` and `Retry`.
+  plus on `Check Now` and `Retry`.
 - The first frame renders `Checking…`; the read happens on the next frame.
 - A read failure sets that card or row to Unreachable (the pointer file is
   missing, for example the share is offline) or Invalid (the file can't be
